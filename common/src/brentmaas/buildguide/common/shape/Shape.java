@@ -140,6 +140,12 @@ public abstract class Shape {
 		originOffsetZ = dz;
 	}
 	
+	// Player block position relative to this shape set's origin, i.e. in the local coordinates shapes use
+	protected ShapeSet.Origin getPlayerPositionLocal() {
+		ShapeSet.Origin pos = BuildGuide.shapeHandler.getPlayerPosition();
+		return new ShapeSet.Origin(pos.x - shapeSet.getOriginX(), pos.y - shapeSet.getOriginY(), pos.z - shapeSet.getOriginZ());
+	}
+	
 	public void onSelectedInGUI() {
 		for(int i = 0;i < properties.size();++i) {
 			properties.get(i).setX(ShapeScreen.basePropertiesX);

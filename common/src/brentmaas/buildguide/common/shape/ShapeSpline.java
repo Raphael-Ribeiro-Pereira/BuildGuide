@@ -3,12 +3,16 @@ package brentmaas.buildguide.common.shape;
 import java.util.HashSet;
 import java.util.Set;
 
+import brentmaas.buildguide.common.property.Property;
+import brentmaas.buildguide.common.property.PropertyCompactInt;
 import brentmaas.buildguide.common.property.PropertyEnum;
-import brentmaas.buildguide.common.property.PropertyInt;
+import brentmaas.buildguide.common.property.PropertyPointRow;
 import brentmaas.buildguide.common.property.PropertyPositiveFloat;
 import brentmaas.buildguide.common.property.PropertyPositiveInt;
 import brentmaas.buildguide.common.property.PropertyRunnable;
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
+import brentmaas.buildguide.common.screen.ShapeScreen;
+import brentmaas.buildguide.common.screen.widget.AbstractWidgetHandler;
 
 // Catmull-Rom spline through five control points, extruded as a disc of the given diameter
 public class ShapeSpline extends Shape implements IValidatable {
@@ -18,28 +22,33 @@ public class ShapeSpline extends Shape implements IValidatable {
 		Z
 	}
 
+	private static final int numPoints = 5;
+
 	private String[] directionNames = {"X", "Y", "Z"};
 
 	private PropertyEnum<direction> propertyDir = new PropertyEnum<direction>(direction.Y, new Translatable("property.buildguide.direction"), () -> update(), directionNames);
-	private PropertyInt p1x = new PropertyInt(0, new Translatable("property.buildguide.point", "1", "X"), () -> update());
-	private PropertyInt p1y = new PropertyInt(0, new Translatable("property.buildguide.point", "1", "Y"), () -> update());
-	private PropertyInt p1z = new PropertyInt(0, new Translatable("property.buildguide.point", "1", "Z"), () -> update());
-	private PropertyInt p2x = new PropertyInt(5, new Translatable("property.buildguide.point", "2", "X"), () -> update());
-	private PropertyInt p2y = new PropertyInt(3, new Translatable("property.buildguide.point", "2", "Y"), () -> update());
-	private PropertyInt p2z = new PropertyInt(0, new Translatable("property.buildguide.point", "2", "Z"), () -> update());
-	private PropertyInt p3x = new PropertyInt(10, new Translatable("property.buildguide.point", "3", "X"), () -> update());
-	private PropertyInt p3y = new PropertyInt(0, new Translatable("property.buildguide.point", "3", "Y"), () -> update());
-	private PropertyInt p3z = new PropertyInt(5, new Translatable("property.buildguide.point", "3", "Z"), () -> update());
-	private PropertyInt p4x = new PropertyInt(15, new Translatable("property.buildguide.point", "4", "X"), () -> update());
-	private PropertyInt p4y = new PropertyInt(3, new Translatable("property.buildguide.point", "4", "Y"), () -> update());
-	private PropertyInt p4z = new PropertyInt(0, new Translatable("property.buildguide.point", "4", "Z"), () -> update());
-	private PropertyInt p5x = new PropertyInt(20, new Translatable("property.buildguide.point", "5", "X"), () -> update());
-	private PropertyInt p5y = new PropertyInt(0, new Translatable("property.buildguide.point", "5", "Y"), () -> update());
-	private PropertyInt p5z = new PropertyInt(0, new Translatable("property.buildguide.point", "5", "Z"), () -> update());
+	// Persistence order: p1x, p1y, p1z, p2x, ... p5z. Do not reorder; the compact layout is handled in onSelectedInGUI
+	private PropertyCompactInt p1x = new PropertyCompactInt(0, new Translatable("property.buildguide.point", "1", "X"), () -> update(), 0);
+	private PropertyCompactInt p1y = new PropertyCompactInt(0, new Translatable("property.buildguide.point", "1", "Y"), () -> update(), 1);
+	private PropertyCompactInt p1z = new PropertyCompactInt(0, new Translatable("property.buildguide.point", "1", "Z"), () -> update(), 2);
+	private PropertyCompactInt p2x = new PropertyCompactInt(5, new Translatable("property.buildguide.point", "2", "X"), () -> update(), 0);
+	private PropertyCompactInt p2y = new PropertyCompactInt(3, new Translatable("property.buildguide.point", "2", "Y"), () -> update(), 1);
+	private PropertyCompactInt p2z = new PropertyCompactInt(0, new Translatable("property.buildguide.point", "2", "Z"), () -> update(), 2);
+	private PropertyCompactInt p3x = new PropertyCompactInt(10, new Translatable("property.buildguide.point", "3", "X"), () -> update(), 0);
+	private PropertyCompactInt p3y = new PropertyCompactInt(0, new Translatable("property.buildguide.point", "3", "Y"), () -> update(), 1);
+	private PropertyCompactInt p3z = new PropertyCompactInt(5, new Translatable("property.buildguide.point", "3", "Z"), () -> update(), 2);
+	private PropertyCompactInt p4x = new PropertyCompactInt(15, new Translatable("property.buildguide.point", "4", "X"), () -> update(), 0);
+	private PropertyCompactInt p4y = new PropertyCompactInt(3, new Translatable("property.buildguide.point", "4", "Y"), () -> update(), 1);
+	private PropertyCompactInt p4z = new PropertyCompactInt(0, new Translatable("property.buildguide.point", "4", "Z"), () -> update(), 2);
+	private PropertyCompactInt p5x = new PropertyCompactInt(20, new Translatable("property.buildguide.point", "5", "X"), () -> update(), 0);
+	private PropertyCompactInt p5y = new PropertyCompactInt(0, new Translatable("property.buildguide.point", "5", "Y"), () -> update(), 1);
+	private PropertyCompactInt p5z = new PropertyCompactInt(0, new Translatable("property.buildguide.point", "5", "Z"), () -> update(), 2);
 	private PropertyPositiveFloat propertyDiameter = new PropertyPositiveFloat(1.0f, new Translatable("property.buildguide.diameter"), () -> update());
 	private PropertyPositiveInt propertyStepsPerSegment = new PropertyPositiveInt(8, new Translatable("property.buildguide.stepspersegment"), () -> update());
 	// PropertyRunnable renders as a button
 	private PropertyRunnable propertyValidate = new PropertyRunnable(() -> triggerValidation(), new Translatable("property.buildguide.validate"));
+	// Row owners (label + Set + from-player) for the five points; appended last so older saves still load
+	private PropertyPointRow[] pointRows = new PropertyPointRow[numPoints];
 
 	private final Set<Long> expectedBlocks = new HashSet<Long>();
 	private transient boolean validateNextRender = false;
@@ -66,6 +75,42 @@ public class ShapeSpline extends Shape implements IValidatable {
 		properties.add(propertyDiameter);
 		properties.add(propertyStepsPerSegment);
 		properties.add(propertyValidate);
+
+		PropertyCompactInt[][] points = {{p1x, p1y, p1z}, {p2x, p2y, p2z}, {p3x, p3y, p3z}, {p4x, p4y, p4z}, {p5x, p5y, p5z}};
+		for(int i = 0;i < numPoints;++i) {
+			pointRows[i] = new PropertyPointRow(new Translatable("property.buildguide.pointrow", "" + (i + 1)), points[i][0], points[i][1], points[i][2], () -> update(), () -> {
+				ShapeSet.Origin pos = getPlayerPositionLocal();
+				return new int[] {pos.x, pos.y, pos.z};
+			});
+			properties.add(pointRows[i]);
+		}
+	}
+
+	/**
+	 * Custom layout: one row per point (X Y Z Set Pos) instead of three, so the panel fits
+	 * on screen. Rows, top to bottom: direction, point 1..5, diameter, steps, validate.
+	 */
+	@Override
+	public void onSelectedInGUI() {
+		int row = 0;
+		row = placeRow(propertyDir, row);
+		Property<?>[] pointProps = {p1x, p1y, p1z, p2x, p2y, p2z, p3x, p3y, p3z, p4x, p4y, p4z, p5x, p5y, p5z};
+		for(int i = 0;i < numPoints;++i) {
+			placeRow(pointProps[3 * i], row);
+			placeRow(pointProps[3 * i + 1], row);
+			placeRow(pointProps[3 * i + 2], row);
+			row = placeRow(pointRows[i], row);
+		}
+		row = placeRow(propertyDiameter, row);
+		row = placeRow(propertyStepsPerSegment, row);
+		row = placeRow(propertyValidate, row);
+	}
+
+	private int placeRow(Property<?> p, int row) {
+		p.setX(ShapeScreen.basePropertiesX);
+		p.setY(ShapeScreen.basePropertiesY + row * AbstractWidgetHandler.defaultSize);
+		p.setVisibility(true);
+		return row + 1;
 	}
 
 	protected void updateShape(IShapeBuffer buffer) throws InterruptedException {

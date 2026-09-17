@@ -72,6 +72,8 @@ export PATH="$JAVA_HOME/bin:$PATH"
 
 ## Workflow
 
+- **Rule zero:** read `docs/API_REFERENCE.md` before touching properties, widgets,
+  persistence or handlers, and update it in the same change when a contract moves.
 - `git push` at the end of every session. The remote is the only backup.
 - Use the `decompiled/` reference when in doubt about original behaviour: decompile the
   new jar with the same Vineflower and `diff -r` against `decompiled/Fabric-0.4.8-spline`
@@ -80,11 +82,8 @@ export PATH="$JAVA_HOME/bin:$PATH"
 
 ## Known issues
 
-- **Spline overflows the property list.** `ShapeScreen` stacks properties 20 px apart
-  with no scrolling; Spline has 19 (5 points × XYZ + direction, diameter, steps,
-  validate) and runs off the screen. Inherited from the original June 2026 jar.
-  Options: (A) add scrolling to the properties column, (B) compact each point into one
-  row with a "Set from player position" button (like Catenary's `Set endpoint`).
+- No scrolling in the property panel. Shapes with many properties must lay themselves
+  out (see `ShapeSpline.onSelectedInGUI`); Spline was compacted to 9 rows for this reason.
 
 ## Verified in-game (2026-09-17, rebuilt jar)
 

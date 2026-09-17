@@ -9,8 +9,8 @@ import brentmaas.buildguide.common.screen.widget.ITextField;
 import brentmaas.buildguide.common.screen.widget.IWidget;
 
 public class PropertyInt extends Property<Integer> {
-	private ITextField valueTextField;
-	private Runnable onPress;
+	protected ITextField valueTextField;
+	protected Runnable onPress;
 	
 	public PropertyInt(int value, Translatable name, Runnable onPress) {
 		super(value, name);
