@@ -93,8 +93,7 @@ public class RenderHandler extends AbstractRenderHandler {
 
 	protected void validateShape(ShapeSet shapeSet) {
 		if(!(shapeSet.getShape() instanceof ShapeCone cone)) return;
-		if(cone.getValidateMode() == ShapeCone.ValidateMode.OFF) return;
-		if(!cone.consumeNeedsValidation()) return;
+		if(!cone.consumeValidateRequest()) return;
 
 		ClientLevel world = Minecraft.getInstance().level;
 		if(world == null) return;

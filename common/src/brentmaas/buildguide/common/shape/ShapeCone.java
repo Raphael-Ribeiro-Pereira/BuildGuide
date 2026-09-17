@@ -8,6 +8,7 @@ import brentmaas.buildguide.common.property.PropertyEnum;
 import brentmaas.buildguide.common.property.PropertyFloat;
 import brentmaas.buildguide.common.property.PropertyPositiveFloat;
 import brentmaas.buildguide.common.property.PropertyPositiveInt;
+import brentmaas.buildguide.common.property.PropertyRunnable;
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
 
 public class ShapeCone extends Shape {
@@ -22,14 +23,8 @@ public class ShapeCone extends Shape {
 		SOLID
 	}
 
-	public enum ValidateMode{
-		OFF,
-		COUNT
-	}
-
 	private String[] directionNames = {"X", "Y", "Z"};
 	private String[] modeNames = {"Hollow", "Solid"};
-	private String[] validateModeNames = {"Off", "Count"};
 
 	private PropertyEnum<direction> propertyDir = new PropertyEnum<direction>(direction.X, new Translatable("property.buildguide.direction"), () -> update(), directionNames);
 	private PropertyPositiveFloat propertyRadius = new PropertyPositiveFloat(3, new Translatable("property.buildguide.radius"), () -> update());
@@ -40,11 +35,12 @@ public class ShapeCone extends Shape {
 	private PropertyEnum<Mode> propertyMode = new PropertyEnum<Mode>(Mode.HOLLOW, new Translatable("property.buildguide.mode"), () -> update(), modeNames);
 	private PropertyPositiveFloat propertyTaper = new PropertyPositiveFloat(1.0f, new Translatable("property.buildguide.taper"), () -> update());
 	private PropertyPositiveInt propertyLayerThickness = new PropertyPositiveInt(1, new Translatable("property.buildguide.layerthickness"), () -> update());
-	private PropertyEnum<ValidateMode> propertyValidateMode = new PropertyEnum<ValidateMode>(ValidateMode.OFF, new Translatable("property.buildguide.validatemode"), () -> update(), validateModeNames);
+	// PropertyRunnable renders as a button
+	private PropertyRunnable propertyValidate = new PropertyRunnable(() -> triggerValidation(), new Translatable("property.buildguide.validate"));
 
-	// Local (origin-relative) positions of every block in the shape, packed with packLocal; only filled when validating
+	// Local (origin-relative) positions of every block in the shape, packed with packLocal
 	private final Set<Long> expectedBlocks = new HashSet<Long>();
-	private boolean needsValidation = false;
+	private transient boolean validateNextRender = false;
 
 	public ShapeCone() {
 		super();
@@ -57,7 +53,7 @@ public class ShapeCone extends Shape {
 		properties.add(propertyMode);
 		properties.add(propertyTaper);
 		properties.add(propertyLayerThickness);
-		properties.add(propertyValidateMode);
+		properties.add(propertyValidate);
 	}
 
 	protected void updateShape(IShapeBuffer buffer) throws InterruptedException {
@@ -171,9 +167,6 @@ public class ShapeCone extends Shape {
 				}
 			}
 		}
-
-		// Ask the render handler to validate against the world on the next frame
-		if(propertyValidateMode.value != ValidateMode.OFF) needsValidation = true;
 	}
 
 	private void emit(IShapeBuffer buffer, int x, int y, int z) throws InterruptedException {
@@ -196,7 +189,7 @@ public class ShapeCone extends Shape {
 			break;
 		}
 		addShapeCube(buffer, fx, fy, fz);
-		if(propertyValidateMode.value != ValidateMode.OFF) expectedBlocks.add(packLocal(fx, fy, fz));
+		expectedBlocks.add(packLocal(fx, fy, fz));
 	}
 
 	/**
@@ -232,18 +225,19 @@ public class ShapeCone extends Shape {
 		return radiusSmooth[cLow] + (radiusSmooth[cHigh] - radiusSmooth[cLow]) * frac;
 	}
 
-	public ValidateMode getValidateMode() {
-		return propertyValidateMode.value;
+	// Called from the Validate button; the render handler picks it up on the next frame
+	public void triggerValidation() {
+		validateNextRender = true;
 	}
 
 	public Set<Long> getExpectedBlocks() {
 		return expectedBlocks;
 	}
 
-	// Returns true exactly once per shape update while validation is on
-	public boolean consumeNeedsValidation() {
-		if(needsValidation) {
-			needsValidation = false;
+	// Returns true exactly once per button press
+	public boolean consumeValidateRequest() {
+		if(validateNextRender) {
+			validateNextRender = false;
 			return true;
 		}
 		return false;
