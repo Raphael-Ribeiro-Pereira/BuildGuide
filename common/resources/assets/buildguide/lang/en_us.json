@@ -32,6 +32,7 @@
 	"property.buildguide.innerradius": "Inner radius",
 	"property.buildguide.invert": "Invert",
 	"property.buildguide.length": "Length",
+	"property.buildguide.mode": "Mode",
 	"property.buildguide.offset": "%s offset",
 	"property.buildguide.outerevenmode": "Outer even mode",
 	"property.buildguide.outerradius": "Outer radius",
@@ -41,6 +42,7 @@
 	"property.buildguide.setendpoint": "Set endpoint",
 	"property.buildguide.steps": "%s steps",
 	"property.buildguide.sides": "Sides",
+	"property.buildguide.topradius": "Top radius",
 	"property.buildguide.walls": "Walls",
 	"property.buildguide.width": "Width",
 	
@@ -90,4 +92,4 @@
 	"shape.buildguide.polygonalpyramid": "Polygonal pyramid",
 	"shape.buildguide.sphere": "Sphere",
 	"shape.buildguide.torus": "Torus"
-}
+}
