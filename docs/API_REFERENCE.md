@@ -59,7 +59,9 @@ public abstract class Shape {
 - `BlockOps.offset(dx,dy,dz,next)`, `clipAABB(min…,max…,next)`, `excludeAABB(…)` — consumer decorators.
 - `CatmullRomCurve(int[][] points)` — `sample(seg,t)`, `tangent(seg,t)`, `getLength()`,
   `parameterAtLength(s)`, `sampleAtLength(s)` (arc-length table, 32 samples/segment, lazy).
-  Ends are clamped (phantom points), matching the original Spline segment table.
+  Ends are clamped (phantom points), matching the original Spline segment table. Accepts
+  N >= 2 (N=2 is a straight segment); degenerate/zero-length curves map every arc length
+  to the start point (tested: coincident points, all-equal points, s<0, s>len, NaN).
 - Rule: a composing shape never instantiates other shapes or touches their properties;
   it calls `enumerate` and emits through its own `addShapeCube` (keeps count/validation
   correct) with a `Set<Long>` for dedup.
@@ -81,6 +83,8 @@ final before the first layout.
 | `PropertyRunnable` | Runnable | one 210-wide button at `x` | persists as `"Runnable"`; renders as a button (used for Validate, Set endpoint) |
 | `PropertyCompactInt` (fork) | int | `-`(16) field(30) `+`(16) at `x+50+column*62` | no label, no Set; `commitTextField()` parses without `onPress` |
 | `PropertyPointRow` (fork) | none | label +5, `Set`(26) at +236, `Pos`(26) at +264 | owns three `PropertyCompactInt`; Set commits all then one `onUpdate`; Pos fills from `IPositionSource` |
+| `PropertyRangeInt` (fork) | int | same as `PropertyInt` | clamped to [min,max]; `-`/`+` disabled at the bounds via `IButton.setActive` |
+| `PropertySection` (fork) | int | `<-` name `->` like `PropertyEnum` | panel section selector; lives in `Shape.sectionSelector`, **not** in `properties`, never persisted |
 
 Row width budget: base `x = 180`; a `PropertyInt` row ends at 390, a point row at 470.
 Keep rows ≤ 480 so they fit at GUI scale 4 on 1080p.
@@ -97,6 +101,25 @@ Keep rows ≤ 480 so they fit at GUI scale 4 on 1080p.
 - `getStringValue()` must never contain a comma;
 - non-value properties (`PropertyRunnable`, `PropertyPointRow`) return a constant and
   accept anything in `setValueFromString`.
+
+### Panel sections
+
+A shape with many properties splits its panel with `Shape.declareSection(name)` (returns
+an index; the first call creates the selector) and `assignSection(index, props...)`.
+Properties never assigned are shown in every section (that is how Validate stays
+visible). `getGuiProperties()` = `properties` + selector, and is what `ShapeScreen` adds
+as widgets. The default `onSelectedInGUI` lays out: selector on row 0, then each property
+of the current section or unassigned, in list order; shapes with no section keep the
+original layout untouched. Changing the section re-runs `onSelectedInGUI`. Helpers for
+custom layouts: `placeSectionSelector()`, `placeRow(row, props...)`, `isShown(p)`.
+
+### Variable point count (Spline pattern)
+
+Persistence is by index, so a shape cannot add or remove properties at runtime. The
+pattern is fixed slots (5 point rows) plus a `Point count` `PropertyRangeInt` appended at
+the end: layout hides rows beyond the count, `updateShape` uses only the first N. New
+splines default to 2; `ShapeSpline.restorePersistence` forces 5 when the save predates the
+property, so old saves load unchanged.
 
 ### Custom layout
 
@@ -119,4 +142,5 @@ property yourself. Layout is independent of list order — this is how `ShapeSpl
 `common/resources/assets/buildguide/lang/en_us.json`, alphabetical. `Translatable(key,
 args...)` formats with `%s`. Keys added by this fork: `mode`, `topradius`, `taper`,
 `layerthickness`, `thickness`, `validate`, `diameter`, `point`, `pointrow`,
-`stepspersegment`, `fromplayer`, `shape.buildguide.spline`.
+`stepspersegment`, `fromplayer`, `shape.buildguide.spline`; Step 0.5 added `section`,
+`section.shape`, `section.points`, `pointcount`.

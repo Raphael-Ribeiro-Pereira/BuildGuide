@@ -118,7 +118,7 @@ public class ShapeScreen extends BaseScreen{
 	}
 	
 	private void addShapeProperties(Shape shape) {
-		for(Property<?> p: shape.properties) {
+		for(Property<?> p: shape.getGuiProperties()) {
 			addProperty(p);
 		}
 	}

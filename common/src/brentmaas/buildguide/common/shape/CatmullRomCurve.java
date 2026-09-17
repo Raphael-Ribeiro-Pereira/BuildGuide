@@ -90,7 +90,8 @@ public class CatmullRomCurve {
 	public double[] parameterAtLength(double s) {
 		if(cumulativeLength == null) buildLengthTable();
 		int n = cumulativeLength.length - 1;
-		if(s <= 0) return new double[] {0, 0};
+		// Degenerate curves (all points equal) have zero length: everything maps to the start
+		if(Double.isNaN(s) || s <= 0 || cumulativeLength[n] <= 0) return new double[] {0, 0};
 		if(s >= cumulativeLength[n]) return new double[] {getSegmentCount() - 1, 1.0};
 		// Binary search for the table interval containing s
 		int lo = 0, hi = n;

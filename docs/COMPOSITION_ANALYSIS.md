@@ -1,3 +1,4 @@
+  **Mitigated in Step 0.5:** `Shape.declareSection`/`assignSection` (enum-style selector, one section at a time). Spline uses Shape/Points sections, max 8 rows. Bridge should do the same.
 # Composition analysis — can `ShapeBridge` reuse existing shapes?
 
 Investigation for Etapa B. No feature code was written. Line numbers refer to branch

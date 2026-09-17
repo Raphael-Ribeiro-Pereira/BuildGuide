@@ -46,6 +46,8 @@ export PATH="$JAVA_HOME/bin:$PATH"
   — **always append at the end**. Saved shapes reference the registry index.
 - New `Property` fields **always go at the end of `properties`** so shapes persisted by
   older versions still load (graceful degradation).
+- Variable-count things (Spline points) are fixed slots + a count property appended last;
+  never add/remove properties at runtime (persistence is by index).
 - `PropertyRunnable` renders as a button (used for `Validate`, `Set endpoint`).
 - Block solidity: `BlockState.getMaterial().isSolid()` does not exist on 1.21.11 — use
   `isAir()` / `blocksMotion()`.
@@ -85,8 +87,9 @@ export PATH="$JAVA_HOME/bin:$PATH"
 
 ## Known issues
 
-- No scrolling in the property panel. Shapes with many properties must lay themselves
-  out (see `ShapeSpline.onSelectedInGUI`); Spline was compacted to 9 rows for this reason.
+- No scrolling in the property panel. Shapes with many properties use panel sections
+  (`declareSection`/`assignSection`, see `docs/API_REFERENCE.md`) and/or a custom
+  `onSelectedInGUI`; Spline uses both (max 8 rows).
 
 ## Verified in-game (2026-09-17, rebuilt jar)
 

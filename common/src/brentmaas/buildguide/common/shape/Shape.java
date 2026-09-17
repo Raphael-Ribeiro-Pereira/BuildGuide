@@ -1,6 +1,9 @@
 package brentmaas.buildguide.common.shape;
 
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -8,12 +11,17 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import brentmaas.buildguide.common.BuildGuide;
 import brentmaas.buildguide.common.property.Property;
+import brentmaas.buildguide.common.property.PropertySection;
+import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
 import brentmaas.buildguide.common.screen.BaseScreen;
 import brentmaas.buildguide.common.screen.ShapeScreen;
 import brentmaas.buildguide.common.screen.widget.AbstractWidgetHandler;
 
 public abstract class Shape {
 	public ArrayList<Property<?>> properties = new ArrayList<Property<?>>();
+	// Optional panel sections (see declareSection). The selector is UI state: not in `properties`, never persisted
+	private PropertySection sectionSelector = null;
+	private Map<Property<?>, Integer> propertySections = new IdentityHashMap<Property<?>, Integer>();
 	public IShapeBuffer buffer;
 	private int nBlocks = 0;
 	public boolean ready = false;
@@ -146,11 +154,64 @@ public abstract class Shape {
 		return new ShapeSet.Origin(pos.x - shapeSet.getOriginX(), pos.y - shapeSet.getOriginY(), pos.z - shapeSet.getOriginZ());
 	}
 	
+	/**
+	 * Declares a panel section and returns its index. Properties assigned to a section are
+	 * shown only while it is selected; properties never assigned are shown in every section.
+	 * Shapes that declare no section keep the plain single-column layout.
+	 */
+	protected int declareSection(Translatable name) {
+		if(sectionSelector == null) sectionSelector = new PropertySection(new Translatable("property.buildguide.section"), () -> onSelectedInGUI());
+		return sectionSelector.addSection(name);
+	}
+	
+	protected void assignSection(int section, Property<?>... props) {
+		for(Property<?> p: props) propertySections.put(p, section);
+	}
+	
+	// Everything the screen must add as widgets: the persisted properties plus the section selector
+	public List<Property<?>> getGuiProperties() {
+		if(sectionSelector == null) return properties;
+		List<Property<?>> all = new ArrayList<Property<?>>(properties);
+		all.add(sectionSelector);
+		return all;
+	}
+	
+	// True if the property belongs to the selected section or to no section
+	protected boolean isShown(Property<?> p) {
+		Integer section = propertySections.get(p);
+		return section == null || sectionSelector == null || section == sectionSelector.value;
+	}
+	
+	// Places all given properties on the same row and shows them; returns the next row
+	protected int placeRow(int row, Property<?>... props) {
+		for(Property<?> p: props) {
+			p.setX(ShapeScreen.basePropertiesX);
+			p.setY(ShapeScreen.basePropertiesY + row * AbstractWidgetHandler.defaultSize);
+			p.setVisibility(true);
+		}
+		return row + 1;
+	}
+	
+	// Row 0 is the section selector when sections exist; returns the first row for properties
+	protected int placeSectionSelector() {
+		if(sectionSelector == null) return 0;
+		return placeRow(0, sectionSelector);
+	}
+	
 	public void onSelectedInGUI() {
-		for(int i = 0;i < properties.size();++i) {
-			properties.get(i).setX(ShapeScreen.basePropertiesX);
-			properties.get(i).setY(ShapeScreen.basePropertiesY + i * AbstractWidgetHandler.defaultSize);
-			properties.get(i).setVisibility(true);
+		if(sectionSelector == null) {
+			for(int i = 0;i < properties.size();++i) {
+				properties.get(i).setX(ShapeScreen.basePropertiesX);
+				properties.get(i).setY(ShapeScreen.basePropertiesY + i * AbstractWidgetHandler.defaultSize);
+				properties.get(i).setVisibility(true);
+			}
+			return;
+		}
+		
+		int row = placeSectionSelector();
+		for(Property<?> p: properties) {
+			if(isShown(p)) row = placeRow(row, p);
+			else p.setVisibility(false);
 		}
 	}
 	
@@ -158,6 +219,7 @@ public abstract class Shape {
 		for(Property<?> p: properties) {
 			p.setVisibility(false);
 		}
+		if(sectionSelector != null) sectionSelector.setVisibility(false);
 	}
 	
 	public int getNumberOfBlocks() {

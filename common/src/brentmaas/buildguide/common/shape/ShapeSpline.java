@@ -9,10 +9,9 @@ import brentmaas.buildguide.common.property.PropertyEnum;
 import brentmaas.buildguide.common.property.PropertyPointRow;
 import brentmaas.buildguide.common.property.PropertyPositiveFloat;
 import brentmaas.buildguide.common.property.PropertyPositiveInt;
+import brentmaas.buildguide.common.property.PropertyRangeInt;
 import brentmaas.buildguide.common.property.PropertyRunnable;
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
-import brentmaas.buildguide.common.screen.ShapeScreen;
-import brentmaas.buildguide.common.screen.widget.AbstractWidgetHandler;
 
 // Catmull-Rom spline through five control points, extruded as a disc of the given diameter
 public class ShapeSpline extends Shape implements IValidatable {
@@ -22,7 +21,8 @@ public class ShapeSpline extends Shape implements IValidatable {
 		Z
 	}
 
-	private static final int numPoints = 5;
+	private static final int maxPoints = 5;
+	private static final int minPoints = 2;
 
 	private String[] directionNames = {"X", "Y", "Z"};
 
@@ -48,7 +48,10 @@ public class ShapeSpline extends Shape implements IValidatable {
 	// PropertyRunnable renders as a button
 	private PropertyRunnable propertyValidate = new PropertyRunnable(() -> triggerValidation(), new Translatable("property.buildguide.validate"));
 	// Row owners (label + Set + from-player) for the five points; appended last so older saves still load
-	private PropertyPointRow[] pointRows = new PropertyPointRow[numPoints];
+	private PropertyPointRow[] pointRows = new PropertyPointRow[maxPoints];
+	// How many of the five point slots are in use. New splines start with 2; saves from before
+	// this property existed are forced back to 5 in restorePersistence so they load unchanged
+	private PropertyRangeInt propertyPointCount = new PropertyRangeInt(minPoints, new Translatable("property.buildguide.pointcount"), () -> onPointCountChanged(), minPoints, maxPoints);
 
 	private final Set<Long> expectedBlocks = new HashSet<Long>();
 	private transient boolean validateNextRender = false;
@@ -77,52 +80,72 @@ public class ShapeSpline extends Shape implements IValidatable {
 		properties.add(propertyValidate);
 
 		PropertyCompactInt[][] points = {{p1x, p1y, p1z}, {p2x, p2y, p2z}, {p3x, p3y, p3z}, {p4x, p4y, p4z}, {p5x, p5y, p5z}};
-		for(int i = 0;i < numPoints;++i) {
+		for(int i = 0;i < maxPoints;++i) {
 			pointRows[i] = new PropertyPointRow(new Translatable("property.buildguide.pointrow", "" + (i + 1)), points[i][0], points[i][1], points[i][2], () -> update(), () -> {
 				ShapeSet.Origin pos = getPlayerPositionLocal();
 				return new int[] {pos.x, pos.y, pos.z};
 			});
 			properties.add(pointRows[i]);
 		}
+		properties.add(propertyPointCount);
+		
+		// Panel sections: curve settings vs. control points; Validate stays visible in both
+		int sectionShape = declareSection(new Translatable("property.buildguide.section.shape"));
+		int sectionPoints = declareSection(new Translatable("property.buildguide.section.points"));
+		assignSection(sectionShape, propertyDir, propertyDiameter, propertyStepsPerSegment);
+		assignSection(sectionPoints, propertyPointCount);
+		for(int i = 0;i < maxPoints;++i) assignSection(sectionPoints, points[i][0], points[i][1], points[i][2], pointRows[i]);
+	}
+	
+	@Override
+	public void restorePersistence(String persistenceData) {
+		super.restorePersistence(persistenceData);
+		if(persistenceData.split(",").length <= properties.indexOf(propertyPointCount)) propertyPointCount.setValue(maxPoints);
+	}
+	
+	private void onPointCountChanged() {
+		onSelectedInGUI(); // show/hide point rows
+		update();
 	}
 
 	/**
-	 * Custom layout: one row per point (X Y Z Set Pos) instead of three, so the panel fits
-	 * on screen. Rows, top to bottom: direction, point 1..5, diameter, steps, validate.
+	 * Custom layout: one row per point (X Y Z Set Pos) instead of three, and only the
+	 * first `Point count` rows. Rows: section selector, then either the curve settings or
+	 * (count + points), then Validate.
 	 */
 	@Override
 	public void onSelectedInGUI() {
-		int row = 0;
-		row = placeRow(propertyDir, row);
-		Property<?>[] pointProps = {p1x, p1y, p1z, p2x, p2y, p2z, p3x, p3y, p3z, p4x, p4y, p4z, p5x, p5y, p5z};
-		for(int i = 0;i < numPoints;++i) {
-			placeRow(pointProps[3 * i], row);
-			placeRow(pointProps[3 * i + 1], row);
-			placeRow(pointProps[3 * i + 2], row);
-			row = placeRow(pointRows[i], row);
+		int row = placeSectionSelector();
+		for(Property<?> p: new Property<?>[] {propertyDir, propertyDiameter, propertyStepsPerSegment, propertyPointCount}) {
+			if(isShown(p)) row = placeRow(row, p);
+			else p.setVisibility(false);
 		}
-		row = placeRow(propertyDiameter, row);
-		row = placeRow(propertyStepsPerSegment, row);
-		row = placeRow(propertyValidate, row);
+		Property<?>[] pointProps = {p1x, p1y, p1z, p2x, p2y, p2z, p3x, p3y, p3z, p4x, p4y, p4z, p5x, p5y, p5z};
+		for(int i = 0;i < maxPoints;++i) {
+			Property<?>[] rowProps = {pointProps[3 * i], pointProps[3 * i + 1], pointProps[3 * i + 2], pointRows[i]};
+			if(i < propertyPointCount.value && isShown(pointRows[i])) {
+				row = placeRow(row, rowProps);
+			}else {
+				for(Property<?> p: rowProps) p.setVisibility(false);
+			}
+		}
+		row = placeRow(row, propertyValidate);
 	}
-
-	private int placeRow(Property<?> p, int row) {
-		p.setX(ShapeScreen.basePropertiesX);
-		p.setY(ShapeScreen.basePropertiesY + row * AbstractWidgetHandler.defaultSize);
-		p.setVisibility(true);
-		return row + 1;
-	}
-
+	
 	protected void updateShape(IShapeBuffer buffer) throws InterruptedException {
 		expectedBlocks.clear();
 
-		CatmullRomCurve curve = new CatmullRomCurve(new int[][] {
+		int[][] allPoints = {
 			{p1x.value, p1y.value, p1z.value},
 			{p2x.value, p2y.value, p2z.value},
 			{p3x.value, p3y.value, p3z.value},
 			{p4x.value, p4y.value, p4z.value},
 			{p5x.value, p5y.value, p5z.value}
-		});
+		};
+		int count = Math.max(minPoints, Math.min(maxPoints, propertyPointCount.value));
+		int[][] used = new int[count][];
+		for(int i = 0;i < count;++i) used[i] = allPoints[i];
+		CatmullRomCurve curve = new CatmullRomCurve(used);
 		double radius = propertyDiameter.value / 2.0;
 		int steps = Math.max(1, propertyStepsPerSegment.value);
 
