@@ -42,6 +42,7 @@
 	"property.buildguide.setendpoint": "Set endpoint",
 	"property.buildguide.steps": "%s steps",
 	"property.buildguide.sides": "Sides",
+	"property.buildguide.taper": "Taper",
 	"property.buildguide.topradius": "Top radius",
 	"property.buildguide.walls": "Walls",
 	"property.buildguide.width": "Width",

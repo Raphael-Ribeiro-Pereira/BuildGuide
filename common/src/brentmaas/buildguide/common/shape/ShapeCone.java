@@ -28,6 +28,7 @@ public class ShapeCone extends Shape {
 	// New properties go at the end so saved shapes from older versions still load
 	private PropertyFloat propertyTopRadius = new PropertyFloat(0.0f, new Translatable("property.buildguide.topradius"), () -> update());
 	private PropertyEnum<Mode> propertyMode = new PropertyEnum<Mode>(Mode.HOLLOW, new Translatable("property.buildguide.mode"), () -> update(), modeNames);
+	private PropertyPositiveFloat propertyTaper = new PropertyPositiveFloat(1.0f, new Translatable("property.buildguide.taper"), () -> update());
 	
 	public ShapeCone() {
 		super();
@@ -38,6 +39,7 @@ public class ShapeCone extends Shape {
 		properties.add(propertyEvenMode);
 		properties.add(propertyTopRadius);
 		properties.add(propertyMode);
+		properties.add(propertyTaper);
 	}
 	
 	protected void updateShape(IShapeBuffer buffer) throws InterruptedException {
@@ -60,29 +62,42 @@ public class ShapeCone extends Shape {
 		boolean solid = propertyMode.value == Mode.SOLID;
 		double absHeight = Math.abs(height);
 		float maxRadius = Math.max(baseRadius, topRadius);
+		float taper = propertyTaper.value;
 		for(int x = (int) Math.floor(-maxRadius + offset);x <= (int) Math.ceil(maxRadius + offset);++x) {
 			for(int y = (int) Math.floor(-maxRadius + offset);y <= (int) Math.ceil(maxRadius + offset);++y) {
 				for(int z = height < 0 ? (int) Math.floor(height) : 0;z <= (height > 0 ? (int) Math.ceil(height) : 0);++z) {
-					double r = Math.sqrt((x - offset) * (x - offset) + (y - offset) * (y - offset));
-					double absZ = Math.abs(z);
-					// Linear interpolation between base and top radius (frustum); topRadius == 0 gives the classic cone
-					double radiusAtZ = absHeight == 0.0 ? baseRadius : baseRadius + (topRadius - baseRadius) * (absZ / absHeight);
-					if(radiusAtZ < 0.0) radiusAtZ = 0.0;
-					
 					boolean inShape;
-					if(solid) {
-						inShape = r <= radiusAtZ + 0.5;
-					}else {
-						inShape = false;
-						if(r <= maxRadius + 0.5) {
-							if(r >= radiusAtZ - 0.5 && r <= radiusAtZ + 0.5) {
-								inShape = true;
-							}else if(Math.abs(topRadius - baseRadius) > 1e-6) {
-								// Also fill along the slope so steep walls don't leave gaps
-								double heightAtR = absHeight * (r - baseRadius) / (topRadius - baseRadius);
-								if(heightAtR >= absZ - 0.5 && heightAtR <= absZ + 0.5) inShape = true;
+					if(taper == 1.0f) {
+						// Linear slope: keep the exact frustum logic
+						double r = Math.sqrt((x - offset) * (x - offset) + (y - offset) * (y - offset));
+						double absZ = Math.abs(z);
+						double radiusAtZ = absHeight == 0.0 ? baseRadius : baseRadius + (topRadius - baseRadius) * (absZ / absHeight);
+						if(radiusAtZ < 0.0) radiusAtZ = 0.0;
+						
+						if(solid) {
+							inShape = r <= radiusAtZ + 0.5;
+						}else {
+							inShape = false;
+							if(r <= maxRadius + 0.5) {
+								if(r >= radiusAtZ - 0.5 && r <= radiusAtZ + 0.5) {
+									inShape = true;
+								}else if(Math.abs(topRadius - baseRadius) > 1e-6) {
+									// Also fill along the slope so steep walls don't leave gaps
+									double heightAtR = absHeight * (r - baseRadius) / (topRadius - baseRadius);
+									if(heightAtR >= absZ - 0.5 && heightAtR <= absZ + 0.5) inShape = true;
+								}
 							}
 						}
+					}else if(!isInsideCone(x, y, z, offset, height, baseRadius, topRadius, taper)) {
+						inShape = false;
+					}else if(solid) {
+						inShape = true;
+					}else {
+						// Curved slope: a block is wall if any horizontal neighbour is outside the cone
+						inShape = !isInsideCone(x + 1, y, z, offset, height, baseRadius, topRadius, taper)
+								|| !isInsideCone(x - 1, y, z, offset, height, baseRadius, topRadius, taper)
+								|| !isInsideCone(x, y + 1, z, offset, height, baseRadius, topRadius, taper)
+								|| !isInsideCone(x, y - 1, z, offset, height, baseRadius, topRadius, taper);
 					}
 					
 					if(inShape) {
@@ -101,5 +116,23 @@ public class ShapeCone extends Shape {
 				}
 			}
 		}
+	}
+	
+	/**
+	 * Radius of the cone at height z. taper == 1 is linear; taper > 1 bulges outward
+	 * (bell shaped), taper < 1 pinches inward (trumpet shaped).
+	 */
+	private double coneRadiusAtZ(int z, float height, float baseRadius, float topRadius, float taper) {
+		double absHeight = Math.abs(height);
+		double t = absHeight == 0.0 ? 0.0 : Math.abs(z) / absHeight;
+		if(t < 0.0) t = 0.0;
+		if(t > 1.0) t = 1.0;
+		double r = topRadius + (baseRadius - topRadius) * Math.pow(1.0 - t, taper);
+		return r < 0.0 ? 0.0 : r;
+	}
+	
+	private boolean isInsideCone(int x, int y, int z, double offset, float height, float baseRadius, float topRadius, float taper) {
+		double r = Math.sqrt((x - offset) * (x - offset) + (y - offset) * (y - offset));
+		return r <= coneRadiusAtZ(z, height, baseRadius, topRadius, taper) + 0.5;
 	}
 }
