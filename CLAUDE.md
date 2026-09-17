@@ -77,3 +77,17 @@ export PATH="$JAVA_HOME/bin:$PATH"
   new jar with the same Vineflower and `diff -r` against `decompiled/Fabric-0.4.8-spline`
   — only ordering/style differences should appear.
 - To test in-game, copy the built jar over the one in the Modrinth mods folder.
+
+## Known issues
+
+- **Spline overflows the property list.** `ShapeScreen` stacks properties 20 px apart
+  with no scrolling; Spline has 19 (5 points × XYZ + direction, diameter, steps,
+  validate) and runs off the screen. Inherited from the original June 2026 jar.
+  Options: (A) add scrolling to the properties column, (B) compact each point into one
+  row with a "Set from player position" button (like Catenary's `Set endpoint`).
+
+## Verified in-game (2026-09-17, rebuilt jar)
+
+Cone (top radius, solid, taper, layer thickness), Catenary thickness, Validate button
+(chat report), persistence reload with `Layer thickness = 1` (the `PropertyMinimumInt`
+fix) — all OK.
