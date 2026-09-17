@@ -70,7 +70,7 @@ public class PropertyMinimumInt extends Property<Integer> {
 	public boolean setValueFromString(String value) {
 		try {
 			int parsedValue = Integer.parseInt(value);
-			if(parsedValue > minValue) {
+			if(parsedValue >= minValue) {
 				setValue(parsedValue);
 				return true;
 			}

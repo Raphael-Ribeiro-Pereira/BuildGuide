@@ -31,6 +31,7 @@
 	"property.buildguide.innerevenmode": "Inner even mode",
 	"property.buildguide.innerradius": "Inner radius",
 	"property.buildguide.invert": "Invert",
+	"property.buildguide.layerthickness": "Layer thickness",
 	"property.buildguide.length": "Length",
 	"property.buildguide.mode": "Mode",
 	"property.buildguide.offset": "%s offset",
