@@ -52,6 +52,9 @@ export PATH="$JAVA_HOME/bin:$PATH"
 - Validation flow: shape implements `IValidatable` (expected local blocks packed with
   `LocalPos.pack`, one-shot `consumeValidateRequest()`); Fabric `RenderHandler.validateShape`
   reads the world and reports via `BuildGuide.logHandler.sendChatMessage`.
+- Geometry lives in `public static enumerate(..., IBlockConsumer)` on Circle/Cuboid/Line/Cone;
+  `updateShape` only wires it to `addShapeCube`. Compose with `BlockOps` decorators, never by
+  instantiating other shapes (see `docs/API_REFERENCE.md` → Composition primitives).
 - Translation keys live in `common/resources/assets/buildguide/lang/en_us.json`, kept
   alphabetical. Only `en_us` is maintained for our keys.
 - Line endings are mixed upstream: `common/**` and `en_us.json` are CRLF,

@@ -28,12 +28,17 @@ public class ShapeLine extends Shape {
 	}
 	
 	protected void updateShape(IShapeBuffer buffer) throws InterruptedException {
-		int d = Math.max(Math.max(Math.abs(propertyDx.value), Math.abs(propertyDy.value)), Math.abs(propertyDz.value));
-		double dx = ((double) propertyDx.value) / d;
-		double dy = ((double) propertyDy.value) / d;
-		double dz = ((double) propertyDz.value) / d;
+		enumerate(propertyDx.value, propertyDy.value, propertyDz.value, (x, y, z) -> addShapeCube(buffer, x, y, z));
+	}
+	
+	// Straight line of blocks from the origin to (deltaX, deltaY, deltaZ), in local coordinates
+	public static void enumerate(int deltaX, int deltaY, int deltaZ, IBlockConsumer out) throws InterruptedException {
+		int d = Math.max(Math.max(Math.abs(deltaX), Math.abs(deltaY)), Math.abs(deltaZ));
+		double dx = ((double) deltaX) / d;
+		double dy = ((double) deltaY) / d;
+		double dz = ((double) deltaZ) / d;
 		for(int i = 0;i <= d;++i) {
-			addShapeCube(buffer, (int) (dx * i + 0.5 * Math.signum(propertyDx.value)), (int) (dy * i + 0.5 * Math.signum(propertyDy.value)), (int) (dz * i + 0.5 * Math.signum(propertyDz.value)));
+			out.accept((int) (dx * i + 0.5 * Math.signum(deltaX)), (int) (dy * i + 0.5 * Math.signum(deltaY)), (int) (dz * i + 0.5 * Math.signum(deltaZ)));
 		}
 	}
 }

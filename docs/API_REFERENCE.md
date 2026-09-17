@@ -46,6 +46,24 @@ public abstract class Shape {
   `consumeValidateRequest()` one-shot). `fabric/RenderHandler.validateShape` compares with
   the world and reports via `logHandler.sendChatMessage`.
 
+### Composition primitives (Step 0)
+
+- `IBlockConsumer` — `void accept(int x, int y, int z) throws InterruptedException`.
+- `ShapeCircle.enumerate(direction, radius, depth, evenMode, out)`,
+  `ShapeCuboid.enumerate(dx, dy, dz, walls, centredOrigin, out)`,
+  `ShapeLine.enumerate(deltaX, deltaY, deltaZ, out)`,
+  `ShapeCone.enumerate(direction, baseRadius, height, evenMode, topRadius, mode, taper, layerThickness, out)`
+  — `public static`, pure geometry in local coordinates, no shape instance needed. Each
+  shape's `updateShape` calls its own `enumerate` with `(x,y,z) -> addShapeCube(buffer,x,y,z)`
+  (Cone also records `expectedBlocks`). The `direction`/`walls`/`Mode` enums are public.
+- `BlockOps.offset(dx,dy,dz,next)`, `clipAABB(min…,max…,next)`, `excludeAABB(…)` — consumer decorators.
+- `CatmullRomCurve(int[][] points)` — `sample(seg,t)`, `tangent(seg,t)`, `getLength()`,
+  `parameterAtLength(s)`, `sampleAtLength(s)` (arc-length table, 32 samples/segment, lazy).
+  Ends are clamped (phantom points), matching the original Spline segment table.
+- Rule: a composing shape never instantiates other shapes or touches their properties;
+  it calls `enumerate` and emits through its own `addShapeCube` (keeps count/validation
+  correct) with a `Set<Long>` for dedup.
+
 ## Properties (`common/property`)
 
 `Property<T>` owns a value and its widgets. Widgets are created **lazily** on the first

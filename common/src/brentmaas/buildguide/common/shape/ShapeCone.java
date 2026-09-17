@@ -12,13 +12,13 @@ import brentmaas.buildguide.common.property.PropertyRunnable;
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
 
 public class ShapeCone extends Shape implements IValidatable {
-	private enum direction{
+	public enum direction{
 		X,
 		Y,
 		Z
 	}
 
-	private enum Mode{
+	public enum Mode{
 		HOLLOW,
 		SOLID
 	}
@@ -72,14 +72,23 @@ public class ShapeCone extends Shape implements IValidatable {
 			break;
 		}
 
-		float baseRadius = propertyRadius.value;
-		float topRadius = Math.max(0.0f, propertyTopRadius.value);
-		float height = propertyHeight.value;
-		boolean solid = propertyMode.value == Mode.SOLID;
+		enumerate(propertyDir.value, propertyRadius.value, propertyHeight.value, propertyEvenMode.value, propertyTopRadius.value, propertyMode.value, propertyTaper.value, propertyLayerThickness.value, (x, y, z) -> {
+			addShapeCube(buffer, x, y, z);
+			expectedBlocks.add(LocalPos.pack(x, y, z));
+		});
+	}
+	
+	/**
+	 * Cone / frustum along `dir` with base radius, height (sign = direction), optional even
+	 * mode, top radius, hollow/solid mode, taper and layer thickness, in local coordinates.
+	 */
+	public static void enumerate(direction dir, float baseRadius, float height, boolean evenMode, float topRadius, Mode mode, float taper, int layerThickness, IBlockConsumer out) throws InterruptedException {
+		double offset = evenMode ? 0.5 : 0.0;
+		topRadius = Math.max(0.0f, topRadius);
+		boolean solid = mode == Mode.SOLID;
 		double absHeight = Math.abs(height);
 		float maxRadius = Math.max(baseRadius, topRadius);
-		float taper = propertyTaper.value;
-		int thickness = Math.max(1, propertyLayerThickness.value);
+		int thickness = Math.max(1, layerThickness);
 
 		int zMin = height < 0 ? (int) Math.floor(height) : 0;
 		int zMax = height > 0 ? (int) Math.ceil(height) : 0;
@@ -125,7 +134,7 @@ public class ShapeCone extends Shape implements IValidatable {
 									|| !isInsideCone(x, y - 1, z, offset, height, baseRadius, topRadius, taper);
 						}
 
-						if(inShape) emit(buffer, x, y, z);
+						if(inShape) emit(dir, x, y, z, out);
 					}
 				}
 			}
@@ -162,16 +171,17 @@ public class ShapeCone extends Shape implements IValidatable {
 									|| Math.sqrt((x - offset) * (x - offset) + (y - 1 - offset) * (y - 1 - offset)) > rz + 0.5;
 						}
 
-						if(inShape) emit(buffer, x, y, z);
+						if(inShape) emit(dir, x, y, z, out);
 					}
 				}
 			}
 		}
 	}
 
-	private void emit(IShapeBuffer buffer, int x, int y, int z) throws InterruptedException {
+	// Map the cone-local (x, y, z) with z along the axis onto the chosen direction
+	private static void emit(direction dir, int x, int y, int z, IBlockConsumer out) throws InterruptedException {
 		int fx, fy, fz;
-		switch(propertyDir.value) {
+		switch(dir) {
 		case X:
 			fx = z;
 			fy = x;
@@ -188,15 +198,14 @@ public class ShapeCone extends Shape implements IValidatable {
 			fz = z;
 			break;
 		}
-		addShapeCube(buffer, fx, fy, fz);
-		expectedBlocks.add(LocalPos.pack(fx, fy, fz));
+		out.accept(fx, fy, fz);
 	}
 
 	/**
 	 * Radius of the cone at height z. taper == 1 is linear; taper > 1 bulges outward
 	 * (bell shaped), taper < 1 pinches inward (trumpet shaped).
 	 */
-	private double coneRadiusAtZ(int z, float height, float baseRadius, float topRadius, float taper) {
+	private static double coneRadiusAtZ(int z, float height, float baseRadius, float topRadius, float taper) {
 		double absHeight = Math.abs(height);
 		double t = absHeight == 0.0 ? 0.0 : Math.abs(z) / absHeight;
 		if(t < 0.0) t = 0.0;
@@ -205,13 +214,13 @@ public class ShapeCone extends Shape implements IValidatable {
 		return r < 0.0 ? 0.0 : r;
 	}
 
-	private boolean isInsideCone(int x, int y, int z, double offset, float height, float baseRadius, float topRadius, float taper) {
+	private static boolean isInsideCone(int x, int y, int z, double offset, float height, float baseRadius, float topRadius, float taper) {
 		double r = Math.sqrt((x - offset) * (x - offset) + (y - offset) * (y - offset));
 		return r <= coneRadiusAtZ(z, height, baseRadius, topRadius, taper) + 0.5;
 	}
 
 	// Linear interpolation between the two smoothed layer radii surrounding absZ
-	private double smoothedRadius(int absZ, int thickness, float[] radiusSmooth) {
+	private static double smoothedRadius(int absZ, int thickness, float[] radiusSmooth) {
 		double c = (double) absZ / thickness;
 		int last = radiusSmooth.length - 1;
 		int cLow = (int) Math.floor(c);

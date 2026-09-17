@@ -116,38 +116,23 @@ public class ShapeSpline extends Shape implements IValidatable {
 	protected void updateShape(IShapeBuffer buffer) throws InterruptedException {
 		expectedBlocks.clear();
 
-		int[] cp1 = {p1x.value, p1y.value, p1z.value};
-		int[] cp2 = {p2x.value, p2y.value, p2z.value};
-		int[] cp3 = {p3x.value, p3y.value, p3z.value};
-		int[] cp4 = {p4x.value, p4y.value, p4z.value};
-		int[] cp5 = {p5x.value, p5y.value, p5z.value};
+		CatmullRomCurve curve = new CatmullRomCurve(new int[][] {
+			{p1x.value, p1y.value, p1z.value},
+			{p2x.value, p2y.value, p2z.value},
+			{p3x.value, p3y.value, p3z.value},
+			{p4x.value, p4y.value, p4z.value},
+			{p5x.value, p5y.value, p5z.value}
+		});
 		double radius = propertyDiameter.value / 2.0;
 		int steps = Math.max(1, propertyStepsPerSegment.value);
 
-		// Endpoints are duplicated so the curve passes through the first and last control point
-		int[][][] segments = {
-			{cp1, cp1, cp2, cp3},
-			{cp1, cp2, cp3, cp4},
-			{cp2, cp3, cp4, cp5},
-			{cp3, cp4, cp5, cp5}
-		};
-
 		Set<Long> emitted = new HashSet<Long>();
-		for(int[][] seg: segments) {
+		for(int seg = 0;seg < curve.getSegmentCount();++seg) {
 			for(int i = 0;i <= steps;++i) {
-				double t = (double) i / steps;
-				double cx = catmullRom(seg[0][0], seg[1][0], seg[2][0], seg[3][0], t);
-				double cy = catmullRom(seg[0][1], seg[1][1], seg[2][1], seg[3][1], t);
-				double cz = catmullRom(seg[0][2], seg[1][2], seg[2][2], seg[3][2], t);
-				emitDisk(buffer, cx, cy, cz, radius, emitted);
+				double[] c = curve.sample(seg, (double) i / steps);
+				emitDisk(buffer, c[0], c[1], c[2], radius, emitted);
 			}
 		}
-	}
-
-	private double catmullRom(int p0, int p1, int p2, int p3, double t) {
-		double t2 = t * t;
-		double t3 = t2 * t;
-		return 0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3);
 	}
 
 	// Disc perpendicular to the chosen direction, deduplicated against previously emitted blocks

@@ -7,7 +7,7 @@ import brentmaas.buildguide.common.property.PropertyPositiveFloat;
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
 
 public class ShapeCircle extends Shape{
-	private enum direction{
+	public enum direction{
 		X,
 		Y,
 		Z
@@ -30,25 +30,30 @@ public class ShapeCircle extends Shape{
 	}
 	
 	protected void updateShape(IShapeBuffer buffer) throws InterruptedException {
-		float radius = propertyRadius.value;
-		int depth = propertyDepth.value;
 		double offset = propertyEvenMode.value ? 0.5 : 0.0;
 		setOriginOffset(propertyDir.value == direction.X ? 0 : offset, propertyDir.value == direction.Y ? 0 : offset, propertyDir.value == direction.Z ? 0 : offset);
+		
+		enumerate(propertyDir.value, propertyRadius.value, propertyDepth.value, propertyEvenMode.value, (x, y, z) -> addShapeCube(buffer, x, y, z));
+	}
+	
+	// Ring of the given radius extruded `depth` blocks along `dir`, in local coordinates
+	public static void enumerate(direction dir, float radius, int depth, boolean evenMode, IBlockConsumer out) throws InterruptedException {
+		double offset = evenMode ? 0.5 : 0.0;
 		
 		for(int x = (int) Math.floor(-radius + offset);x <= (int) Math.ceil(radius + offset);++x) {
 			for(int y = (int) Math.floor(-radius + offset);y <= (int) Math.ceil(radius + offset);++y) {
 				double r2 = (x - offset) * (x - offset) + (y - offset) * (y - offset);
 				if(r2 >= (radius - 0.5) * (radius - 0.5) && r2 <= (radius + 0.5) * (radius + 0.5)) {
 					for(int z = (depth > 0 ? 0 : depth + 1);z < (depth > 0 ? depth : 1);++z) {
-						switch(propertyDir.value) {
+						switch(dir) {
 						case X:
-							addShapeCube(buffer, z, x, y);
+							out.accept(z, x, y);
 							break;
 						case Y:
-							addShapeCube(buffer, x, z, y);
+							out.accept(x, z, y);
 							break;
 						case Z:
-							addShapeCube(buffer, x, y, z);
+							out.accept(x, y, z);
 							break;
 						}
 					}

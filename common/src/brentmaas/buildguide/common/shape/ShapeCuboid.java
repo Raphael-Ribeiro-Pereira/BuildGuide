@@ -6,7 +6,7 @@ import brentmaas.buildguide.common.property.PropertyNonzeroInt;
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
 
 public class ShapeCuboid extends Shape {
-	private enum walls{
+	public enum walls{
 		ALL,
 		X,
 		Y,
@@ -36,12 +36,11 @@ public class ShapeCuboid extends Shape {
 	}
 	
 	protected void updateShape(IShapeBuffer buffer) throws InterruptedException {
-		int dx = propertyX.value;
-		int dy = propertyY.value;
-		int dz = propertyZ.value;
-		walls w = propertyWalls.value;
-		boolean centredOrigin = propertyCentredOrigin.value;
-		
+		enumerate(propertyX.value, propertyY.value, propertyZ.value, propertyWalls.value, propertyCentredOrigin.value, (x, y, z) -> addShapeCube(buffer, x, y, z));
+	}
+	
+	// Wireframe box of size dx*dy*dz with the selected walls filled, in local coordinates
+	public static void enumerate(int dx, int dy, int dz, walls w, boolean centredOrigin, IBlockConsumer out) throws InterruptedException {
 		int lowerX, lowerY, lowerZ, upperX, upperY, upperZ;
 		if(centredOrigin) {
 			lowerX = -Math.abs(dx) + 1;
@@ -61,39 +60,39 @@ public class ShapeCuboid extends Shape {
 		
 		//Wireframe
 		for(int x = lowerX;x < upperX;++x) {
-			addShapeCube(buffer, x, lowerY, lowerZ);
+			out.accept(x, lowerY, lowerZ);
 			if(upperY - lowerY > 1) {
-				addShapeCube(buffer, x, upperY - 1, lowerZ);
+				out.accept(x, upperY - 1, lowerZ);
 			}
 			if(upperZ - lowerZ > 1) {
-				addShapeCube(buffer, x, lowerY, upperZ - 1);
+				out.accept(x, lowerY, upperZ - 1);
 			}
 			if(upperY - lowerY > 1 && upperZ - lowerZ > 1) {
-				addShapeCube(buffer, x, upperY - 1, upperZ - 1);
+				out.accept(x, upperY - 1, upperZ - 1);
 			}
 		}
 		for(int y = lowerY + 1;y < upperY - 1;++y) {
-			addShapeCube(buffer, lowerX, y, lowerZ);
+			out.accept(lowerX, y, lowerZ);
 			if(upperX - lowerX > 1) {
-				addShapeCube(buffer, upperX - 1, y, lowerZ);
+				out.accept(upperX - 1, y, lowerZ);
 			}
 			if(upperZ - lowerZ > 1) {
-				addShapeCube(buffer, lowerX, y, upperZ - 1);
+				out.accept(lowerX, y, upperZ - 1);
 			}
 			if(upperX - lowerX > 1 && upperZ - lowerZ > 1) {
-				addShapeCube(buffer, upperX - 1, y, upperZ - 1);
+				out.accept(upperX - 1, y, upperZ - 1);
 			}
 		}
 		for(int z = lowerZ + 1;z < upperZ - 1;++z) {
-			addShapeCube(buffer, lowerX, lowerY, z);
+			out.accept(lowerX, lowerY, z);
 			if(upperX - lowerX > 1) {
-				addShapeCube(buffer, upperX - 1, lowerY, z);
+				out.accept(upperX - 1, lowerY, z);
 			}
 			if(upperY - lowerY > 1) {
-				addShapeCube(buffer, lowerX, upperY - 1, z);
+				out.accept(lowerX, upperY - 1, z);
 			}
 			if(upperX - lowerX > 1 && upperY - lowerY > 1) {
-				addShapeCube(buffer, upperX - 1, upperY - 1, z);
+				out.accept(upperX - 1, upperY - 1, z);
 			}
 		}
 		
@@ -101,9 +100,9 @@ public class ShapeCuboid extends Shape {
 		if(w == walls.ALL || w == walls.X || w == walls.XY || w == walls.XZ) {
 			for(int y = lowerY + 1;y < upperY - 1;++y) {
 				for(int z = lowerZ + 1;z < upperZ - 1;++z) {
-					addShapeCube(buffer, lowerX, y, z);
+					out.accept(lowerX, y, z);
 					if(upperX - lowerX > 1) {
-						addShapeCube(buffer, upperX - 1, y, z);
+						out.accept(upperX - 1, y, z);
 					}
 				}
 			}
@@ -113,9 +112,9 @@ public class ShapeCuboid extends Shape {
 		if(w == walls.ALL || w == walls.Y || w == walls.XY || w == walls.YZ) {
 			for(int x = lowerX + 1;x < upperX - 1;++x) {
 				for(int z = lowerZ + 1;z < upperZ - 1;++z) {
-					addShapeCube(buffer, x, lowerY, z);
+					out.accept(x, lowerY, z);
 					if(upperY - lowerY > 1) {
-						addShapeCube(buffer, x, upperY - 1, z);
+						out.accept(x, upperY - 1, z);
 					}
 				}
 			}
@@ -125,9 +124,9 @@ public class ShapeCuboid extends Shape {
 		if(w == walls.ALL || w == walls.Z || w == walls.XZ || w == walls.YZ) {
 			for(int x = lowerX + 1;x < upperX - 1;++x) {
 				for(int y = lowerY + 1;y < upperY - 1;++y) {
-					addShapeCube(buffer, x, y, lowerZ);
+					out.accept(x, y, lowerZ);
 					if(upperZ - lowerZ > 1) {
-						addShapeCube(buffer, x, y, upperZ - 1);
+						out.accept(x, y, upperZ - 1);
 					}
 				}
 			}

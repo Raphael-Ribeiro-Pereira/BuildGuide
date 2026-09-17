@@ -173,6 +173,10 @@ regenerates the whole bridge. Same as every shape today; acceptable.
 
 ### Step 0 — refactor (prerequisite, ~½ day, zero behaviour change)
 
+**Status: done (Step 0 commit on `feat/cone-expanded`).** Verified by decompile-diff:
+only structural differences in Circle/Cuboid/Line/Cone/Spline; see `API_REFERENCE.md`
+→ "Composition primitives".
+
 ```java
 // common/shape/IBlockConsumer.java
 public interface IBlockConsumer {
