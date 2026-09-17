@@ -1,5 +1,8 @@
 package brentmaas.buildguide.common.shape;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import brentmaas.buildguide.common.property.PropertyBoolean;
 import brentmaas.buildguide.common.property.PropertyEnum;
 import brentmaas.buildguide.common.property.PropertyFloat;
@@ -19,8 +22,14 @@ public class ShapeCone extends Shape {
 		SOLID
 	}
 
+	public enum ValidateMode{
+		OFF,
+		COUNT
+	}
+
 	private String[] directionNames = {"X", "Y", "Z"};
 	private String[] modeNames = {"Hollow", "Solid"};
+	private String[] validateModeNames = {"Off", "Count"};
 
 	private PropertyEnum<direction> propertyDir = new PropertyEnum<direction>(direction.X, new Translatable("property.buildguide.direction"), () -> update(), directionNames);
 	private PropertyPositiveFloat propertyRadius = new PropertyPositiveFloat(3, new Translatable("property.buildguide.radius"), () -> update());
@@ -31,6 +40,11 @@ public class ShapeCone extends Shape {
 	private PropertyEnum<Mode> propertyMode = new PropertyEnum<Mode>(Mode.HOLLOW, new Translatable("property.buildguide.mode"), () -> update(), modeNames);
 	private PropertyPositiveFloat propertyTaper = new PropertyPositiveFloat(1.0f, new Translatable("property.buildguide.taper"), () -> update());
 	private PropertyPositiveInt propertyLayerThickness = new PropertyPositiveInt(1, new Translatable("property.buildguide.layerthickness"), () -> update());
+	private PropertyEnum<ValidateMode> propertyValidateMode = new PropertyEnum<ValidateMode>(ValidateMode.OFF, new Translatable("property.buildguide.validatemode"), () -> update(), validateModeNames);
+
+	// Local (origin-relative) positions of every block in the shape, packed with packLocal; only filled when validating
+	private final Set<Long> expectedBlocks = new HashSet<Long>();
+	private boolean needsValidation = false;
 
 	public ShapeCone() {
 		super();
@@ -43,9 +57,12 @@ public class ShapeCone extends Shape {
 		properties.add(propertyMode);
 		properties.add(propertyTaper);
 		properties.add(propertyLayerThickness);
+		properties.add(propertyValidateMode);
 	}
 
 	protected void updateShape(IShapeBuffer buffer) throws InterruptedException {
+		expectedBlocks.clear();
+
 		double offset = propertyEvenMode.value ? 0.5 : 0.0;
 		switch(propertyDir.value) {
 		case X:
@@ -154,20 +171,32 @@ public class ShapeCone extends Shape {
 				}
 			}
 		}
+
+		// Ask the render handler to validate against the world on the next frame
+		if(propertyValidateMode.value != ValidateMode.OFF) needsValidation = true;
 	}
 
 	private void emit(IShapeBuffer buffer, int x, int y, int z) throws InterruptedException {
+		int fx, fy, fz;
 		switch(propertyDir.value) {
 		case X:
-			addShapeCube(buffer, z, x, y);
+			fx = z;
+			fy = x;
+			fz = y;
 			break;
 		case Y:
-			addShapeCube(buffer, x, z, y);
+			fx = x;
+			fy = z;
+			fz = y;
 			break;
-		case Z:
-			addShapeCube(buffer, x, y, z);
+		default:
+			fx = x;
+			fy = y;
+			fz = z;
 			break;
 		}
+		addShapeCube(buffer, fx, fy, fz);
+		if(propertyValidateMode.value != ValidateMode.OFF) expectedBlocks.add(packLocal(fx, fy, fz));
 	}
 
 	/**
@@ -201,5 +230,43 @@ public class ShapeCone extends Shape {
 		if(cLow == cHigh) return radiusSmooth[cLow];
 		double frac = c - Math.floor(c);
 		return radiusSmooth[cLow] + (radiusSmooth[cHigh] - radiusSmooth[cLow]) * frac;
+	}
+
+	public ValidateMode getValidateMode() {
+		return propertyValidateMode.value;
+	}
+
+	public Set<Long> getExpectedBlocks() {
+		return expectedBlocks;
+	}
+
+	// Returns true exactly once per shape update while validation is on
+	public boolean consumeNeedsValidation() {
+		if(needsValidation) {
+			needsValidation = false;
+			return true;
+		}
+		return false;
+	}
+
+	// 21 bits per axis (signed), enough for any local shape coordinate
+	public static long packLocal(int x, int y, int z) {
+		return ((x & 0x1FFFFFL) << 42) | ((y & 0x1FFFFFL) << 21) | (z & 0x1FFFFFL);
+	}
+
+	public static int unpackLocalX(long key) {
+		return signExtend21((int) ((key >> 42) & 0x1FFFFFL));
+	}
+
+	public static int unpackLocalY(long key) {
+		return signExtend21((int) ((key >> 21) & 0x1FFFFFL));
+	}
+
+	public static int unpackLocalZ(long key) {
+		return signExtend21((int) (key & 0x1FFFFFL));
+	}
+
+	private static int signExtend21(int v) {
+		return (v << 11) >> 11;
 	}
 }

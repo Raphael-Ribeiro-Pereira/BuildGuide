@@ -16,6 +16,9 @@ public abstract class AbstractRenderHandler {
 	
 	protected abstract void popProfiler();
 	
+	// Hook for loader-specific world validation; called once per rendered shape set
+	protected void validateShape(ShapeSet shapeSet) {}
+	
 	public void render() {
 		pushProfiler(BuildGuide.modid);
 		
@@ -38,6 +41,7 @@ public abstract class AbstractRenderHandler {
 					setupRenderingShapeSet(shapeSet);
 					renderShapeBuffer(shapeSet.getShape());
 					endRenderingShapeSet();
+					validateShape(shapeSet);
 				}
 			}finally {
 				shapeSet.getShape().lock.unlock();
