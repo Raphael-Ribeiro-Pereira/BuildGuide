@@ -4,9 +4,13 @@ import brentmaas.buildguide.common.BuildGuide;
 import brentmaas.buildguide.common.property.PropertyBoolean;
 import brentmaas.buildguide.common.property.PropertyInt;
 import brentmaas.buildguide.common.property.PropertyPositiveFloat;
+import brentmaas.buildguide.common.property.PropertyPositiveInt;
 import brentmaas.buildguide.common.property.PropertyRunnable;
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
 import brentmaas.buildguide.common.shape.ShapeSet.Origin;
+
+import java.util.HashSet;
+import java.util.Set;
 
 public class ShapeCatenary extends Shape {
 	private static final double eps = 0.001;
@@ -23,6 +27,8 @@ public class ShapeCatenary extends Shape {
 	}, new Translatable("property.buildguide.setendpoint"));
 	private PropertyPositiveFloat propertyAddLength = new PropertyPositiveFloat(1, new Translatable("property.buildguide.addlength"), () -> update());
 	private PropertyBoolean propertyInvert = new PropertyBoolean(false, new Translatable("property.buildguide.invert"), () -> update());
+	// New properties go at the end so saved shapes from older versions still load
+	private PropertyPositiveInt propertyThickness = new PropertyPositiveInt(1, new Translatable("property.buildguide.thickness"), () -> update());
 	
 	public ShapeCatenary() {
 		super();
@@ -33,9 +39,12 @@ public class ShapeCatenary extends Shape {
 		properties.add(propertySetEndpoint);
 		properties.add(propertyAddLength);
 		properties.add(propertyInvert);
+		properties.add(propertyThickness);
 	}
 	
 	protected void updateShape(IShapeBuffer buffer) throws Exception {
+		int thickness = Math.max(1, propertyThickness.value);
+		Set<Long> emitted = new HashSet<Long>();
 		double dr = Math.sqrt(propertyDx.value * propertyDx.value + propertyDz.value * propertyDz.value);
 		int dy = propertyDy.value;
 		float ds = propertyAddLength.value;
@@ -73,13 +82,33 @@ public class ShapeCatenary extends Shape {
 					if((a * Math.cosh((i * fac + rl) / a) - a * Math.cosh(rl / a) >= j - 0.5 && a * Math.cosh((i * fac + rl) / a) - a * Math.cosh(rl / a) < j + 0.5) //Check down
 					|| (a * Math.cosh(((i - 0.5) * fac + rl) / a) - a * Math.cosh(rl / a) >= j && a * Math.cosh(((i + 0.5) * fac + rl) / a) - a * Math.cosh(rl / a) < j) //Check left
 					|| (a * Math.cosh(((i + 0.5) * fac + rl) / a) - a * Math.cosh(rl / a) >= j && a * Math.cosh(((i - 0.5) * fac + rl) / a) - a * Math.cosh(rl / a) < j)) { //Check right
-						addShapeCube(buffer, inv ? (int) (dx * (d - i) + Math.signum(dx) * 0.5) : (int) (dx * i + Math.signum(dx) * 0.5), inv ? dy - j : j, inv ? (int) (dz * (d - i) + Math.signum(dz) * 0.5) : (int) (dz * i + Math.signum(dz) * 0.5));
+						emitColumn(buffer, inv ? (int) (dx * (d - i) + Math.signum(dx) * 0.5) : (int) (dx * i + Math.signum(dx) * 0.5), inv ? dy - j : j, inv ? (int) (dz * (d - i) + Math.signum(dz) * 0.5) : (int) (dz * i + Math.signum(dz) * 0.5), thickness, emitted);
 					}
 				}
 			}
 		}else { //No valid catenary solution. Instead, a thin rope would go only vertically and double up on itself below the lower starting point
 			for(int i = (int) (-ds / 2 - 0.5 + (dy >= 0 ? 0 : dy));i <= (dy >= 0 ? dy : 0);++i) {
-				addShapeCube(buffer, 0, i, 0);
+				emitColumn(buffer, 0, i, 0, thickness, emitted);
+			}
+		}
+	}
+	
+	// Emit a horizontal disc of diameter `thickness` around (x, y, z), deduplicating overlapping discs
+	private void emitColumn(IShapeBuffer buffer, int x, int y, int z, int thickness, Set<Long> emitted) throws InterruptedException {
+		if(thickness <= 1) {
+			addShapeCube(buffer, x, y, z);
+			return;
+		}
+		double radius = thickness / 2.0;
+		int radiusCeil = (int) Math.ceil(radius);
+		for(int dx = -radiusCeil;dx <= radiusCeil;++dx) {
+			for(int dz = -radiusCeil;dz <= radiusCeil;++dz) {
+				if(Math.sqrt(dx * dx + dz * dz) <= radius) {
+					int bx = x + dx;
+					int bz = z + dz;
+					long key = ((bx & 0x1FFFFFL) << 42) | ((y & 0x1FFFFFL) << 21) | (bz & 0x1FFFFFL);
+					if(emitted.add(key)) addShapeCube(buffer, bx, y, bz);
+				}
 			}
 		}
 	}
