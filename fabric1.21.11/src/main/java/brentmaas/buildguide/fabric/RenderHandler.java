@@ -18,7 +18,8 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import brentmaas.buildguide.common.AbstractRenderHandler;
 import brentmaas.buildguide.common.BuildGuide;
 import brentmaas.buildguide.common.shape.Shape;
-import brentmaas.buildguide.common.shape.ShapeCone;
+import brentmaas.buildguide.common.shape.IValidatable;
+import brentmaas.buildguide.common.shape.LocalPos;
 import brentmaas.buildguide.common.shape.ShapeSet;
 import brentmaas.buildguide.fabric.shape.ShapeBuffer;
 import brentmaas.buildguide.fabric.validation.NearBlock;
@@ -92,8 +93,8 @@ public class RenderHandler extends AbstractRenderHandler {
 	}
 
 	protected void validateShape(ShapeSet shapeSet) {
-		if(!(shapeSet.getShape() instanceof ShapeCone cone)) return;
-		if(!cone.consumeValidateRequest()) return;
+		if(!(shapeSet.getShape() instanceof IValidatable validatable)) return;
+		if(!validatable.consumeValidateRequest()) return;
 
 		ClientLevel world = Minecraft.getInstance().level;
 		if(world == null) return;
@@ -106,10 +107,10 @@ public class RenderHandler extends AbstractRenderHandler {
 		Set<Long> expectedWorld = new HashSet<Long>();
 		int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
 		int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE;
-		for(long local: cone.getExpectedBlocks()) {
-			int wx = ox + ShapeCone.unpackLocalX(local);
-			int wy = oy + ShapeCone.unpackLocalY(local);
-			int wz = oz + ShapeCone.unpackLocalZ(local);
+		for(long local: validatable.getExpectedBlocks()) {
+			int wx = ox + LocalPos.unpackX(local);
+			int wy = oy + LocalPos.unpackY(local);
+			int wz = oz + LocalPos.unpackZ(local);
 			expectedWorld.add(BlockPos.asLong(wx, wy, wz));
 			if(wx < minX) minX = wx;
 			if(wx > maxX) maxX = wx;

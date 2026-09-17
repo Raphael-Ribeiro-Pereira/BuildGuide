@@ -11,7 +11,7 @@ import brentmaas.buildguide.common.property.PropertyPositiveInt;
 import brentmaas.buildguide.common.property.PropertyRunnable;
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
 
-public class ShapeCone extends Shape {
+public class ShapeCone extends Shape implements IValidatable {
 	private enum direction{
 		X,
 		Y,
@@ -189,7 +189,7 @@ public class ShapeCone extends Shape {
 			break;
 		}
 		addShapeCube(buffer, fx, fy, fz);
-		expectedBlocks.add(packLocal(fx, fy, fz));
+		expectedBlocks.add(LocalPos.pack(fx, fy, fz));
 	}
 
 	/**
@@ -241,26 +241,5 @@ public class ShapeCone extends Shape {
 			return true;
 		}
 		return false;
-	}
-
-	// 21 bits per axis (signed), enough for any local shape coordinate
-	public static long packLocal(int x, int y, int z) {
-		return ((x & 0x1FFFFFL) << 42) | ((y & 0x1FFFFFL) << 21) | (z & 0x1FFFFFL);
-	}
-
-	public static int unpackLocalX(long key) {
-		return signExtend21((int) ((key >> 42) & 0x1FFFFFL));
-	}
-
-	public static int unpackLocalY(long key) {
-		return signExtend21((int) ((key >> 21) & 0x1FFFFFL));
-	}
-
-	public static int unpackLocalZ(long key) {
-		return signExtend21((int) (key & 0x1FFFFFL));
-	}
-
-	private static int signExtend21(int v) {
-		return (v << 11) >> 11;
 	}
 }

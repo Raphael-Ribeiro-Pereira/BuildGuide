@@ -19,6 +19,7 @@ import brentmaas.buildguide.common.shape.ShapePolygon;
 import brentmaas.buildguide.common.shape.ShapePolygonalPyramid;
 import brentmaas.buildguide.common.shape.ShapeRegistry;
 import brentmaas.buildguide.common.shape.ShapeSphere;
+import brentmaas.buildguide.common.shape.ShapeSpline;
 import brentmaas.buildguide.common.shape.ShapeTorus;
 
 public class BuildGuide {
@@ -56,6 +57,8 @@ public class BuildGuide {
 		ShapeRegistry.registerShape(ShapePolygonalPyramid.class, "shape.buildguide.polygonalpyramid");
 		ShapeRegistry.registerShape(ShapeSphere.class, "shape.buildguide.sphere");
 		ShapeRegistry.registerShape(ShapeTorus.class, "shape.buildguide.torus");
+		// New shapes always go at the end: the registry index is what saved shapes reference
+		ShapeRegistry.registerShape(ShapeSpline.class, "shape.buildguide.spline");
 		
 		renderHandler.register();
 	}
