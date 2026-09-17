@@ -1,0 +1,79 @@
+# Build Guide — fork `feat/cone-expanded`
+
+Fork of [brentmaas/BuildGuide](https://github.com/brentmaas/BuildGuide) (Minecraft
+building-guide mod). Our work lives on branch `feat/cone-expanded`, based on upstream
+`d4b846f` (mod version 0.4.8, Fabric 1.21.11).
+
+## Permanent paths — never use temp folders
+
+| What | Path |
+|---|---|
+| Repo | `C:\Users\rapha\Documents\BuildGuide-src` |
+| JDK 21 (`JAVA_HOME`) | `C:\Users\rapha\Documents\BuildGuide-tools\jdk-21.0.12.1+1` |
+| Vineflower decompiler | `C:\Users\rapha\Documents\BuildGuide-tools\vineflower.jar` |
+| Decompiled reference jars | `C:\Users\rapha\Documents\BuildGuide-tools\decompiled\` |
+| Original jars (June 2026) | `C:\Users\rapha\Documents\Buildguide\*.jar*` |
+| Minecraft mods folder (Modrinth) | `C:\Users\rapha\AppData\Roaming\ModrinthApp\profiles\Fabulously Optimized (1)\mods` |
+
+Nothing project-related goes in a scratchpad or `%TEMP%`. The original source repo was
+lost that way once; this branch was rebuilt from decompiled jars.
+
+## Build
+
+```bash
+export JAVA_HOME="C:/Users/rapha/Documents/BuildGuide-tools/jdk-21.0.12.1+1"
+export PATH="$JAVA_HOME/bin:$PATH"
+./gradlew :fabric1.21.11:build --configure-on-demand --no-daemon
+```
+
+- `--configure-on-demand` is required: upstream includes ~40 subprojects and the
+  Forge ones demand JDK 25 at configuration time. We only build `common` +
+  `fabric1.21.11`.
+- Output: `fabric1.21.11/build/libs/BuildGuide-Fabric-0.4.8.jar`.
+- First build downloads Gradle 9 + Loom + Minecraft (~10 min); later builds are fast.
+- Only `fabric1.21.11` is maintained on this branch. Forge/NeoForge are untouched upstream code.
+
+## Architecture rules (these are what made the recovery possible)
+
+- **`common` never imports `net.minecraft`.** Anything loader-specific goes behind an
+  interface or an abstract handler (`AbstractRenderHandler`, `ILogHandler`,
+  `IShapeBuffer`…) implemented in `fabric1.21.11`. Because of this, `common` decompiles
+  cleanly from a production jar; the Fabric side comes back with intermediary names.
+- Shape base class is `Shape` (not `AbstractShape`). Override
+  `protected void updateShape(IShapeBuffer buffer) throws InterruptedException`
+  (`addShapeCube` throws `InterruptedException`; Catenary declares `throws Exception`).
+- Register shapes in `BuildGuide.init()` via `ShapeRegistry.registerShape(Class, langKey)`
+  — **always append at the end**. Saved shapes reference the registry index.
+- New `Property` fields **always go at the end of `properties`** so shapes persisted by
+  older versions still load (graceful degradation).
+- `PropertyRunnable` renders as a button (used for `Validate`, `Set endpoint`).
+- Block solidity: `BlockState.getMaterial().isSolid()` does not exist on 1.21.11 — use
+  `isAir()` / `blocksMotion()`.
+- Validation flow: shape implements `IValidatable` (expected local blocks packed with
+  `LocalPos.pack`, one-shot `consumeValidateRequest()`); Fabric `RenderHandler.validateShape`
+  reads the world and reports via `BuildGuide.logHandler.sendChatMessage`.
+- Translation keys live in `common/resources/assets/buildguide/lang/en_us.json`, kept
+  alphabetical. Only `en_us` is maintained for our keys.
+- Line endings are mixed upstream: `common/**` and `en_us.json` are CRLF,
+  `fabric1.21.11/**` is LF. `core.autocrlf=false` is set locally; match the file's existing
+  ending so diffs stay minimal.
+
+## Branch history (one commit per original jar)
+
+| Commit | Original jar | Change |
+|---|---|---|
+| top radius + mode | `cone-expanded.jar.bak` | frustum, Hollow/Solid |
+| taper | `cone-taper.jar.bak` | curved slope `(1-t)^taper` |
+| layer thickness | `cone-layers.jar.bak` | stepped layers, [.25 .5 .25] smoothing, `PropertyMinimumInt` `>=` fix |
+| catenary thickness | `catenary-thick.jar.bak` | disc per point + dedup |
+| validator | `validator.jar.bak` | world check, near-block scan (d ≤ 2) |
+| validate button | `validate-button.jar.bak` | `PropertyRunnable` |
+| spline | `spline.jar` | Catmull-Rom, `IValidatable`, `LocalPos` |
+
+## Workflow
+
+- `git push` at the end of every session. The remote is the only backup.
+- Use the `decompiled/` reference when in doubt about original behaviour: decompile the
+  new jar with the same Vineflower and `diff -r` against `decompiled/Fabric-0.4.8-spline`
+  — only ordering/style differences should appear.
+- To test in-game, copy the built jar over the one in the Modrinth mods folder.
