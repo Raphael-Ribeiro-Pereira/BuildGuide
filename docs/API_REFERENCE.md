@@ -62,9 +62,35 @@ public abstract class Shape {
   Ends are clamped (phantom points), matching the original Spline segment table. Accepts
   N >= 2 (N=2 is a straight segment); degenerate/zero-length curves map every arc length
   to the start point (tested: coincident points, all-equal points, s<0, s>len, NaN).
+- `Profiles.filledEllipse(width, height, out)` — the one profile no existing shape
+  provides (Circle/Ellipse are hollow rings). Emits in **section space**: `u ∈ [0,width)`,
+  `v ∈ [0,height)`, `w = 0` — the same frame as `ShapeCuboid.enumerate(width, height, 1, …)`,
+  so one placing consumer serves every profile.
 - Rule: a composing shape never instantiates other shapes or touches their properties;
   it calls `enumerate` and emits through its own `addShapeCube` (keeps count/validation
   correct) with a `Set<Long>` for dedup.
+
+### ShapeBridge (Step 1: curve + deck)
+
+First composed shape. 2..5 control points (fixed slots + `Point count`), sampled **by
+arc length** every `Sample step` blocks (default 0.5, always including the end); at each
+sample a horizontal cross-section is placed:
+
+- lateral normal from the horizontal tangent: `n = normalize(-tz, 0, tx)`; when the
+  tangent has no horizontal component the previous `n` is reused (initial `(1,0,0)`) so a
+  near-vertical stretch does not twist the deck;
+- profile enumerated in section space and mapped with
+  `x = round(cx + (u − (width−1)/2)·nx)`, `y = round(cy) − v`, `z = round(cz + (u − (width−1)/2)·nz)`;
+- **the curve is the top row of the deck; thickness grows downward**;
+- profiles: `Flat` = `ShapeCuboid.enumerate(w, t, 1, walls.ALL)` (filled), `Box` =
+  `walls.NONE` (outline), `Disk` = `Profiles.filledEllipse(w, t)`;
+- one `Set<Long>` dedups overlapping sections and is the `IValidatable` set.
+
+Persistence order: `p1x..p5z` (15), `Point count`, `Sample step`, `Profile`, `Width`,
+`Thickness`, `Validate` (21 entries). Point rows are GUI-only (see below), so unlike
+Spline they take no persistence slots. Handrail and pillar properties will be appended
+after `Validate`. Sections: `Shape` (count, point rows, sample step) and `Deck`
+(profile, width, thickness); Validate global. Registered last.
 
 ## Properties (`common/property`)
 
@@ -113,6 +139,12 @@ of the current section or unassigned, in list order; shapes with no section keep
 original layout untouched. Changing the section re-runs `onSelectedInGUI`. Helpers for
 custom layouts: `placeSectionSelector()`, `placeRow(row, props...)`, `isShown(p)`.
 
+**GUI-only properties.** `Shape.addGuiOnly(p)` registers a property that gets widgets,
+layout and visibility handling but is **not** in `properties` and therefore never
+persisted. Use it for row owners and buttons (`PropertyPointRow` in Bridge). Spline still
+keeps its rows in `properties` (they were appended before this existed and persist as
+`"Row"`); do not change that.
+
 ### Variable point count (Spline pattern)
 
 Persistence is by index, so a shape cannot add or remove properties at runtime. The
@@ -143,4 +175,5 @@ property yourself. Layout is independent of list order — this is how `ShapeSpl
 args...)` formats with `%s`. Keys added by this fork: `mode`, `topradius`, `taper`,
 `layerthickness`, `thickness`, `validate`, `diameter`, `point`, `pointrow`,
 `stepspersegment`, `fromplayer`, `shape.buildguide.spline`; Step 0.5 added `section`,
-`section.shape`, `section.points`, `pointcount`.
+`section.shape`, `section.points`, `pointcount`; Step 1 added `shape.buildguide.bridge`,
+`section.deck`, `samplestep`, `profile`.

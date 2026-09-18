@@ -22,6 +22,8 @@ public abstract class Shape {
 	// Optional panel sections (see declareSection). The selector is UI state: not in `properties`, never persisted
 	private PropertySection sectionSelector = null;
 	private Map<Property<?>, Integer> propertySections = new IdentityHashMap<Property<?>, Integer>();
+	// Properties that only exist for the panel (row owners, buttons): shown and laid out, never persisted
+	private List<Property<?>> guiOnlyProperties = new ArrayList<Property<?>>();
 	public IShapeBuffer buffer;
 	private int nBlocks = 0;
 	public boolean ready = false;
@@ -168,11 +170,16 @@ public abstract class Shape {
 		for(Property<?> p: props) propertySections.put(p, section);
 	}
 	
+	protected void addGuiOnly(Property<?> p) {
+		guiOnlyProperties.add(p);
+	}
+	
 	// Everything the screen must add as widgets: the persisted properties plus the section selector
 	public List<Property<?>> getGuiProperties() {
-		if(sectionSelector == null) return properties;
+		if(sectionSelector == null && guiOnlyProperties.isEmpty()) return properties;
 		List<Property<?>> all = new ArrayList<Property<?>>(properties);
-		all.add(sectionSelector);
+		all.addAll(guiOnlyProperties);
+		if(sectionSelector != null) all.add(sectionSelector);
 		return all;
 	}
 	
@@ -219,6 +226,7 @@ public abstract class Shape {
 		for(Property<?> p: properties) {
 			p.setVisibility(false);
 		}
+		for(Property<?> p: guiOnlyProperties) p.setVisibility(false);
 		if(sectionSelector != null) sectionSelector.setVisibility(false);
 	}
 	

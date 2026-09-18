@@ -5,6 +5,7 @@ import java.io.File;
 import brentmaas.buildguide.common.screen.AbstractScreenHandler;
 import brentmaas.buildguide.common.screen.widget.AbstractWidgetHandler;
 import brentmaas.buildguide.common.shape.IShapeHandler;
+import brentmaas.buildguide.common.shape.ShapeBridge;
 import brentmaas.buildguide.common.shape.ShapeCatenary;
 import brentmaas.buildguide.common.shape.ShapeCircle;
 import brentmaas.buildguide.common.shape.ShapeCone;
@@ -59,6 +60,7 @@ public class BuildGuide {
 		ShapeRegistry.registerShape(ShapeTorus.class, "shape.buildguide.torus");
 		// New shapes always go at the end: the registry index is what saved shapes reference
 		ShapeRegistry.registerShape(ShapeSpline.class, "shape.buildguide.spline");
+		ShapeRegistry.registerShape(ShapeBridge.class, "shape.buildguide.bridge");
 		
 		renderHandler.register();
 	}

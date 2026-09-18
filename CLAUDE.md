@@ -48,6 +48,8 @@ export PATH="$JAVA_HOME/bin:$PATH"
   older versions still load (graceful degradation).
 - Variable-count things (Spline points) are fixed slots + a count property appended last;
   never add/remove properties at runtime (persistence is by index).
+- GUI-only properties (row owners, buttons) go through `Shape.addGuiOnly` so they take no
+  persistence slot. Composed shapes: `ShapeBridge` is the model (sections, count, dedup set).
 - `PropertyRunnable` renders as a button (used for `Validate`, `Set endpoint`).
 - Block solidity: `BlockState.getMaterial().isSolid()` does not exist on 1.21.11 — use
   `isAir()` / `blocksMotion()`.

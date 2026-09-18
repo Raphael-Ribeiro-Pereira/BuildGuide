@@ -199,6 +199,10 @@ public interface IBlockConsumer {
 
 ### Step 1 — Deck (~1 session)
 
+**Status: done.** `ShapeBridge` with Flat/Box/Disk profiles, arc-length sampling (first
+real caller of `parameterAtLength`), GUI-only point rows. See `API_REFERENCE.md` →
+ShapeBridge.
+
 `ShapeBridge implements IValidatable`: 5 control points (reuse `PropertyCompactInt` +
 `PropertyPointRow`), `width`, `thickness`, `steps`. Sample the curve by arc length, stamp a
 `width × thickness` horizontal slab (cuboid enumerator with `offset`) at each sample,
