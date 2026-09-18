@@ -3,7 +3,8 @@
     "compatibilityLevel": "JAVA_21",
     "mixins": [],
     "client": [
-        "MixinLevelRenderer"
+        "MixinLevelRenderer",
+        "MixinClientLevel"
     ],
     "server": [],
     "refmap": "mixins.buildguide.fabric.refmap.json",

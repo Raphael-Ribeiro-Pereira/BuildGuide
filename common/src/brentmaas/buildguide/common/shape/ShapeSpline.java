@@ -96,6 +96,10 @@ public class ShapeSpline extends Shape implements IValidatable {
 		assignSection(sectionShape, propertyDir, propertyDiameter, propertyStepsPerSegment);
 		assignSection(sectionPoints, propertyPointCount);
 		for(int i = 0;i < maxPoints;++i) assignSection(sectionPoints, points[i][0], points[i][1], points[i][2], pointRows[i]);
+		
+		// The screen's Reset button never touches control points or the count
+		for(int i = 0;i < maxPoints;++i) protectFromReset(points[i][0], points[i][1], points[i][2]);
+		protectFromReset(propertyPointCount);
 	}
 	
 	@Override
@@ -134,8 +138,8 @@ public class ShapeSpline extends Shape implements IValidatable {
 	}
 	
 	protected void updateShape(IShapeBuffer buffer) throws InterruptedException {
+		validationState.invalidate(); // before clearing: block events check isValidated() and never touch expectedBlocks
 		expectedBlocks.clear();
-		validationState.invalidate();
 
 		int[][] allPoints = {
 			{p1x.value, p1y.value, p1z.value},

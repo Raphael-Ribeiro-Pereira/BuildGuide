@@ -1,8 +1,6 @@
 package brentmaas.buildguide.common.shape;
 
 import java.util.HashSet;
-import java.util.IdentityHashMap;
-import java.util.Map;
 import java.util.Set;
 
 import brentmaas.buildguide.common.property.Property;
@@ -109,7 +107,7 @@ public class ShapeBridge extends Shape implements IValidatable {
 	private PropertyPositiveInt propertyWidth = new PropertyPositiveInt(3, new Translatable("property.buildguide.width"), () -> update());
 	private PropertyPositiveInt propertyThickness = new PropertyPositiveInt(1, new Translatable("property.buildguide.thickness"), () -> update());
 	// PropertyRunnable renders as a button
-	private PropertyRunnable propertyValidate = new PropertyRunnable(() -> triggerValidation(), new Translatable("property.buildguide.validate"), 0, 100);
+	private PropertyRunnable propertyValidate = new PropertyRunnable(() -> triggerValidation(), new Translatable("property.buildguide.validate"));
 	// Rails (Step 2). Rail width/height are the rail's cross-section; elevation is how far above
 	// the curve the section starts; inset moves it from the deck edge inward (negative = outward)
 	private PropertyEnum<RailMode> propertyRailMode = new PropertyEnum<RailMode>(RailMode.NONE, new Translatable("property.buildguide.railmode"), () -> update(), railModeNames);
@@ -132,9 +130,6 @@ public class ShapeBridge extends Shape implements IValidatable {
 
 	private PropertyCompactInt[][] points = {{p1x, p1y, p1z}, {p2x, p2y, p2z}, {p3x, p3y, p3z}, {p4x, p4y, p4z}, {p5x, p5y, p5z}};
 	private PropertyPointRow[] pointRows = new PropertyPointRow[maxPoints];
-	// Per-section Reset buttons (GUI-only) and the defaults they restore, captured at construction
-	private Map<Property<?>, Object> defaults = new IdentityHashMap<Property<?>, Object>();
-	private PropertyRunnable resetDeck, resetRails, resetSupports;
 
 	// Every emitted block (packed with LocalPos): dedup between overlapping sections and the validation set
 	private final Set<Long> expectedBlocks = new HashSet<Long>();
@@ -194,35 +189,11 @@ public class ShapeBridge extends Shape implements IValidatable {
 		assignSection(sectionRails, propertyRailMode, propertyRailSides, propertyRailProfile, propertyRailWidth, propertyRailHeight, propertyRailElevation, propertyRailInset, propertyPostSpacing);
 		assignSection(sectionSupports, propertyPillarMode, propertyPillarShape, propertyPillarWidth, propertyPillarDepth, propertyPillarSpacing, propertyPillarTaper);
 		
-		// Reset buttons: restore the section's defaults with a single regeneration; points/count untouched
-		Property<?>[] deckProps = {propertyProfile, propertyWidth, propertyThickness};
-		Property<?>[] railProps = {propertyRailMode, propertyRailSides, propertyRailProfile, propertyRailWidth, propertyRailHeight, propertyRailElevation, propertyRailInset, propertyPostSpacing};
-		Property<?>[] pillarProps = {propertyPillarMode, propertyPillarShape, propertyPillarWidth, propertyPillarDepth, propertyPillarSpacing, propertyPillarTaper};
-		rememberDefaults(deckProps);
-		rememberDefaults(railProps);
-		rememberDefaults(pillarProps);
-		resetDeck = new PropertyRunnable(() -> resetToDefaults(deckProps), new Translatable("property.buildguide.resetsection"), 110, 100);
-		resetRails = new PropertyRunnable(() -> resetToDefaults(railProps), new Translatable("property.buildguide.resetsection"), 110, 100);
-		resetSupports = new PropertyRunnable(() -> resetToDefaults(pillarProps), new Translatable("property.buildguide.resetsection"), 110, 100);
-		addGuiOnly(resetDeck);
-		addGuiOnly(resetRails);
-		addGuiOnly(resetSupports);
-		assignSection(sectionDeck, resetDeck);
-		assignSection(sectionRails, resetRails);
-		assignSection(sectionSupports, resetSupports);
+		// The screen's Reset button restores the current section; control points and count are never reset
+		for(int i = 0;i < maxPoints;++i) protectFromReset(points[i][0], points[i][1], points[i][2]);
+		protectFromReset(propertyPointCount);
 	}
 
-	private void rememberDefaults(Property<?>... props) {
-		for(Property<?> p: props) defaults.put(p, p.value);
-	}
-	
-	// Property.setValue does not run onPress, so this regenerates exactly once at the end
-	@SuppressWarnings("unchecked")
-	private void resetToDefaults(Property<?>... props) {
-		for(Property<?> p: props) ((Property<Object>) p).setValue(defaults.get(p));
-		update();
-	}
-	
 	private void onPointCountChanged() {
 		onSelectedInGUI(); // show/hide point rows
 		update();
@@ -247,19 +218,12 @@ public class ShapeBridge extends Shape implements IValidatable {
 			if(isShown(p)) row = placeRow(row, p);
 			else p.setVisibility(false);
 		}
-		PropertyRunnable[] resets = {resetDeck, resetRails, resetSupports};
-		PropertyRunnable shownReset = null;
-		for(PropertyRunnable r: resets) {
-			if(isShown(r) && shownReset == null) shownReset = r;
-			else r.setVisibility(false);
-		}
-		if(shownReset != null) row = placeRow(row, propertyValidate, shownReset);
-		else row = placeRow(row, propertyValidate);
+		row = placeRow(row, propertyValidate);
 	}
 
 	protected void updateShape(IShapeBuffer buffer) throws InterruptedException {
+		validationState.invalidate(); // before clearing: block events check isValidated() and never touch expectedBlocks
 		expectedBlocks.clear();
-		validationState.invalidate();
 		lastNx = 1.0;
 		lastNz = 0.0;
 

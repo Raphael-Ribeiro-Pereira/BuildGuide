@@ -31,6 +31,11 @@ public class ShapeScreen extends BaseScreen{
 	private ITextField textFieldX = BuildGuide.widgetHandler.createTextField(45, 135, "");
 	private ITextField textFieldY = BuildGuide.widgetHandler.createTextField(45, 155, "");
 	private ITextField textFieldZ = BuildGuide.widgetHandler.createTextField(45, 175, "");
+	// Fixed Reset: restores the defaults of the properties shown right now (current section, or all
+	// when the shape has no sections); control points are protected by the shapes themselves
+	private IButton buttonReset = BuildGuide.widgetHandler.createButton(5, 238, 160, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.reset"), () -> {
+		if(BuildGuide.stateManager.getState().isShapeAvailable()) BuildGuide.stateManager.getState().getCurrentShape().resetShownToDefaults();
+	});
 	private IButton buttonSetX = BuildGuide.widgetHandler.createButton(115, 135, 30, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.set"), () -> {
 		try {
 			int newval = Integer.parseInt(textFieldX.getTextValue());
@@ -94,6 +99,7 @@ public class ShapeScreen extends BaseScreen{
 		addWidget(textFieldZ);
 		addWidget(buttonSetZ);
 		addWidget(buttonOriginZIncrease);
+		addWidget(buttonReset);
 		
 		if(BuildGuide.stateManager.getState().isShapeAvailable()) {
 			for(Shape shape: BuildGuide.stateManager.getState().getCurrentShapeSet().shapes) {

@@ -5,7 +5,6 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 
 import com.mojang.blaze3d.pipeline.BlendFunction;
@@ -163,23 +162,12 @@ public class RenderHandler extends AbstractRenderHandler {
 
 		state.setNearBlocks(near);
 		state.endScan();
-		logValidation(state, ox, oy, oz);
+		logValidation(state);
 	}
 
-	// Chat summary read from the state (kept for debugging; the GUI shows the same numbers)
-	private void logValidation(ValidationState state, int ox, int oy, int oz) {
-		List<NearBlock> nearBlocks = state.getNearBlocks();
-		BuildGuide.logHandler.sendChatMessage("[Build Guide] Validate - ok: " + state.getOk() + ", missing: " + state.getMissing() + ", wrong: " + state.getWrong() + ", near: " + nearBlocks.size());
-		int shown = 0;
-		for(NearBlock nb: nearBlocks) {
-			if(shown >= 10) {
-				BuildGuide.logHandler.sendChatMessage("  ... and " + (nearBlocks.size() - 10) + " more near blocks");
-				break;
-			}
-			++shown;
-			int x = ox + LocalPos.unpackX(nb.localPos), y = oy + LocalPos.unpackY(nb.localPos), z = oz + LocalPos.unpackZ(nb.localPos);
-			BuildGuide.logHandler.sendChatMessage("  near [" + x + ", " + y + ", " + z + "] " + nb.blockName + " (d=" + String.format(Locale.ROOT, "%.1f", nb.distance) + ")");
-		}
+	// One-line chat summary read from the state; positions will be shown in the GUI (2.4), not logged
+	private void logValidation(ValidationState state) {
+		BuildGuide.logHandler.sendChatMessage("[Build Guide] Validate - ok " + state.getOk() + ", missing " + state.getMissing() + ", wrong " + state.getWrong() + ", near " + state.getNearCount());
 	}
 
 	public static RenderPipeline getRenderPipeline() {

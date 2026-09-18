@@ -3,6 +3,7 @@ package brentmaas.buildguide.common.shape;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -37,7 +38,11 @@ public class ValidationState {
 
 	private final Map<Long, Byte> status = new HashMap<Long, Byte>();
 	private final Map<Long, String> wrongBlockNames = new HashMap<Long, String>();
-	private List<NearBlock> nearBlocks = new ArrayList<NearBlock>();
+	// Near blocks keyed by local position so incremental updates can add and remove them
+	private Map<Long, NearBlock> nearBlocks = new LinkedHashMap<Long, NearBlock>();
+	// Local bounding box of the expected positions, expanded by nearRadius; cheap pre-filter for block events
+	private int minX, minY, minZ, maxX, maxY, maxZ;
+	public static final int nearRadius = 2;
 	private int ok = 0, missing = 0, wrong = 0;
 	private boolean validated = false;
 
@@ -45,15 +50,26 @@ public class ValidationState {
 	public synchronized void invalidate() {
 		status.clear();
 		wrongBlockNames.clear();
-		nearBlocks = new ArrayList<NearBlock>();
+		nearBlocks.clear();
 		ok = missing = wrong = 0;
 		validated = false;
+		minX = minY = minZ = Integer.MAX_VALUE;
+		maxX = maxY = maxZ = Integer.MIN_VALUE;
 	}
 
 	// Start a full scan over these expected positions (all UNKNOWN until set)
 	public synchronized void beginScan(Collection<Long> expected) {
 		invalidate();
-		for(long pos: expected) status.put(pos, UNKNOWN);
+		for(long pos: expected) {
+			status.put(pos, UNKNOWN);
+			int x = LocalPos.unpackX(pos), y = LocalPos.unpackY(pos), z = LocalPos.unpackZ(pos);
+			if(x < minX) minX = x;
+			if(x > maxX) maxX = x;
+			if(y < minY) minY = y;
+			if(y > maxY) maxY = y;
+			if(z < minZ) minZ = z;
+			if(z > maxZ) maxZ = z;
+		}
 	}
 
 	public synchronized void endScan() {
@@ -96,7 +112,48 @@ public class ValidationState {
 	}
 
 	public synchronized void setNearBlocks(List<NearBlock> near) {
-		nearBlocks = near != null ? new ArrayList<NearBlock>(near) : new ArrayList<NearBlock>();
+		nearBlocks.clear();
+		if(near != null) for(NearBlock nb: near) nearBlocks.put(nb.localPos, nb);
+	}
+	
+	// True if a local position could affect this state: inside the expected bounding box expanded by nearRadius
+	public synchronized boolean isInRange(int x, int y, int z) {
+		return validated && x >= minX - nearRadius && x <= maxX + nearRadius && y >= minY - nearRadius && y <= maxY + nearRadius && z >= minZ - nearRadius && z <= maxZ + nearRadius;
+	}
+	
+	/**
+	 * Incremental update for one changed block (same rules as the full scan). Expected
+	 * position: air -> MISSING, solid -> OK, otherwise WRONG. Other positions: a solid block
+	 * within nearRadius of an expected one becomes a near block; anything else removes one.
+	 */
+	public synchronized void updateBlock(long local, boolean air, boolean solid, String blockName) {
+		if(!validated) return;
+		if(status.containsKey(local)) {
+			if(air) setStatus(local, MISSING, null);
+			else if(solid) setStatus(local, OK, null);
+			else setStatus(local, WRONG, blockName);
+			return;
+		}
+		if(air || !solid) {
+			nearBlocks.remove(local);
+			return;
+		}
+		int x = LocalPos.unpackX(local), y = LocalPos.unpackY(local), z = LocalPos.unpackZ(local);
+		double best = Double.MAX_VALUE;
+		for(int dx = -nearRadius;dx <= nearRadius;++dx) {
+			for(int dy = -nearRadius;dy <= nearRadius;++dy) {
+				for(int dz = -nearRadius;dz <= nearRadius;++dz) {
+					int d2 = dx * dx + dy * dy + dz * dz;
+					if(d2 == 0 || d2 > nearRadius * nearRadius) continue;
+					if(status.containsKey(LocalPos.pack(x + dx, y + dy, z + dz))) {
+						double d = Math.sqrt(d2);
+						if(d < best) best = d;
+					}
+				}
+			}
+		}
+		if(best <= nearRadius) nearBlocks.put(local, new NearBlock(local, blockName, (float) best));
+		else nearBlocks.remove(local);
 	}
 
 	public synchronized boolean isValidated() {
@@ -143,6 +200,10 @@ public class ValidationState {
 	}
 
 	public synchronized List<NearBlock> getNearBlocks() {
-		return new ArrayList<NearBlock>(nearBlocks);
+		return new ArrayList<NearBlock>(nearBlocks.values());
+	}
+	
+	public synchronized int getNearCount() {
+		return nearBlocks.size();
 	}
 }

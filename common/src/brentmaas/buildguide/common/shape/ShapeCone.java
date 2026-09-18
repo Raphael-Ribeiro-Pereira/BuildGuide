@@ -58,8 +58,8 @@ public class ShapeCone extends Shape implements IValidatable {
 	}
 
 	protected void updateShape(IShapeBuffer buffer) throws InterruptedException {
+		validationState.invalidate(); // before clearing: block events check isValidated() and never touch expectedBlocks
 		expectedBlocks.clear();
-		validationState.invalidate();
 
 		double offset = propertyEvenMode.value ? 0.5 : 0.0;
 		switch(propertyDir.value) {

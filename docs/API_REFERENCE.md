@@ -64,8 +64,33 @@ held by each `IValidatable` shape in a `transient` field (never persisted):
   `getWrongBlockName(pos)` (error lists, 2.4), `getNearBlocks()`.
 - Shapes call `validationState.invalidate()` right where they clear `expectedBlocks` in
   `updateShape`: a regenerated shape is "never validated" again.
-- Threads: today the scan runs on the render thread and `invalidate()` on the generation
-  executor; 2.2 adds block-event writers. Hence `synchronized` from day one.
+- Threads: the scan and the incremental updates run on the client main thread,
+  `invalidate()` on the generation executor. Hence `synchronized` from day one.
+
+**Incremental validation (Etapa 2.2).** `fabric/mixin/MixinClientLevel` injects at the
+return of `ClientLevel.setBlock(BlockPos, BlockState, int, int)` — the single point where
+server block updates, section updates, local placement prediction and block destruction
+converge (chunk loads do not: that is what the Validate scan is for). It calls
+`fabric/validation/IncrementalValidator.onBlockChanged`, which for every shape set with an
+instantiated `IValidatable` shape does, cheapest first: `isInRange(local)` (validated **and**
+inside the expected bounding box expanded by `nearRadius` = 2, ~0.01 µs), then
+`ValidationState.updateBlock(local, air, solid, name)`: an expected position becomes
+MISSING / OK / WRONG by transition (~0.1 µs); any other position runs the same 5×5×5 near
+test as the scan and adds or **removes** a near block (near blocks are keyed by position in
+a `LinkedHashMap`; ~0.6 µs measured on a 50k-position state). Never touches the shape's
+`expectedBlocks` set — shapes call `invalidate()` **before** `expectedBlocks.clear()` so a
+regenerating shape is skipped. The scan log is one line: `[Build Guide] Validate - ok N,
+missing N, wrong N, near N`.
+
+**Reset (Etapa 2.2).** One fixed `Reset` button in `ShapeScreen` at `(5, 238)` 160×20
+(below the validation block, above the 270 px limit). `ShapeSet.initialiseShape` calls
+`Shape.captureDefaults()` right after construction (before `restorePersistence`), storing
+every persisted property's constructor value in an `IdentityHashMap`.
+`Shape.resetShownToDefaults()` restores the properties currently `isShown` (the selected
+section with sections, all of them without), skipping `protectFromReset(...)` ones and
+value-less ones, then calls `update()` **once** (`setValue` never runs `onPress`). Spline and
+Bridge protect their control points and `Point count`. The per-section Reset buttons of
+Step 4 are gone (Bridge `Rails` is back to 9 rows).
 
 The old Fabric-only `validation/NearBlock` and `ValidationResult` were removed; the state
 lives in `common` so the GUI can read it.
@@ -169,11 +194,8 @@ would be a new `Taper square` shape interpolating `w` per row.
   step) and is hidden with `Shape.hideFromGui` — still in `properties`, so persistence
   stays aligned.
 - `Post spacing` moved to the `Rails` section (layout only; persistence order unchanged).
-- Per-section **Reset** buttons (`Deck`, `Rails`, `Supports`): GUI-only `PropertyRunnable`s
-  sharing the last row with Validate (`PropertyRunnable(run, name, xOffset, width)`:
-  Validate `0/100`, Reset `110/100`). Defaults are captured at construction into an
-  `IdentityHashMap` (`rememberDefaults`); reset calls `setValue` on each (which does not
-  run `onPress`) and then **one** `update()`. Points and count are never reset.
+- ~~Per-section Reset buttons~~ — replaced in Etapa 2.2 by the screen-wide Reset (see
+  ValidationState section); `PropertyRunnable(run, name, xOffset, width)` remains available.
 
 Persistence order: `p1x..p5z` (15), `Point count`, `Sample step` (hidden), `Profile`,
 `Width`, `Thickness`, `Validate`, then Step 2: `Rail mode`, `Rail sides`, `Rail profile`,
@@ -183,7 +205,7 @@ Persistence order: `p1x..p5z` (15), `Point count`, `Sample step` (hidden), `Prof
 they take no persistence slots. Sections and row counts (selector + properties + last row
 with Validate/Reset): `Shape` (count + up to 5 point rows) = 7; `Deck` (3) = 5; `Rails`
 (7 rail + post spacing = 8) = **10 rows = 270 px, exactly the GUI height at scale 4** —
-anything more must split; `Supports` (6 pillar) = 8; Validate global. Registered last.
+anything more must split (the Step 4 reset button that shared the Validate row is gone); `Supports` (6 pillar) = 8; Validate global. Registered last.
 
 Offline harness: `BuildGuide-tools/bridgetest/BridgeTest.java` (property indices in its
 header) — run it before any in-game test of Bridge changes.
@@ -282,4 +304,4 @@ args...)` formats with `%s`. Keys added by this fork: `mode`, `topradius`, `tape
 `railwidth`, `railheight`, `railelevation`, `railinset`, `postspacing`, `section.rails`,
 `section.supports`; Step 3 added `pillarmode`, `pillarshape`, `pillarwidth`, `pillardepth`,
 `pillarspacing`, `pillartaper`; Step 4 added `resetsection`; Etapa 2.1 added
-`screen.buildguide.validation`.
+`screen.buildguide.validation`; Etapa 2.2 added `screen.buildguide.reset` and removed `resetsection`.

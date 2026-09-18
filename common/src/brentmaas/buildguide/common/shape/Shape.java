@@ -28,6 +28,10 @@ public abstract class Shape {
 	private List<Property<?>> guiOnlyProperties = new ArrayList<Property<?>>();
 	// Persisted properties that are no longer shown (kept in `properties` so saves stay aligned)
 	private Set<Property<?>> hiddenProperties = Collections.newSetFromMap(new IdentityHashMap<Property<?>, Boolean>());
+	// Reset support: constructor values of every persisted property (captured by ShapeSet right after
+	// construction, before any persistence is restored) and the properties Reset must never touch
+	private Map<Property<?>, Object> defaults = new IdentityHashMap<Property<?>, Object>();
+	private Set<Property<?>> resetProtected = Collections.newSetFromMap(new IdentityHashMap<Property<?>, Boolean>());
 	public IShapeBuffer buffer;
 	private int nBlocks = 0;
 	public boolean ready = false;
@@ -181,6 +185,34 @@ public abstract class Shape {
 	// Keep a property in the persistence list but out of the panel (for properties that became inert)
 	protected void hideFromGui(Property<?> p) {
 		hiddenProperties.add(p);
+	}
+	
+	// Called once by ShapeSet after construction: remember what "default" means for this shape
+	public void captureDefaults() {
+		for(Property<?> p: properties) defaults.put(p, p.value);
+	}
+	
+	// Properties Reset must leave alone (e.g. control points captured from the player position)
+	protected void protectFromReset(Property<?>... props) {
+		for(Property<?> p: props) resetProtected.add(p);
+	}
+	
+	/**
+	 * Restore defaults for the properties currently shown (the selected section when the shape
+	 * has sections, all of them otherwise), except protected ones, then regenerate once.
+	 * Property.setValue does not run onPress, so there is exactly one update().
+	 */
+	@SuppressWarnings("unchecked")
+	public void resetShownToDefaults() {
+		boolean changed = false;
+		for(Property<?> p: properties) {
+			if(resetProtected.contains(p) || !isShown(p) || !defaults.containsKey(p)) continue;
+			Object def = defaults.get(p);
+			if(def == null || def instanceof Runnable) continue; // buttons and row owners hold no value
+			((Property<Object>) p).setValue(def);
+			changed = true;
+		}
+		if(changed) update();
 	}
 	
 	// Everything the screen must add as widgets: the persisted properties plus the section selector

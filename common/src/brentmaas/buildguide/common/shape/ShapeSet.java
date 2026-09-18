@@ -51,6 +51,7 @@ public class ShapeSet {
 	private Shape initialiseShape(String shapeId) {
 		Shape newShape = ShapeRegistry.getNewInstance(shapeId);
 		newShape.shapeSet = this;
+		newShape.captureDefaults();
 		BaseScreen.shouldUpdatePersistence = true;
 		return newShape;
 	}
