@@ -9,12 +9,22 @@ import brentmaas.buildguide.common.screen.widget.AbstractWidgetHandler;
 import brentmaas.buildguide.common.screen.widget.IWidget;
 
 public class PropertyRunnable extends Property<Runnable> {
+	private int xOffset = 0;
+	private int width = 210;
+	
 	public PropertyRunnable(Runnable value, Translatable name) {
 		super(value, name);
 	}
 	
+	// Narrower button at x + xOffset, so two buttons can share a row (e.g. Validate + Reset)
+	public PropertyRunnable(Runnable value, Translatable name, int xOffset, int width) {
+		super(value, name);
+		this.xOffset = xOffset;
+		this.width = width;
+	}
+	
 	protected void initWidgets(ArrayList<IWidget> widgetList) {
-		widgetList.add(BuildGuide.widgetHandler.createButton(x, y, 210, AbstractWidgetHandler.defaultSize, name, () -> {
+		widgetList.add(BuildGuide.widgetHandler.createButton(x + xOffset, y, width, AbstractWidgetHandler.defaultSize, name, () -> {
 			this.value.run();
 		}));
 	}

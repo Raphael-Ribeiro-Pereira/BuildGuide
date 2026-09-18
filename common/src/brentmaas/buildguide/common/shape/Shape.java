@@ -1,9 +1,11 @@
 package brentmaas.buildguide.common.shape;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -24,6 +26,8 @@ public abstract class Shape {
 	private Map<Property<?>, Integer> propertySections = new IdentityHashMap<Property<?>, Integer>();
 	// Properties that only exist for the panel (row owners, buttons): shown and laid out, never persisted
 	private List<Property<?>> guiOnlyProperties = new ArrayList<Property<?>>();
+	// Persisted properties that are no longer shown (kept in `properties` so saves stay aligned)
+	private Set<Property<?>> hiddenProperties = Collections.newSetFromMap(new IdentityHashMap<Property<?>, Boolean>());
 	public IShapeBuffer buffer;
 	private int nBlocks = 0;
 	public boolean ready = false;
@@ -174,10 +178,16 @@ public abstract class Shape {
 		guiOnlyProperties.add(p);
 	}
 	
+	// Keep a property in the persistence list but out of the panel (for properties that became inert)
+	protected void hideFromGui(Property<?> p) {
+		hiddenProperties.add(p);
+	}
+	
 	// Everything the screen must add as widgets: the persisted properties plus the section selector
 	public List<Property<?>> getGuiProperties() {
-		if(sectionSelector == null && guiOnlyProperties.isEmpty()) return properties;
-		List<Property<?>> all = new ArrayList<Property<?>>(properties);
+		if(sectionSelector == null && guiOnlyProperties.isEmpty() && hiddenProperties.isEmpty()) return properties;
+		List<Property<?>> all = new ArrayList<Property<?>>();
+		for(Property<?> p: properties) if(!hiddenProperties.contains(p)) all.add(p);
 		all.addAll(guiOnlyProperties);
 		if(sectionSelector != null) all.add(sectionSelector);
 		return all;
@@ -185,6 +195,7 @@ public abstract class Shape {
 	
 	// True if the property belongs to the selected section or to no section
 	protected boolean isShown(Property<?> p) {
+		if(hiddenProperties.contains(p)) return false;
 		Integer section = propertySections.get(p);
 		return section == null || sectionSelector == null || section == sectionSelector.value;
 	}

@@ -126,15 +126,32 @@ offset is subtracted back to centre the footprint); `Pillar taper` is the base/t
 ratio — 2.0 = base twice as wide (the reference bridges), 0.5 = obelisk. A square taper
 would be a new `Taper square` shape interpolating `w` per row.
 
-Persistence order: `p1x..p5z` (15), `Point count`, `Sample step`, `Profile`, `Width`,
-`Thickness`, `Validate`, then Step 2: `Rail mode`, `Rail sides`, `Rail profile`,
+**Step 4 fixes (after the first in-game test).**
+- End pillars are pulled inward by `min(length/2, (w−1)/2)` along the curve so the whole
+  footprint stays under the deck (harness: 100% under deck in +x/−x/+z/diagonal, even and
+  odd widths). A pillar wider than the bridge is long still overhangs — unavoidable.
+- `Rail profile: Round` is **hollow** (`Profiles.hollowEllipse` = filled ellipse minus the
+  filled ellipse inscribed one block in; for `w ≤ 2` or `h ≤ 2` it equals the filled one, so
+  it never goes empty). Deck `Disk` and pillar `Round` stay filled.
+- `Sample step` is inert (adaptive subdivision caps section spacing at 0.75 whatever the
+  step) and is hidden with `Shape.hideFromGui` — still in `properties`, so persistence
+  stays aligned.
+- `Post spacing` moved to the `Rails` section (layout only; persistence order unchanged).
+- Per-section **Reset** buttons (`Deck`, `Rails`, `Supports`): GUI-only `PropertyRunnable`s
+  sharing the last row with Validate (`PropertyRunnable(run, name, xOffset, width)`:
+  Validate `0/100`, Reset `110/100`). Defaults are captured at construction into an
+  `IdentityHashMap` (`rememberDefaults`); reset calls `setValue` on each (which does not
+  run `onPress`) and then **one** `update()`. Points and count are never reset.
+
+Persistence order: `p1x..p5z` (15), `Point count`, `Sample step` (hidden), `Profile`,
+`Width`, `Thickness`, `Validate`, then Step 2: `Rail mode`, `Rail sides`, `Rail profile`,
 `Rail width`, `Rail height`, `Rail elevation`, `Rail inset`, `Post spacing`, then Step 3:
 `Pillar mode`, `Pillar shape`, `Pillar width`, `Pillar depth`, `Pillar spacing`,
-`Pillar taper` (35 entries). Point rows are GUI-only (see below), so unlike Spline they
-take no persistence slots. Sections: `Shape` (count, point rows, sample step), `Deck`
-(profile, width, thickness), `Rails` (7), `Supports` (post spacing + 6 pillar properties =
-7 → 9 rows with selector and Validate = 250 px, the ceiling; anything more must split into
-`Posts` / `Pillars`); Validate global. Registered last.
+`Pillar taper` (35 entries). Point rows and Reset buttons are GUI-only (see below), so
+they take no persistence slots. Sections and row counts (selector + properties + last row
+with Validate/Reset): `Shape` (count + up to 5 point rows) = 7; `Deck` (3) = 5; `Rails`
+(7 rail + post spacing = 8) = **10 rows = 270 px, exactly the GUI height at scale 4** —
+anything more must split; `Supports` (6 pillar) = 8; Validate global. Registered last.
 
 Offline harness: `BuildGuide-tools/bridgetest/BridgeTest.java` (property indices in its
 header) — run it before any in-game test of Bridge changes.
@@ -153,7 +170,7 @@ final before the first layout.
 | `PropertyFloat` / `PositiveFloat` / `NonzeroFloat` | float | same layout | |
 | `PropertyBoolean` | bool | checkbox | |
 | `PropertyEnum<E>` | enum | `<-` name `->` | needs display names array |
-| `PropertyRunnable` | Runnable | one 210-wide button at `x` | persists as `"Runnable"`; renders as a button (used for Validate, Set endpoint) |
+| `PropertyRunnable` | Runnable | 210-wide button at `x`, or `(run, name, xOffset, width)` for a narrower one sharing a row | persists as `"Runnable"`; renders as a button (Validate, Set endpoint, Reset) |
 | `PropertyCompactInt` (fork) | int | `-`(16) field(30) `+`(16) at `x+50+column*62` | no label, no Set; `commitTextField()` parses without `onPress` |
 | `PropertyPointRow` (fork) | none | label +5, `Set`(26) at +236, `Pos`(26) at +264 | owns three `PropertyCompactInt`; Set commits all then one `onUpdate`; Pos fills from `IPositionSource` |
 | `PropertyRangeInt` (fork) | int | same as `PropertyInt` | clamped to [min,max]; `-`/`+` disabled at the bounds via `IButton.setActive` |
@@ -192,6 +209,12 @@ persisted. Use it for row owners and buttons (`PropertyPointRow` in Bridge). Spl
 keeps its rows in `properties` (they were appended before this existed and persist as
 `"Row"`); do not change that.
 
+**Hidden properties.** `Shape.hideFromGui(p)` keeps a property in `properties` (persistence
+slot preserved) but out of `getGuiProperties()` and of the layout (`isShown` is false). Use
+it when a property becomes inert (Bridge `Sample step`). Requires the shape to have
+sections or a custom layout: the plain no-section loop in `onSelectedInGUI` is left
+untouched on purpose.
+
 ### Variable point count (Spline pattern)
 
 Persistence is by index, so a shape cannot add or remove properties at runtime. The
@@ -226,4 +249,4 @@ args...)` formats with `%s`. Keys added by this fork: `mode`, `topradius`, `tape
 `section.deck`, `samplestep`, `profile`; Step 2 added `railmode`, `railsides`, `railprofile`,
 `railwidth`, `railheight`, `railelevation`, `railinset`, `postspacing`, `section.rails`,
 `section.supports`; Step 3 added `pillarmode`, `pillarshape`, `pillarwidth`, `pillardepth`,
-`pillarspacing`, `pillartaper`.
+`pillarspacing`, `pillartaper`; Step 4 added `resetsection`.

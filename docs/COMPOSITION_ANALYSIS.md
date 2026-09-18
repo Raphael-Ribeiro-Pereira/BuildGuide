@@ -1,4 +1,4 @@
-**Done in Step 0.5** (`declareSection`/`assignSection`); Bridge uses Shape / Deck / Rails / Supports, max 9 rows. |# Composition analysis — can `ShapeBridge` reuse existing shapes?
+# Composition analysis — can `ShapeBridge` reuse existing shapes?
 
 Investigation for Etapa B. No feature code was written. Line numbers refer to branch
 `feat/cone-expanded` at the time of writing (Spline compaction included).
@@ -232,7 +232,7 @@ second enum or fixed defaults for the MVP.
 
 | Risk | Severity | Mitigation |
 |---|---|---|
-| **Property panel height.** Bridge ≈ 16 rows (5 points + 2 deck + 3 rail + 4 pillar + steps + validate) = 70 + 16×20 = 390 px. At GUI scale 4 on 1080p the GUI is 270 px tall; Spline's 9 rows (250) already brushes the limit. | High | Add a `PropertyEnum` "Section: Deck / Rails / Pillars" whose `onPress` toggles `setVisibility` on the other groups — `Property.setVisibility` already exists ([Property.java:65-70](../common/src/brentmaas/buildguide/common/property/Property.java#L65)), so this is cheap (~2 h) and avoids building scrolling. Do it in Step 1. |
+| **Property panel height.** Bridge ≈ 16 rows (5 points + 2 deck + 3 rail + 4 pillar + steps + validate) = 70 + 16×20 = 390 px. At GUI scale 4 on 1080p the GUI is 270 px tall; Spline's 9 rows (250) already brushes the limit. | High | Add a `PropertyEnum` "Section: Deck / Rails / Pillars" whose `onPress` toggles `setVisibility` on the other groups — `Property.setVisibility` already exists ([Property.java:65-70](../common/src/brentmaas/buildguide/common/property/Property.java#L65)), so this is cheap (~2 h) and avoids building scrolling. **Done in Step 0.5** (`declareSection`/`assignSection`); Bridge uses Shape / Deck / Rails / Supports, max 10 rows. |
 | Refactor regressions in Circle/Cuboid/Line/Cone | Medium | Enumerators are moved, not rewritten; decompile-diff + in-game checklist. |
 | Stair-stepping on bends (deck not tangent-aligned) | Low (MVP accepted) | Later: 90° snapping of the slab to the dominant tangent axis, or full rotation (§3). |
 | Double counting / duplicate cubes across parts | Low | Bridge-level `emitted` set (Spline pattern). |
