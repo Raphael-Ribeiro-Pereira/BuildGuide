@@ -96,6 +96,10 @@ public class ScreenWrapper extends Screen implements IScreenWrapper {
 		guiGraphicsInstance.drawString(this.minecraft.font, text, x, y, ARGB.color((colour >> 16) & 0xFF, (colour >> 8) & 0xFF, colour & 0xFF), true);
 	}
 	
+	public void fillRect(int x1, int y1, int x2, int y2, int colour) {
+		guiGraphicsInstance.fill(x1, y1, x2, y2, colour);
+	}
+	
 	public int getTextWidth(String text) {
 		return font.width(text);
 	}

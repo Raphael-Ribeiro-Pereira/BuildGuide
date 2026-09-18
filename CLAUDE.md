@@ -59,8 +59,12 @@ export PATH="$JAVA_HOME/bin:$PATH"
 - Block solidity: `BlockState.getMaterial().isSolid()` does not exist on 1.21.11 — use
   `isAir()` / `blocksMotion()`.
 - Validation flow: shape implements `IValidatable` (expected local blocks packed with
-  `LocalPos.pack`, one-shot `consumeValidateRequest()`); Fabric `RenderHandler.validateShape`
-  reads the world and reports via `BuildGuide.logHandler.sendChatMessage`.
+  `LocalPos.pack`, one-shot `consumeValidateRequest()`, a transient `ValidationState`);
+  Fabric `RenderHandler.validateShape` reads the world and fills the state (mutable,
+  per-position, synchronized; see `docs/API_REFERENCE.md`), then logs a summary from it.
+  Shapes call `validationState.invalidate()` where they clear `expectedBlocks`.
+- `IScreenWrapper.fillRect` is the only drawing primitive besides text; the validation bar
+  lives in `ShapeScreen.renderValidation()` (left column, y 205–230), not in a property row.
 - Geometry lives in `public static enumerate(..., IBlockConsumer)` on Circle/Cuboid/Line/Cone;
   `updateShape` only wires it to `addShapeCube`. Compose with `BlockOps` decorators, never by
   instantiating other shapes (see `docs/API_REFERENCE.md` → Composition primitives).

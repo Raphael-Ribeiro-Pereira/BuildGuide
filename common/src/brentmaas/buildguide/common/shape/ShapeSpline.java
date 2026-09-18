@@ -55,6 +55,7 @@ public class ShapeSpline extends Shape implements IValidatable {
 
 	private final Set<Long> expectedBlocks = new HashSet<Long>();
 	private transient boolean validateNextRender = false;
+	private transient ValidationState validationState = new ValidationState();
 
 	public ShapeSpline() {
 		super();
@@ -134,6 +135,7 @@ public class ShapeSpline extends Shape implements IValidatable {
 	
 	protected void updateShape(IShapeBuffer buffer) throws InterruptedException {
 		expectedBlocks.clear();
+		validationState.invalidate();
 
 		int[][] allPoints = {
 			{p1x.value, p1y.value, p1z.value},
@@ -205,5 +207,9 @@ public class ShapeSpline extends Shape implements IValidatable {
 
 	public Set<Long> getExpectedBlocks() {
 		return expectedBlocks;
+	}
+	
+	public ValidationState getValidationState() {
+		return validationState;
 	}
 }

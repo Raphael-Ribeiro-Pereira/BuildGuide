@@ -21,9 +21,9 @@ import brentmaas.buildguide.common.shape.Shape;
 import brentmaas.buildguide.common.shape.IValidatable;
 import brentmaas.buildguide.common.shape.LocalPos;
 import brentmaas.buildguide.common.shape.ShapeSet;
+import brentmaas.buildguide.common.shape.ValidationState;
+import brentmaas.buildguide.common.shape.ValidationState.NearBlock;
 import brentmaas.buildguide.fabric.shape.ShapeBuffer;
-import brentmaas.buildguide.fabric.validation.NearBlock;
-import brentmaas.buildguide.fabric.validation.ValidationResult;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -103,7 +103,9 @@ public class RenderHandler extends AbstractRenderHandler {
 		int oy = shapeSet.getOriginY();
 		int oz = shapeSet.getOriginZ();
 
-		// Expected blocks in world coordinates, plus their bounding box
+		// Expected blocks in world coordinates (mapped back to local for the state), plus their bounding box
+		ValidationState state = validatable.getValidationState();
+		state.beginScan(validatable.getExpectedBlocks());
 		Set<Long> expectedWorld = new HashSet<Long>();
 		int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
 		int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE;
@@ -121,13 +123,14 @@ public class RenderHandler extends AbstractRenderHandler {
 		}
 		if(expectedWorld.isEmpty()) return;
 
-		// Count expected positions: air -> missing, non-solid -> wrong, otherwise ok
-		int ok = 0, missing = 0, wrong = 0;
+		// Classify expected positions into the state: air -> missing, non-solid -> wrong, otherwise ok
 		for(long wl: expectedWorld) {
-			BlockState st = world.getBlockState(BlockPos.of(wl));
-			if(st.isAir()) ++missing;
-			else if(st.blocksMotion()) ++ok;
-			else ++wrong;
+			BlockPos wp = BlockPos.of(wl);
+			long local = LocalPos.pack(wp.getX() - ox, wp.getY() - oy, wp.getZ() - oz);
+			BlockState st = world.getBlockState(wp);
+			if(st.isAir()) state.setStatus(local, ValidationState.MISSING, null);
+			else if(st.blocksMotion()) state.setStatus(local, ValidationState.OK, null);
+			else state.setStatus(local, ValidationState.WRONG, st.getBlock().getName().getString());
 		}
 
 		// Solid blocks near (within 2) the shape but not part of it, likely misplaced
@@ -153,24 +156,29 @@ public class RenderHandler extends AbstractRenderHandler {
 							}
 						}
 					}
-					if(best <= 2.0) near.add(new NearBlock(x, y, z, st.getBlock().getName().getString(), (float) best));
+					if(best <= 2.0) near.add(new NearBlock(LocalPos.pack(x - ox, y - oy, z - oz), st.getBlock().getName().getString(), (float) best));
 				}
 			}
 		}
 
-		logValidation(new ValidationResult(ok, missing, wrong, near));
+		state.setNearBlocks(near);
+		state.endScan();
+		logValidation(state, ox, oy, oz);
 	}
 
-	private void logValidation(ValidationResult result) {
-		BuildGuide.logHandler.sendChatMessage("[Build Guide] Validate - ok: " + result.blocksOk + ", missing: " + result.blocksMissing + ", wrong: " + result.blocksWrong + ", near: " + result.nearBlocks.size());
+	// Chat summary read from the state (kept for debugging; the GUI shows the same numbers)
+	private void logValidation(ValidationState state, int ox, int oy, int oz) {
+		List<NearBlock> nearBlocks = state.getNearBlocks();
+		BuildGuide.logHandler.sendChatMessage("[Build Guide] Validate - ok: " + state.getOk() + ", missing: " + state.getMissing() + ", wrong: " + state.getWrong() + ", near: " + nearBlocks.size());
 		int shown = 0;
-		for(NearBlock nb: result.nearBlocks) {
+		for(NearBlock nb: nearBlocks) {
 			if(shown >= 10) {
-				BuildGuide.logHandler.sendChatMessage("  ... and " + (result.nearBlocks.size() - 10) + " more near blocks");
+				BuildGuide.logHandler.sendChatMessage("  ... and " + (nearBlocks.size() - 10) + " more near blocks");
 				break;
 			}
 			++shown;
-			BuildGuide.logHandler.sendChatMessage("  near [" + nb.x + ", " + nb.y + ", " + nb.z + "] " + nb.blockName + " (d=" + String.format(Locale.ROOT, "%.1f", nb.distance) + ")");
+			int x = ox + LocalPos.unpackX(nb.localPos), y = oy + LocalPos.unpackY(nb.localPos), z = oz + LocalPos.unpackZ(nb.localPos);
+			BuildGuide.logHandler.sendChatMessage("  near [" + x + ", " + y + ", " + z + "] " + nb.blockName + " (d=" + String.format(Locale.ROOT, "%.1f", nb.distance) + ")");
 		}
 	}
 

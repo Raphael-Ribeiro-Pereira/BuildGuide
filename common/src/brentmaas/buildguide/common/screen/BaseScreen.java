@@ -102,6 +102,10 @@ public abstract class BaseScreen {
 		if(wrapper != null) wrapper.drawShadow(text, x - wrapper.getTextWidth(text), y, colour);
 	}
 	
+	public void fillRect(int x1, int y1, int x2, int y2, int colour) {
+		if(wrapper != null) wrapper.fillRect(x1, y1, x2, y2, colour);
+	}
+	
 	protected void addProperty(Property<?> p) {
 		properties.add(p);
 		p.addToScreen(this);
@@ -126,4 +130,4 @@ public abstract class BaseScreen {
 	public boolean isPauseScreen() {
 		return false;
 	}
-}
+}

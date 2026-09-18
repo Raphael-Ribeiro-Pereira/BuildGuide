@@ -139,6 +139,7 @@ public class ShapeBridge extends Shape implements IValidatable {
 	// Every emitted block (packed with LocalPos): dedup between overlapping sections and the validation set
 	private final Set<Long> expectedBlocks = new HashSet<Long>();
 	private transient boolean validateNextRender = false;
+	private transient ValidationState validationState = new ValidationState();
 
 	// Lateral normal of the previous section; reused when the tangent has no horizontal
 	// component (vertical or degenerate stretch) so the deck does not twist abruptly
@@ -258,6 +259,7 @@ public class ShapeBridge extends Shape implements IValidatable {
 
 	protected void updateShape(IShapeBuffer buffer) throws InterruptedException {
 		expectedBlocks.clear();
+		validationState.invalidate();
 		lastNx = 1.0;
 		lastNz = 0.0;
 
@@ -484,5 +486,9 @@ public class ShapeBridge extends Shape implements IValidatable {
 
 	public Set<Long> getExpectedBlocks() {
 		return expectedBlocks;
+	}
+	
+	public ValidationState getValidationState() {
+		return validationState;
 	}
 }

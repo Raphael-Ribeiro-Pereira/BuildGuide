@@ -41,6 +41,7 @@ public class ShapeCone extends Shape implements IValidatable {
 	// Local (origin-relative) positions of every block in the shape, packed with packLocal
 	private final Set<Long> expectedBlocks = new HashSet<Long>();
 	private transient boolean validateNextRender = false;
+	private transient ValidationState validationState = new ValidationState();
 
 	public ShapeCone() {
 		super();
@@ -58,6 +59,7 @@ public class ShapeCone extends Shape implements IValidatable {
 
 	protected void updateShape(IShapeBuffer buffer) throws InterruptedException {
 		expectedBlocks.clear();
+		validationState.invalidate();
 
 		double offset = propertyEvenMode.value ? 0.5 : 0.0;
 		switch(propertyDir.value) {
@@ -241,6 +243,10 @@ public class ShapeCone extends Shape implements IValidatable {
 
 	public Set<Long> getExpectedBlocks() {
 		return expectedBlocks;
+	}
+	
+	public ValidationState getValidationState() {
+		return validationState;
 	}
 
 	// Returns true exactly once per button press

@@ -26,6 +26,9 @@ public interface IScreenWrapper {
 	
 	public void drawShadow(String text, int x, int y, int colour);
 	
+	// Filled rectangle from (x1, y1) inclusive to (x2, y2) exclusive, ARGB colour
+	public void fillRect(int x1, int y1, int x2, int y2, int colour);
+	
 	public int getTextWidth(String text);
 	
 	public int getWidth();

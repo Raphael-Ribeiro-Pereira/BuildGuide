@@ -9,4 +9,7 @@ public interface IValidatable {
 	
 	// Returns true exactly once per validation request
 	public boolean consumeValidateRequest();
+	
+	// Live validation state, filled by the render handler and read by the GUI (transient, never persisted)
+	public ValidationState getValidationState();
 }

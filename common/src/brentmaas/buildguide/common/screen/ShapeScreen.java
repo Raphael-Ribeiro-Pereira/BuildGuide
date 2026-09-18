@@ -7,6 +7,8 @@ import brentmaas.buildguide.common.screen.widget.AbstractWidgetHandler;
 import brentmaas.buildguide.common.screen.widget.IButton;
 import brentmaas.buildguide.common.screen.widget.ITextField;
 import brentmaas.buildguide.common.shape.Shape;
+import brentmaas.buildguide.common.shape.IValidatable;
+import brentmaas.buildguide.common.shape.ValidationState;
 import brentmaas.buildguide.common.shape.ShapeRegistry;
 
 public class ShapeScreen extends BaseScreen{
@@ -14,6 +16,7 @@ public class ShapeScreen extends BaseScreen{
 	public static final int basePropertiesY = 70;
 	
 	private Translatable titleShapeProperties = new Translatable("screen.buildguide.shapeproperties");
+	private Translatable titleValidation = new Translatable("screen.buildguide.validation");
 	private Translatable titleOrigin = new Translatable("screen.buildguide.origin");
 	private Translatable titleShape = new Translatable("screen.buildguide.shape");
 	
@@ -115,6 +118,32 @@ public class ShapeScreen extends BaseScreen{
 		drawShadowLeft("Z", 10, 180, BuildGuide.stateManager.getState().isShapeAvailable() ? 0xFFFFFF : 0x444444);
 		
 		drawShadowCentred(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + titleShapeProperties, 285, 55, 0xFFFFFF);
+		
+		renderValidation();
+	}
+	
+	// Validation block under the origin (y 200..230 is free there): title, bar and "ok / total" text.
+	// Shapes that are not IValidatable show a dash; validatable but never scanned shows "- / total"
+	private void renderValidation() {
+		drawShadowCentred(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + titleValidation, 85, 205, 0xFFFFFF);
+		if(!BuildGuide.stateManager.getState().isShapeAvailable() || !(BuildGuide.stateManager.getState().getCurrentShape() instanceof IValidatable validatable)) {
+			drawShadowCentred("-", 85, 219, 0x888888);
+			return;
+		}
+		ValidationState state = validatable.getValidationState();
+		int barX1 = 5, barX2 = 165, barY1 = 217, barY2 = 224;
+		fillRect(barX1, barY1, barX2, barY2, 0xFF303030);
+		if(!state.isValidated()) {
+			drawShadowCentred("- / " + validatable.getExpectedBlocks().size(), 85, 226, 0xAAAAAA);
+			return;
+		}
+		int ok = state.getOk(), total = state.getTotal(), wrong = state.getWrong();
+		double progress = state.getProgress();
+		int fillX2 = barX1 + (int) Math.round((barX2 - barX1) * progress);
+		if(fillX2 > barX1) fillRect(barX1, barY1, fillX2, barY2, ok == total ? 0xFF40C040 : 0xFF40A0FF);
+		String text = ok + " / " + total + " (" + String.format(java.util.Locale.ROOT, "%.1f", 100.0 * progress) + "%)";
+		if(wrong > 0) text += "  wrong " + wrong;
+		drawShadowCentred(text, 85, 226, wrong > 0 ? 0xFF8080 : 0xFFFFFF);
 	}
 	
 	private void addShapeProperties(Shape shape) {

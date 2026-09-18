@@ -43,8 +43,40 @@ public abstract class Shape {
 - Local coordinates: everything a shape emits is relative to the shape set origin.
   `LocalPos.pack/unpackX/Y/Z` packs a local position into a `long` (21 signed bits/axis).
 - Validation opt-in: implement `IValidatable` (`getExpectedBlocks()` as packed longs,
-  `consumeValidateRequest()` one-shot). `fabric/RenderHandler.validateShape` compares with
-  the world and reports via `logHandler.sendChatMessage`.
+  `consumeValidateRequest()` one-shot, `getValidationState()`). `fabric/RenderHandler.validateShape`
+  compares with the world, **fills the shape's `ValidationState`** and prints a chat
+  summary read from it.
+
+### ValidationState (Etapa 2.1)
+
+`common/shape/ValidationState` — live, **mutable, per-position, `synchronized`** state
+held by each `IValidatable` shape in a `transient` field (never persisted):
+
+- `Map<Long, Byte> status` (packed local position → `UNKNOWN/OK/MISSING/WRONG`), wrong
+  block names in a second map, `List<NearBlock{localPos, blockName, distance}>`.
+- Scan protocol: `beginScan(expected)` (all `UNKNOWN`, not validated) → `setStatus(pos,
+  status, name)` per position → `setNearBlocks(list)` → `endScan()` (validated = true).
+- `setStatus` adjusts `ok/missing/wrong` **by the transition** (O(1)); positions not in the
+  map are ignored. This is what incremental validation (2.2) will call per block event.
+- `exclude(pos)` removes a position: it leaves the total, it does not become missing (2.3).
+- Readers: `isValidated()`, `getOk/Missing/Wrong/Total()`, `getProgress()` (ok/total),
+  `getStatus(pos)` O(1) (for the coloured preview, 1.x), `getPositions(status)` and
+  `getWrongBlockName(pos)` (error lists, 2.4), `getNearBlocks()`.
+- Shapes call `validationState.invalidate()` right where they clear `expectedBlocks` in
+  `updateShape`: a regenerated shape is "never validated" again.
+- Threads: today the scan runs on the render thread and `invalidate()` on the generation
+  executor; 2.2 adds block-event writers. Hence `synchronized` from day one.
+
+The old Fabric-only `validation/NearBlock` and `ValidationResult` were removed; the state
+lives in `common` so the GUI can read it.
+
+**Progress bar.** Drawn by `ShapeScreen.renderValidation()` in the **left column under
+the origin** (y 205–230, which is free; the property rows and the Validate/Reset row are
+untouched, so no section grows): title, a 160×7 bar (`BaseScreen.fillRect` →
+`IScreenWrapper.fillRect` → `GuiGraphics.fill`, the one Fabric addition) and the text
+`ok / total (pct%)`, plus `wrong N` in red when there are wrong blocks. Shapes that are
+not `IValidatable` show `-`; validatable but never scanned shows `- / total` (the total is
+known from `getExpectedBlocks()` without a scan). Green bar when complete, blue otherwise.
 
 ### Composition primitives (Step 0)
 
@@ -249,4 +281,5 @@ args...)` formats with `%s`. Keys added by this fork: `mode`, `topradius`, `tape
 `section.deck`, `samplestep`, `profile`; Step 2 added `railmode`, `railsides`, `railprofile`,
 `railwidth`, `railheight`, `railelevation`, `railinset`, `postspacing`, `section.rails`,
 `section.supports`; Step 3 added `pillarmode`, `pillarshape`, `pillarwidth`, `pillardepth`,
-`pillarspacing`, `pillartaper`; Step 4 added `resetsection`.
+`pillarspacing`, `pillartaper`; Step 4 added `resetsection`; Etapa 2.1 added
+`screen.buildguide.validation`.
