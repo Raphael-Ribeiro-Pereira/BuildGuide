@@ -6,6 +6,7 @@ import java.util.Set;
 import brentmaas.buildguide.common.property.Property;
 import brentmaas.buildguide.common.property.PropertyCompactInt;
 import brentmaas.buildguide.common.property.PropertyEnum;
+import brentmaas.buildguide.common.property.PropertyInt;
 import brentmaas.buildguide.common.property.PropertyPointRow;
 import brentmaas.buildguide.common.property.PropertyPositiveFloat;
 import brentmaas.buildguide.common.property.PropertyPositiveInt;
@@ -15,12 +16,13 @@ import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
 
 /**
  * Composed shape: a Catmull-Rom curve through 2..5 control points with a deck stamped
- * along it. The curve is sampled by arc length; at each sample a horizontal cross-section
- * (Flat, Box or Disk profile) is placed perpendicular to the curve. The curve is the top row
- * of the deck and thickness grows downward.
+ * along it, optional handrails (continuous rail and/or posts) on either side. The curve is
+ * sampled by arc length; at each sample horizontal cross-sections are placed perpendicular
+ * to the curve. Conventions: the curve is the top row of the deck and deck thickness grows
+ * downward; rails sit `Rail elevation` blocks above the curve and grow upward.
  *
  * Geometry comes from the Step 0 enumerators (ShapeCuboid, Profiles); nothing is
- * instantiated. Handrails and pillars are appended in later steps.
+ * instantiated. Pillars are appended in Step 3.
  */
 public class ShapeBridge extends Shape implements IValidatable {
 	public enum Profile{
@@ -29,13 +31,44 @@ public class ShapeBridge extends Shape implements IValidatable {
 		DISK
 	}
 
+	public enum RailMode{
+		NONE,
+		CONTINUOUS,
+		POSTS,
+		BOTH
+	}
+
+	public enum RailSides{
+		LEFT,
+		RIGHT,
+		BOTH
+	}
+
+	public enum RailProfile{
+		SQUARE,
+		ROUND
+	}
+
+	// How a w x h section is filled when placed
+	private enum SectionKind{
+		FILLED,
+		OUTLINE,
+		ELLIPSE
+	}
+
 	private static final int maxPoints = 5;
 	private static final int minPoints = 2;
+	// Consecutive samples are subdivided until no lateral edge moves more than this (blocks)
+	private static final double maxEdgeStep = 0.75;
 
 	private String[] profileNames = {"Flat", "Box", "Disk"};
+	private String[] railModeNames = {"None", "Continuous", "Posts only", "Both"};
+	private String[] railSidesNames = {"Left", "Right", "Both"};
+	private String[] railProfileNames = {"Square", "Round"};
 
-	// Persistence order: p1x, p1y, p1z, ... p5z, count, sample step, profile, width, thickness, validate.
-	// Point rows are GUI-only (not persisted). Handrail/pillar properties go after validate.
+	// Persistence order: p1x, p1y, p1z, ... p5z, count, sample step, profile, width, thickness, validate,
+	// then (Step 2) rail mode, rail sides, rail profile, rail width, rail height, rail elevation, rail inset,
+	// post spacing. Point rows are GUI-only (not persisted). Pillar properties go after post spacing.
 	private PropertyCompactInt p1x = new PropertyCompactInt(0, new Translatable("property.buildguide.point", "1", "X"), () -> update(), 0);
 	private PropertyCompactInt p1y = new PropertyCompactInt(0, new Translatable("property.buildguide.point", "1", "Y"), () -> update(), 1);
 	private PropertyCompactInt p1z = new PropertyCompactInt(0, new Translatable("property.buildguide.point", "1", "Z"), () -> update(), 2);
@@ -59,6 +92,17 @@ public class ShapeBridge extends Shape implements IValidatable {
 	private PropertyPositiveInt propertyThickness = new PropertyPositiveInt(1, new Translatable("property.buildguide.thickness"), () -> update());
 	// PropertyRunnable renders as a button
 	private PropertyRunnable propertyValidate = new PropertyRunnable(() -> triggerValidation(), new Translatable("property.buildguide.validate"));
+	// Rails (Step 2). Rail width/height are the rail's cross-section; elevation is how far above
+	// the curve the section starts; inset moves it from the deck edge inward (negative = outward)
+	private PropertyEnum<RailMode> propertyRailMode = new PropertyEnum<RailMode>(RailMode.NONE, new Translatable("property.buildguide.railmode"), () -> update(), railModeNames);
+	private PropertyEnum<RailSides> propertyRailSides = new PropertyEnum<RailSides>(RailSides.BOTH, new Translatable("property.buildguide.railsides"), () -> update(), railSidesNames);
+	private PropertyEnum<RailProfile> propertyRailProfile = new PropertyEnum<RailProfile>(RailProfile.SQUARE, new Translatable("property.buildguide.railprofile"), () -> update(), railProfileNames);
+	private PropertyPositiveInt propertyRailWidth = new PropertyPositiveInt(1, new Translatable("property.buildguide.railwidth"), () -> update());
+	private PropertyPositiveInt propertyRailHeight = new PropertyPositiveInt(1, new Translatable("property.buildguide.railheight"), () -> update());
+	private PropertyInt propertyRailElevation = new PropertyInt(1, new Translatable("property.buildguide.railelevation"), () -> update());
+	private PropertyInt propertyRailInset = new PropertyInt(0, new Translatable("property.buildguide.railinset"), () -> update());
+	// Target distance between posts along the curve; posts are spread evenly and always sit at both ends
+	private PropertyPositiveInt propertyPostSpacing = new PropertyPositiveInt(4, new Translatable("property.buildguide.postspacing"), () -> update());
 
 	private PropertyCompactInt[][] points = {{p1x, p1y, p1z}, {p2x, p2y, p2z}, {p3x, p3y, p3z}, {p4x, p4y, p4z}, {p5x, p5y, p5z}};
 	private PropertyPointRow[] pointRows = new PropertyPointRow[maxPoints];
@@ -66,6 +110,10 @@ public class ShapeBridge extends Shape implements IValidatable {
 	// Every emitted block (packed with LocalPos): dedup between overlapping sections and the validation set
 	private final Set<Long> expectedBlocks = new HashSet<Long>();
 	private transient boolean validateNextRender = false;
+
+	// Lateral normal of the previous section; reused when the tangent has no horizontal
+	// component (vertical or degenerate stretch) so the deck does not twist abruptly
+	private double lastNx = 1.0, lastNz = 0.0;
 
 	public ShapeBridge() {
 		super();
@@ -81,6 +129,14 @@ public class ShapeBridge extends Shape implements IValidatable {
 		properties.add(propertyWidth);
 		properties.add(propertyThickness);
 		properties.add(propertyValidate);
+		properties.add(propertyRailMode);
+		properties.add(propertyRailSides);
+		properties.add(propertyRailProfile);
+		properties.add(propertyRailWidth);
+		properties.add(propertyRailHeight);
+		properties.add(propertyRailElevation);
+		properties.add(propertyRailInset);
+		properties.add(propertyPostSpacing);
 
 		for(int i = 0;i < maxPoints;++i) {
 			pointRows[i] = new PropertyPointRow(new Translatable("property.buildguide.pointrow", "" + (i + 1)), points[i][0], points[i][1], points[i][2], () -> update(), () -> {
@@ -93,9 +149,13 @@ public class ShapeBridge extends Shape implements IValidatable {
 		// Panel sections; Validate stays visible in all of them
 		int sectionShape = declareSection(new Translatable("property.buildguide.section.shape"));
 		int sectionDeck = declareSection(new Translatable("property.buildguide.section.deck"));
+		int sectionRails = declareSection(new Translatable("property.buildguide.section.rails"));
+		int sectionSupports = declareSection(new Translatable("property.buildguide.section.supports"));
 		assignSection(sectionShape, propertyPointCount, propertySampleStep);
 		for(int i = 0;i < maxPoints;++i) assignSection(sectionShape, points[i][0], points[i][1], points[i][2], pointRows[i]);
 		assignSection(sectionDeck, propertyProfile, propertyWidth, propertyThickness);
+		assignSection(sectionRails, propertyRailMode, propertyRailSides, propertyRailProfile, propertyRailWidth, propertyRailHeight, propertyRailElevation, propertyRailInset);
+		assignSection(sectionSupports, propertyPostSpacing);
 	}
 
 	private void onPointCountChanged() {
@@ -103,7 +163,7 @@ public class ShapeBridge extends Shape implements IValidatable {
 		update();
 	}
 
-	// Rows: section selector; Shape = count, point rows in use, sample step; Deck = profile, width, thickness; then Validate
+	// Rows: section selector; then the current section's properties in list order (point rows only up to the count); then Validate
 	@Override
 	public void onSelectedInGUI() {
 		int row = placeSectionSelector();
@@ -117,7 +177,8 @@ public class ShapeBridge extends Shape implements IValidatable {
 				for(Property<?> p: rowProps) p.setVisibility(false);
 			}
 		}
-		for(Property<?> p: new Property<?>[] {propertySampleStep, propertyProfile, propertyWidth, propertyThickness}) {
+		Property<?>[] rest = {propertySampleStep, propertyProfile, propertyWidth, propertyThickness, propertyRailMode, propertyRailSides, propertyRailProfile, propertyRailWidth, propertyRailHeight, propertyRailElevation, propertyRailInset, propertyPostSpacing};
+		for(Property<?> p: rest) {
 			if(isShown(p)) row = placeRow(row, p);
 			else p.setVisibility(false);
 		}
@@ -126,6 +187,8 @@ public class ShapeBridge extends Shape implements IValidatable {
 
 	protected void updateShape(IShapeBuffer buffer) throws InterruptedException {
 		expectedBlocks.clear();
+		lastNx = 1.0;
+		lastNz = 0.0;
 
 		int count = Math.max(minPoints, Math.min(maxPoints, propertyPointCount.value));
 		int[][] used = new int[count][];
@@ -136,12 +199,27 @@ public class ShapeBridge extends Shape implements IValidatable {
 		double step = Math.max(0.05, propertySampleStep.value);
 		int width = Math.max(1, propertyWidth.value);
 		int thickness = Math.max(1, propertyThickness.value);
-		Profile profile = propertyProfile.value;
+		SectionKind deckKind = propertyProfile.value == Profile.FLAT ? SectionKind.FILLED : propertyProfile.value == Profile.BOX ? SectionKind.OUTLINE : SectionKind.ELLIPSE;
+		double halfWidth = (width - 1) / 2.0;
+
+		RailMode railMode = propertyRailMode.value;
+		boolean continuousRail = railMode == RailMode.CONTINUOUS || railMode == RailMode.BOTH;
+		boolean posts = railMode == RailMode.POSTS || railMode == RailMode.BOTH;
+		boolean leftRail = propertyRailSides.value != RailSides.RIGHT;
+		boolean rightRail = propertyRailSides.value != RailSides.LEFT;
+		int railWidth = Math.max(1, propertyRailWidth.value);
+		int railHeight = Math.max(1, propertyRailHeight.value);
+		int railElevation = propertyRailElevation.value;
+		double railLateral = halfWidth - propertyRailInset.value;
+		SectionKind railKind = propertyRailProfile.value == RailProfile.ROUND ? SectionKind.ELLIPSE : SectionKind.FILLED;
+
+		// The outermost element decides how densely a bend is sampled
+		double ext = halfWidth;
+		if(continuousRail) ext = Math.max(ext, Math.abs(railLateral) + (railWidth - 1) / 2.0);
 
 		// Walk the curve by arc length. `Sample step` sets the spacing at the centre line; on a
-		// bend the outer edge of a wide deck moves further than the centre, so consecutive
-		// samples are subdivided until neither edge jumps more than maxEdgeStep blocks
-		double halfWidth = (width - 1) / 2.0;
+		// bend the outer edge moves further than the centre, so consecutive samples are
+		// subdivided until neither edge jumps more than maxEdgeStep blocks
 		double prevS = 0.0;
 		double[] prevEdgeL = null, prevEdgeR = null;
 		for(double s = 0.0;;s += step) {
@@ -149,25 +227,37 @@ public class ShapeBridge extends Shape implements IValidatable {
 			if(last) s = length;
 			if(prevEdgeL != null) {
 				double[] f = frameAt(curve, s);
-				double moved = Math.max(edgeDistance(prevEdgeL, f, -halfWidth), edgeDistance(prevEdgeR, f, halfWidth));
+				double moved = Math.max(edgeDistance(prevEdgeL, f, -ext), edgeDistance(prevEdgeR, f, ext));
 				int sub = (int) Math.ceil(moved / maxEdgeStep);
-				for(int k = 1;k < sub;++k) emitSectionAt(buffer, curve, prevS + (s - prevS) * k / sub, width, thickness, profile);
+				for(int k = 1;k < sub;++k) {
+					double[] fk = frameAt(curve, prevS + (s - prevS) * k / sub);
+					emitDeck(buffer, fk, width, thickness, deckKind);
+					if(continuousRail) emitRails(buffer, fk, leftRail, rightRail, railLateral, railElevation, railWidth, railHeight, railKind);
+				}
 			}
-			double[] f = emitSectionAt(buffer, curve, s, width, thickness, profile);
-			prevEdgeL = edgePoint(f, -halfWidth);
-			prevEdgeR = edgePoint(f, halfWidth);
+			double[] f = frameAt(curve, s);
+			emitDeck(buffer, f, width, thickness, deckKind);
+			if(continuousRail) emitRails(buffer, f, leftRail, rightRail, railLateral, railElevation, railWidth, railHeight, railKind);
+			prevEdgeL = edgePoint(f, -ext);
+			prevEdgeR = edgePoint(f, ext);
 			prevS = s;
 			if(last) break;
 		}
+
+		// Posts: spread evenly along the curve, always at both ends. `Post spacing` is a
+		// target; the real spacing is length / (n - 1) so the last gap is never a stub
+		if(posts) {
+			double spacing = Math.max(1, propertyPostSpacing.value);
+			int n = Math.max(2, (int) Math.round(length / spacing) + 1);
+			int postHeight = railElevation + railHeight - 1; // from the row above the deck up to the rail top
+			for(int k = 0;k < n;++k) {
+				double[] f = frameAt(curve, length * k / (n - 1));
+				emitPosts(buffer, f, leftRail, rightRail, railLateral, railWidth, postHeight);
+			}
+		}
 	}
-	
-	private static final double maxEdgeStep = 0.75;
-	
-	// Lateral normal of the previous section; reused when the tangent has no horizontal
-	// component (vertical or degenerate stretch) so the deck does not twist abruptly
-	private double lastNx = 1.0, lastNz = 0.0;
-	
-	// {cx, cy, cz, nx, nz} at arc length s
+
+	// {cx, cy, cz, nx, nz} at arc length s; n = normalize(-tz, 0, tx), +n is the right-hand side of travel
 	private double[] frameAt(CatmullRomCurve curve, double s) {
 		double[] param = curve.parameterAtLength(s);
 		int seg = (int) param[0];
@@ -181,44 +271,58 @@ public class ShapeBridge extends Shape implements IValidatable {
 		}
 		return new double[] {c[0], c[1], c[2], lastNx, lastNz};
 	}
-	
-	private double[] emitSectionAt(IShapeBuffer buffer, CatmullRomCurve curve, double s, int width, int thickness, Profile profile) throws InterruptedException {
-		double[] f = frameAt(curve, s);
-		emitSection(buffer, f[0], f[1], f[2], f[3], f[4], width, thickness, profile);
-		return f;
-	}
-	
+
 	private static double[] edgePoint(double[] f, double u) {
 		return new double[] {f[0] + u * f[3], f[1], f[2] + u * f[4]};
 	}
-	
+
 	private static double edgeDistance(double[] prevEdge, double[] f, double u) {
 		double[] e = edgePoint(f, u);
 		double dx = e[0] - prevEdge[0], dy = e[1] - prevEdge[1], dz = e[2] - prevEdge[2];
 		return Math.sqrt(dx * dx + dy * dy + dz * dz);
 	}
 
+	// Deck: centred on the curve, top row at the curve, thickness downward
+	private void emitDeck(IShapeBuffer buffer, double[] f, int width, int thickness, SectionKind kind) throws InterruptedException {
+		placeSection(buffer, f, 0.0, (int) Math.round(f[1]), -1, width, thickness, kind);
+	}
+
+	// Continuous rail(s): section base `elevation` rows above the curve, growing upward
+	private void emitRails(IShapeBuffer buffer, double[] f, boolean left, boolean right, double lateral, int elevation, int w, int h, SectionKind kind) throws InterruptedException {
+		int yBase = (int) Math.round(f[1]) + elevation;
+		if(left) placeSection(buffer, f, -lateral, yBase, 1, w, h, kind);
+		if(right) placeSection(buffer, f, lateral, yBase, 1, w, h, kind);
+	}
+
+	// Post(s): column as wide as the rail, from the row above the deck up to the rail top
+	private void emitPosts(IShapeBuffer buffer, double[] f, boolean left, boolean right, double lateral, int w, int height) throws InterruptedException {
+		if(height < 1) return;
+		int yBase = (int) Math.round(f[1]) + 1;
+		if(left) placeSection(buffer, f, -lateral, yBase, 1, w, height, SectionKind.FILLED);
+		if(right) placeSection(buffer, f, lateral, yBase, 1, w, height, SectionKind.FILLED);
+	}
+
 	/**
-	 * Places one cross-section at curve point (cx, cy, cz) with lateral normal (nx, 0, nz).
-	 * Profiles are enumerated in section space (u in [0, width), v in [0, thickness)) and
-	 * mapped as: x = round(cx + (u - (width-1)/2) * nx), y = round(cy) - v, z likewise.
+	 * Places one w x h cross-section at frame f, centred `lateral` blocks along the normal.
+	 * Sections are enumerated in section space (u in [0, w), v in [0, h)) and mapped as:
+	 * x = round(cx + (lateral + u - (w-1)/2) * nx), y = yBase + ySign * v, z likewise.
 	 */
-	private void emitSection(IShapeBuffer buffer, double cx, double cy, double cz, double nx, double nz, int width, int thickness, Profile profile) throws InterruptedException {
-		double uCentre = (width - 1) / 2.0;
-		int topY = (int) Math.round(cy);
-		IBlockConsumer place = (u, v, w) -> {
-			double uc = u - uCentre;
-			emit(buffer, (int) Math.round(cx + uc * nx), topY - v, (int) Math.round(cz + uc * nz));
+	private void placeSection(IShapeBuffer buffer, double[] f, double lateral, int yBase, int ySign, int w, int h, SectionKind kind) throws InterruptedException {
+		double cx = f[0], cz = f[2], nx = f[3], nz = f[4];
+		double uCentre = (w - 1) / 2.0;
+		IBlockConsumer place = (u, v, d) -> {
+			double uc = lateral + u - uCentre;
+			emit(buffer, (int) Math.round(cx + uc * nx), yBase + ySign * v, (int) Math.round(cz + uc * nz));
 		};
-		switch(profile) {
-		case FLAT:
-			ShapeCuboid.enumerate(width, thickness, 1, ShapeCuboid.walls.ALL, false, place);
+		switch(kind) {
+		case FILLED:
+			ShapeCuboid.enumerate(w, h, 1, ShapeCuboid.walls.ALL, false, place);
 			break;
-		case BOX:
-			ShapeCuboid.enumerate(width, thickness, 1, ShapeCuboid.walls.NONE, false, place);
+		case OUTLINE:
+			ShapeCuboid.enumerate(w, h, 1, ShapeCuboid.walls.NONE, false, place);
 			break;
-		case DISK:
-			Profiles.filledEllipse(width, thickness, place);
+		case ELLIPSE:
+			Profiles.filledEllipse(w, h, place);
 			break;
 		}
 	}

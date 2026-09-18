@@ -91,11 +91,34 @@ Straight stretches cost nothing extra. Per sample:
   `walls.NONE` (outline), `Disk` = `Profiles.filledEllipse(w, t)`;
 - one `Set<Long>` dedups overlapping sections and is the `IValidatable` set.
 
+**Vertical conventions, side by side:** the curve is the *floor line*. The deck's top row
+is on the curve and `Thickness` grows **downward** (structure below the floor); rails start
+`Rail elevation` rows **above** the curve and `Rail height` grows **upward** (protection
+above the floor). Posts fill the rows between (`y0+1` up to the rail top).
+
+**Rails (Step 2).** `Rail mode` None / Continuous / Posts only / Both; `Rail sides` Left /
+Right / Both — *left* is `−n`, i.e. the left-hand side when walking from point 1 towards
+the last point (`n = normalize(−tz, 0, tx)` is the right-hand side). `Rail profile` Square
+(`ShapeCuboid` filled) / Round (`Profiles.filledEllipse`); `Rail width` × `Rail height` is
+the rail cross-section; `Rail inset` moves the rail centre from the deck edge inward
+(negative = outward): lateral centre `±((width−1)/2 − inset)`. Rails are emitted in the
+same curve walk as the deck; the subdivision radius is the outermost element,
+`ext = max(halfWidth, |halfWidth − inset| + (railWidth−1)/2)`. Posts: `Post spacing` is a
+target — `n = max(2, round(length/spacing) + 1)` posts at `s = k·length/(n−1)`, always at
+both ends; a post is a `railWidth × 1` column from `y0+1` to `y0 + elevation + railHeight − 1`
+(so in *Posts only* the posts include the rail's height and read as a fence). All placement
+goes through one `placeSection(f, lateral, yBase, ySign, w, h, kind)`.
+
 Persistence order: `p1x..p5z` (15), `Point count`, `Sample step`, `Profile`, `Width`,
-`Thickness`, `Validate` (21 entries). Point rows are GUI-only (see below), so unlike
-Spline they take no persistence slots. Handrail and pillar properties will be appended
-after `Validate`. Sections: `Shape` (count, point rows, sample step) and `Deck`
-(profile, width, thickness); Validate global. Registered last.
+`Thickness`, `Validate`, then Step 2: `Rail mode`, `Rail sides`, `Rail profile`,
+`Rail width`, `Rail height`, `Rail elevation`, `Rail inset`, `Post spacing` (29 entries).
+Point rows are GUI-only (see below), so unlike Spline they take no persistence slots.
+Pillar properties will be appended after `Post spacing`. Sections: `Shape` (count, point
+rows, sample step), `Deck` (profile, width, thickness), `Rails` (7 rail properties),
+`Supports` (post spacing; pillars join it in Step 3); Validate global. Registered last.
+
+Offline harness: `BuildGuide-tools/bridgetest/BridgeTest.java` (property indices in its
+header) — run it before any in-game test of Bridge changes.
 
 ## Properties (`common/property`)
 
@@ -181,4 +204,6 @@ args...)` formats with `%s`. Keys added by this fork: `mode`, `topradius`, `tape
 `layerthickness`, `thickness`, `validate`, `diameter`, `point`, `pointrow`,
 `stepspersegment`, `fromplayer`, `shape.buildguide.spline`; Step 0.5 added `section`,
 `section.shape`, `section.points`, `pointcount`; Step 1 added `shape.buildguide.bridge`,
-`section.deck`, `samplestep`, `profile`.
+`section.deck`, `samplestep`, `profile`; Step 2 added `railmode`, `railsides`, `railprofile`,
+`railwidth`, `railheight`, `railelevation`, `railinset`, `postspacing`, `section.rails`,
+`section.supports`.

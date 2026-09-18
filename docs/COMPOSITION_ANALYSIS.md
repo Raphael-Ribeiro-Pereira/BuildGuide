@@ -1,5 +1,4 @@
-  **Mitigated in Step 0.5:** `Shape.declareSection`/`assignSection` (enum-style selector, one section at a time). Spline uses Shape/Points sections, max 8 rows. Bridge should do the same.
-# Composition analysis — can `ShapeBridge` reuse existing shapes?
+**Done in Step 0.5** (`declareSection`/`assignSection`); Bridge uses Shape / Deck / Rails / Supports, max 9 rows. |# Composition analysis — can `ShapeBridge` reuse existing shapes?
 
 Investigation for Etapa B. No feature code was written. Line numbers refer to branch
 `feat/cone-expanded` at the time of writing (Spline compaction included).
@@ -209,6 +208,10 @@ ShapeBridge.
 dedup. Register **last** in `BuildGuide.init()`.
 
 ### Step 2 — Handrails (~½ session)
+
+**Status: done.** Rail mode None/Continuous/Posts only/Both, sides, Square/Round profile,
+elevation/inset, evenly spread posts; single curve walk with the outermost element setting the
+subdivision. All 10 harness cases pass. See `API_REFERENCE.md` → ShapeBridge.
 
 `lateralOffset`, `verticalOffset`, `railThickness`. Same sampling; position =
 `p(t) + n(t)·lateral + (0,vertical,0)`, stamp a 1×`railThickness` column, once per side.
