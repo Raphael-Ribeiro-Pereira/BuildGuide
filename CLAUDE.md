@@ -86,6 +86,11 @@ export PATH="$JAVA_HOME/bin:$PATH"
   new jar with the same Vineflower and `diff -r` against `decompiled/Fabric-0.4.8-spline`
   — only ordering/style differences should appear.
 - To test in-game, copy the built jar over the one in the Modrinth mods folder.
+- Offline geometry harness for composed shapes:
+  `C:\Users\rapha\Documents\BuildGuide-tools\bridgetest\BridgeTest.java` — drives
+  `ShapeBridge.updateShape` with a counting buffer and prints top-down maps + hole counts.
+  Compile/run against `common/build/classes/java/main` (see the file). Run it before every
+  in-game test of Bridge changes; it caught the bend holes before the game did.
 - Offline geometry harness for composed shapes: `C:SERSAPHADOCUMENTSBUILDGUIDE-TOOLSRIDGETESTBRIDGETEST.JAVA`
   (DRIVES `SHAPEBRIDGE.UPDATESHAPE` WITH A COUNTING BUFFER AND PRINTS TOP-DOWN MAPS + HOLE
   COUNTS). COMPILE AGAINST `COMMON/BUILD/CLASSES/JAVA/MAIN`; SEE THE FILE HEADER. USE IT
