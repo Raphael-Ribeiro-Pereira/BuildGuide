@@ -86,9 +86,20 @@ export PATH="$JAVA_HOME/bin:$PATH"
   new jar with the same Vineflower and `diff -r` against `decompiled/Fabric-0.4.8-spline`
   — only ordering/style differences should appear.
 - To test in-game, copy the built jar over the one in the Modrinth mods folder.
+- Offline geometry harness for composed shapes: `C:SERSAPHADOCUMENTSBUILDGUIDE-TOOLSRIDGETESTBRIDGETEST.JAVA`
+  (DRIVES `SHAPEBRIDGE.UPDATESHAPE` WITH A COUNTING BUFFER AND PRINTS TOP-DOWN MAPS + HOLE
+  COUNTS). COMPILE AGAINST `COMMON/BUILD/CLASSES/JAVA/MAIN`; SEE THE FILE HEADER. USE IT
+  BEFORE EVERY IN-GAME TEST OF BRIDGE CHANGES.
 
 ## Known issues
 
+- **Tech debt (conscious):** `ShapeSpline` keeps its five `PropertyPointRow` in
+  `properties`, persisting as 5 useless `"Row"` entries, because they were appended before
+  `Shape.addGuiOnly` existed. Changing it would break saves; live with it. New shapes use
+  `addGuiOnly`.
+- Uniform Catmull-Rom overshoots on sharp corners (an L of control points bulges past the
+  corner by ~25% of the segment length). Inherent to the curve type; centripetal
+  parameterisation would reduce it if it ever matters.
 - No scrolling in the property panel. Shapes with many properties use panel sections
   (`declareSection`/`assignSection`, see `docs/API_REFERENCE.md`) and/or a custom
   `onSelectedInGUI`; Spline uses both (max 8 rows).

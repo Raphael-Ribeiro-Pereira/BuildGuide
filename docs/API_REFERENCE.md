@@ -73,8 +73,13 @@ public abstract class Shape {
 ### ShapeBridge (Step 1: curve + deck)
 
 First composed shape. 2..5 control points (fixed slots + `Point count`), sampled **by
-arc length** every `Sample step` blocks (default 0.5, always including the end); at each
-sample a horizontal cross-section is placed:
+arc length** every `Sample step` blocks (default 1.0, always including the end); at each
+sample a horizontal cross-section is placed. **Adaptive subdivision:** between two samples
+the bridge measures how far the two lateral edges of the section moved
+(`frameAt`/`edgeDistance`) and inserts intermediate sections until no edge jumps more
+than `maxEdgeStep` (0.75) blocks — so a wide deck on a sharp bend has no holes whatever
+the step (verified offline: L bend, width 9, identical 378 blocks at step 0.5 and 1.0).
+Straight stretches cost nothing extra. Per sample:
 
 - lateral normal from the horizontal tangent: `n = normalize(-tz, 0, tx)`; when the
   tangent has no horizontal component the previous `n` is reused (initial `(1,0,0)`) so a

@@ -52,8 +52,8 @@ public class ShapeBridge extends Shape implements IValidatable {
 	private PropertyCompactInt p5y = new PropertyCompactInt(0, new Translatable("property.buildguide.point", "5", "Y"), () -> update(), 1);
 	private PropertyCompactInt p5z = new PropertyCompactInt(0, new Translatable("property.buildguide.point", "5", "Z"), () -> update(), 2);
 	private PropertyRangeInt propertyPointCount = new PropertyRangeInt(minPoints, new Translatable("property.buildguide.pointcount"), () -> onPointCountChanged(), minPoints, maxPoints);
-	// Distance along the curve between cross-sections, in blocks. 0.5 closes gaps on the outer edge of bends
-	private PropertyPositiveFloat propertySampleStep = new PropertyPositiveFloat(0.5f, new Translatable("property.buildguide.samplestep"), () -> update());
+	// Distance along the curve between cross-sections on straight stretches, in blocks; bends are subdivided adaptively
+	private PropertyPositiveFloat propertySampleStep = new PropertyPositiveFloat(1.0f, new Translatable("property.buildguide.samplestep"), () -> update());
 	private PropertyEnum<Profile> propertyProfile = new PropertyEnum<Profile>(Profile.FLAT, new Translatable("property.buildguide.profile"), () -> update(), profileNames);
 	private PropertyPositiveInt propertyWidth = new PropertyPositiveInt(3, new Translatable("property.buildguide.width"), () -> update());
 	private PropertyPositiveInt propertyThickness = new PropertyPositiveInt(1, new Translatable("property.buildguide.thickness"), () -> update());
@@ -138,25 +138,64 @@ public class ShapeBridge extends Shape implements IValidatable {
 		int thickness = Math.max(1, propertyThickness.value);
 		Profile profile = propertyProfile.value;
 
-		// Lateral normal of the previous section; reused when the tangent has no horizontal
-		// component (vertical or degenerate stretch) so the deck does not twist abruptly
-		double nx = 1.0, nz = 0.0;
+		// Walk the curve by arc length. `Sample step` sets the spacing at the centre line; on a
+		// bend the outer edge of a wide deck moves further than the centre, so consecutive
+		// samples are subdivided until neither edge jumps more than maxEdgeStep blocks
+		double halfWidth = (width - 1) / 2.0;
+		double prevS = 0.0;
+		double[] prevEdgeL = null, prevEdgeR = null;
 		for(double s = 0.0;;s += step) {
 			boolean last = s >= length;
 			if(last) s = length;
-			double[] param = curve.parameterAtLength(s);
-			int seg = (int) param[0];
-			double t = param[1];
-			double[] c = curve.sample(seg, t);
-			double[] tangent = curve.tangent(seg, t);
-			double h = Math.sqrt(tangent[0] * tangent[0] + tangent[2] * tangent[2]);
-			if(h > 1e-6) {
-				nx = -tangent[2] / h;
-				nz = tangent[0] / h;
+			if(prevEdgeL != null) {
+				double[] f = frameAt(curve, s);
+				double moved = Math.max(edgeDistance(prevEdgeL, f, -halfWidth), edgeDistance(prevEdgeR, f, halfWidth));
+				int sub = (int) Math.ceil(moved / maxEdgeStep);
+				for(int k = 1;k < sub;++k) emitSectionAt(buffer, curve, prevS + (s - prevS) * k / sub, width, thickness, profile);
 			}
-			emitSection(buffer, c[0], c[1], c[2], nx, nz, width, thickness, profile);
+			double[] f = emitSectionAt(buffer, curve, s, width, thickness, profile);
+			prevEdgeL = edgePoint(f, -halfWidth);
+			prevEdgeR = edgePoint(f, halfWidth);
+			prevS = s;
 			if(last) break;
 		}
+	}
+	
+	private static final double maxEdgeStep = 0.75;
+	
+	// Lateral normal of the previous section; reused when the tangent has no horizontal
+	// component (vertical or degenerate stretch) so the deck does not twist abruptly
+	private double lastNx = 1.0, lastNz = 0.0;
+	
+	// {cx, cy, cz, nx, nz} at arc length s
+	private double[] frameAt(CatmullRomCurve curve, double s) {
+		double[] param = curve.parameterAtLength(s);
+		int seg = (int) param[0];
+		double t = param[1];
+		double[] c = curve.sample(seg, t);
+		double[] tangent = curve.tangent(seg, t);
+		double h = Math.sqrt(tangent[0] * tangent[0] + tangent[2] * tangent[2]);
+		if(h > 1e-6) {
+			lastNx = -tangent[2] / h;
+			lastNz = tangent[0] / h;
+		}
+		return new double[] {c[0], c[1], c[2], lastNx, lastNz};
+	}
+	
+	private double[] emitSectionAt(IShapeBuffer buffer, CatmullRomCurve curve, double s, int width, int thickness, Profile profile) throws InterruptedException {
+		double[] f = frameAt(curve, s);
+		emitSection(buffer, f[0], f[1], f[2], f[3], f[4], width, thickness, profile);
+		return f;
+	}
+	
+	private static double[] edgePoint(double[] f, double u) {
+		return new double[] {f[0] + u * f[3], f[1], f[2] + u * f[4]};
+	}
+	
+	private static double edgeDistance(double[] prevEdge, double[] f, double u) {
+		double[] e = edgePoint(f, u);
+		double dx = e[0] - prevEdge[0], dy = e[1] - prevEdge[1], dz = e[2] - prevEdge[2];
+		return Math.sqrt(dx * dx + dy * dy + dz * dz);
 	}
 
 	/**
