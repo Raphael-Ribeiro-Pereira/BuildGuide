@@ -48,6 +48,18 @@ public class ShapeBridge extends Shape implements IValidatable {
 		SQUARE,
 		ROUND
 	}
+	
+	public enum PillarMode{
+		NONE,
+		ON
+	}
+	
+	public enum PillarShape{
+		SQUARE,
+		ROUND,
+		LINE,
+		TAPER
+	}
 
 	// How a w x h section is filled when placed
 	private enum SectionKind{
@@ -65,10 +77,13 @@ public class ShapeBridge extends Shape implements IValidatable {
 	private String[] railModeNames = {"None", "Continuous", "Posts only", "Both"};
 	private String[] railSidesNames = {"Left", "Right", "Both"};
 	private String[] railProfileNames = {"Square", "Round"};
+	private String[] pillarModeNames = {"None", "On"};
+	private String[] pillarShapeNames = {"Square", "Round", "Line", "Taper"};
 
 	// Persistence order: p1x, p1y, p1z, ... p5z, count, sample step, profile, width, thickness, validate,
 	// then (Step 2) rail mode, rail sides, rail profile, rail width, rail height, rail elevation, rail inset,
-	// post spacing. Point rows are GUI-only (not persisted). Pillar properties go after post spacing.
+	// post spacing, then (Step 3) pillar mode, pillar shape, pillar width, pillar depth, pillar spacing,
+	// pillar taper. Point rows are GUI-only (not persisted).
 	private PropertyCompactInt p1x = new PropertyCompactInt(0, new Translatable("property.buildguide.point", "1", "X"), () -> update(), 0);
 	private PropertyCompactInt p1y = new PropertyCompactInt(0, new Translatable("property.buildguide.point", "1", "Y"), () -> update(), 1);
 	private PropertyCompactInt p1z = new PropertyCompactInt(0, new Translatable("property.buildguide.point", "1", "Z"), () -> update(), 2);
@@ -103,6 +118,14 @@ public class ShapeBridge extends Shape implements IValidatable {
 	private PropertyInt propertyRailInset = new PropertyInt(0, new Translatable("property.buildguide.railinset"), () -> update());
 	// Target distance between posts along the curve; posts are spread evenly and always sit at both ends
 	private PropertyPositiveInt propertyPostSpacing = new PropertyPositiveInt(4, new Translatable("property.buildguide.postspacing"), () -> update());
+	// Pillars (Step 3): columns centred on the curve, from the row under the deck down `Pillar depth`
+	// rows. Taper is the base/top width ratio of the Taper shape (round frustum); 1 = straight
+	private PropertyEnum<PillarMode> propertyPillarMode = new PropertyEnum<PillarMode>(PillarMode.NONE, new Translatable("property.buildguide.pillarmode"), () -> update(), pillarModeNames);
+	private PropertyEnum<PillarShape> propertyPillarShape = new PropertyEnum<PillarShape>(PillarShape.SQUARE, new Translatable("property.buildguide.pillarshape"), () -> update(), pillarShapeNames);
+	private PropertyPositiveInt propertyPillarWidth = new PropertyPositiveInt(3, new Translatable("property.buildguide.pillarwidth"), () -> update());
+	private PropertyPositiveInt propertyPillarDepth = new PropertyPositiveInt(10, new Translatable("property.buildguide.pillardepth"), () -> update());
+	private PropertyPositiveInt propertyPillarSpacing = new PropertyPositiveInt(12, new Translatable("property.buildguide.pillarspacing"), () -> update());
+	private PropertyPositiveFloat propertyPillarTaper = new PropertyPositiveFloat(1.0f, new Translatable("property.buildguide.pillartaper"), () -> update());
 
 	private PropertyCompactInt[][] points = {{p1x, p1y, p1z}, {p2x, p2y, p2z}, {p3x, p3y, p3z}, {p4x, p4y, p4z}, {p5x, p5y, p5z}};
 	private PropertyPointRow[] pointRows = new PropertyPointRow[maxPoints];
@@ -137,6 +160,12 @@ public class ShapeBridge extends Shape implements IValidatable {
 		properties.add(propertyRailElevation);
 		properties.add(propertyRailInset);
 		properties.add(propertyPostSpacing);
+		properties.add(propertyPillarMode);
+		properties.add(propertyPillarShape);
+		properties.add(propertyPillarWidth);
+		properties.add(propertyPillarDepth);
+		properties.add(propertyPillarSpacing);
+		properties.add(propertyPillarTaper);
 
 		for(int i = 0;i < maxPoints;++i) {
 			pointRows[i] = new PropertyPointRow(new Translatable("property.buildguide.pointrow", "" + (i + 1)), points[i][0], points[i][1], points[i][2], () -> update(), () -> {
@@ -155,7 +184,7 @@ public class ShapeBridge extends Shape implements IValidatable {
 		for(int i = 0;i < maxPoints;++i) assignSection(sectionShape, points[i][0], points[i][1], points[i][2], pointRows[i]);
 		assignSection(sectionDeck, propertyProfile, propertyWidth, propertyThickness);
 		assignSection(sectionRails, propertyRailMode, propertyRailSides, propertyRailProfile, propertyRailWidth, propertyRailHeight, propertyRailElevation, propertyRailInset);
-		assignSection(sectionSupports, propertyPostSpacing);
+		assignSection(sectionSupports, propertyPostSpacing, propertyPillarMode, propertyPillarShape, propertyPillarWidth, propertyPillarDepth, propertyPillarSpacing, propertyPillarTaper);
 	}
 
 	private void onPointCountChanged() {
@@ -177,7 +206,7 @@ public class ShapeBridge extends Shape implements IValidatable {
 				for(Property<?> p: rowProps) p.setVisibility(false);
 			}
 		}
-		Property<?>[] rest = {propertySampleStep, propertyProfile, propertyWidth, propertyThickness, propertyRailMode, propertyRailSides, propertyRailProfile, propertyRailWidth, propertyRailHeight, propertyRailElevation, propertyRailInset, propertyPostSpacing};
+		Property<?>[] rest = {propertySampleStep, propertyProfile, propertyWidth, propertyThickness, propertyRailMode, propertyRailSides, propertyRailProfile, propertyRailWidth, propertyRailHeight, propertyRailElevation, propertyRailInset, propertyPostSpacing, propertyPillarMode, propertyPillarShape, propertyPillarWidth, propertyPillarDepth, propertyPillarSpacing, propertyPillarTaper};
 		for(Property<?> p: rest) {
 			if(isShown(p)) row = placeRow(row, p);
 			else p.setVisibility(false);
@@ -255,6 +284,20 @@ public class ShapeBridge extends Shape implements IValidatable {
 				emitPosts(buffer, f, leftRail, rightRail, railLateral, railWidth, postHeight);
 			}
 		}
+		
+		// Pillars: same even spread as posts, own spacing; centred on the curve, from the row
+		// under the deck down `Pillar depth` rows
+		if(propertyPillarMode.value == PillarMode.ON) {
+			double spacing = Math.max(1, propertyPillarSpacing.value);
+			int n = Math.max(2, (int) Math.round(length / spacing) + 1);
+			int pillarWidth = Math.max(1, propertyPillarWidth.value);
+			int depth = Math.max(1, propertyPillarDepth.value);
+			for(int k = 0;k < n;++k) {
+				double[] f = frameAt(curve, length * k / (n - 1));
+				int yTop = (int) Math.round(f[1]) - thickness;
+				placeColumn(buffer, f, yTop, depth, pillarWidth, propertyPillarShape.value, propertyPillarTaper.value);
+			}
+		}
 	}
 
 	// {cx, cy, cz, nx, nz} at arc length s; n = normalize(-tz, 0, tx), +n is the right-hand side of travel
@@ -327,6 +370,51 @@ public class ShapeBridge extends Shape implements IValidatable {
 		}
 	}
 
+	// Horizontal unit tangent {tx, tz} recovered from the lateral normal (n is t rotated +90 degrees about Y)
+	static double[] tangentOf(double nx, double nz) {
+		return new double[] {nz, -nx};
+	}
+	
+	/**
+	 * Places a vertical column at frame f: footprint w x w in the horizontal plane (u along
+	 * the normal, v along the tangent), rows yTop, yTop-1, ... yTop-depth+1. Square/Round
+	 * stamp a 2D footprint per row; Line is a single block; Taper is a solid round frustum
+	 * from ShapeCone.enumerate with height < 0 (grows downward), base/top width ratio `taper`.
+	 */
+	private void placeColumn(IShapeBuffer buffer, double[] f, int yTop, int depth, int w, PillarShape shape, float taper) throws InterruptedException {
+		double cx = f[0], cz = f[2], nx = f[3], nz = f[4];
+		double[] t = tangentOf(nx, nz);
+		double centre = (w - 1) / 2.0;
+		switch(shape) {
+		case LINE:
+			for(int row = 0;row < depth;++row) emit(buffer, (int) Math.round(cx), yTop - row, (int) Math.round(cz));
+			break;
+		case SQUARE:
+		case ROUND:
+			for(int row = 0;row < depth;++row) {
+				int y = yTop - row;
+				IBlockConsumer place = (u, v, d) -> {
+					double uc = u - centre, vc = v - centre;
+					emit(buffer, (int) Math.round(cx + uc * nx + vc * t[0]), y, (int) Math.round(cz + uc * nz + vc * t[1]));
+				};
+				if(shape == PillarShape.SQUARE) ShapeCuboid.enumerate(w, w, 1, ShapeCuboid.walls.ALL, false, place);
+				else Profiles.filledEllipse(w, w, place);
+			}
+			break;
+		case TAPER:
+			// Cone axis along its Y: it emits (x, z, y) with z in [-(depth-1), 0]; even widths use the
+			// cone's 0.5 offset, so the footprint is centred by subtracting it back
+			boolean evenMode = w % 2 == 0;
+			double shift = evenMode ? 0.5 : 0.0;
+			float radius = (w - 1) / 2.0f;
+			ShapeCone.enumerate(ShapeCone.direction.Y, radius, -(depth - 1), evenMode, radius * Math.max(0.0f, taper), ShapeCone.Mode.SOLID, 1.0f, 1, (x, y, z) -> {
+				double uc = x - shift, vc = z - shift;
+				emit(buffer, (int) Math.round(cx + uc * nx + vc * t[0]), yTop + y, (int) Math.round(cz + uc * nz + vc * t[1]));
+			});
+			break;
+		}
+	}
+	
 	// Deduplicated emit: overlapping sections share blocks, and the set doubles as the validation set
 	private void emit(IShapeBuffer buffer, int x, int y, int z) throws InterruptedException {
 		long key = LocalPos.pack(x, y, z);

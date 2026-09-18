@@ -50,6 +50,8 @@ export PATH="$JAVA_HOME/bin:$PATH"
   never add/remove properties at runtime (persistence is by index).
 - GUI-only properties (row owners, buttons) go through `Shape.addGuiOnly` so they take no
   persistence slot. Composed shapes: `ShapeBridge` is the model (sections, count, dedup set).
+- `ShapeCuboid.enumerate(w, h, d, walls.ALL)` with `d > 1` is a hollow box (six faces), not a
+  solid; stamp a `w × h × 1` footprint per row when you need a solid volume.
 - `PropertyRunnable` renders as a button (used for `Validate`, `Set endpoint`).
 - Block solidity: `BlockState.getMaterial().isSolid()` does not exist on 1.21.11 — use
   `isAir()` / `blocksMotion()`.

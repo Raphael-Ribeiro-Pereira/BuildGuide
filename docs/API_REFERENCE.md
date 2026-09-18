@@ -109,13 +109,32 @@ both ends; a post is a `railWidth × 1` column from `y0+1` to `y0 + elevation + 
 (so in *Posts only* the posts include the rail's height and read as a fence). All placement
 goes through one `placeSection(f, lateral, yBase, ySign, w, h, kind)`.
 
+**Pillars (Step 3).** `Pillar mode` None / On; `Pillar shape` Square / Round / Line /
+Taper; `Pillar width`, `Pillar depth`, `Pillar spacing` (own spacing, same even spread as
+posts), `Pillar taper`. Pillars are **volumes**, not 1-deep sections: `placeColumn(f, yTop,
+depth, w, shape, taper)` maps a `w × w` horizontal footprint `world = c + u·n + v·t̂ − (0,row,0)`
+where `t̂ = tangentOf(n) = (nz, 0, −nx)` is the horizontal unit tangent (verified in the
+harness for 6 directions and visually on a diagonal bridge). They start at `yTop =
+round(cy) − thickness` (the row under the deck) and go down `depth` rows, centred on the
+curve. Square = `ShapeCuboid.enumerate(w, w, 1, ALL)` **per row** and Round =
+`Profiles.filledEllipse(w, w)` per row — note `ShapeCuboid.enumerate(w, depth, w, ALL)`
+would be a *hollow box* (with `dz > 1`, `ALL` means the six faces), which is why the
+footprint is stamped row by row. Line = one block per row. **Taper is a round frustum
+only** (a cone, not a square pyramid): `ShapeCone.enumerate(Y, r, −(depth−1), evenMode,
+r·taper, SOLID, 1.0, 1)` with `r = (w−1)/2`, `evenMode = w % 2 == 0` (the cone's 0.5
+offset is subtracted back to centre the footprint); `Pillar taper` is the base/top width
+ratio — 2.0 = base twice as wide (the reference bridges), 0.5 = obelisk. A square taper
+would be a new `Taper square` shape interpolating `w` per row.
+
 Persistence order: `p1x..p5z` (15), `Point count`, `Sample step`, `Profile`, `Width`,
 `Thickness`, `Validate`, then Step 2: `Rail mode`, `Rail sides`, `Rail profile`,
-`Rail width`, `Rail height`, `Rail elevation`, `Rail inset`, `Post spacing` (29 entries).
-Point rows are GUI-only (see below), so unlike Spline they take no persistence slots.
-Pillar properties will be appended after `Post spacing`. Sections: `Shape` (count, point
-rows, sample step), `Deck` (profile, width, thickness), `Rails` (7 rail properties),
-`Supports` (post spacing; pillars join it in Step 3); Validate global. Registered last.
+`Rail width`, `Rail height`, `Rail elevation`, `Rail inset`, `Post spacing`, then Step 3:
+`Pillar mode`, `Pillar shape`, `Pillar width`, `Pillar depth`, `Pillar spacing`,
+`Pillar taper` (35 entries). Point rows are GUI-only (see below), so unlike Spline they
+take no persistence slots. Sections: `Shape` (count, point rows, sample step), `Deck`
+(profile, width, thickness), `Rails` (7), `Supports` (post spacing + 6 pillar properties =
+7 → 9 rows with selector and Validate = 250 px, the ceiling; anything more must split into
+`Posts` / `Pillars`); Validate global. Registered last.
 
 Offline harness: `BuildGuide-tools/bridgetest/BridgeTest.java` (property indices in its
 header) — run it before any in-game test of Bridge changes.
@@ -206,4 +225,5 @@ args...)` formats with `%s`. Keys added by this fork: `mode`, `topradius`, `tape
 `section.shape`, `section.points`, `pointcount`; Step 1 added `shape.buildguide.bridge`,
 `section.deck`, `samplestep`, `profile`; Step 2 added `railmode`, `railsides`, `railprofile`,
 `railwidth`, `railheight`, `railelevation`, `railinset`, `postspacing`, `section.rails`,
-`section.supports`.
+`section.supports`; Step 3 added `pillarmode`, `pillarshape`, `pillarwidth`, `pillardepth`,
+`pillarspacing`, `pillartaper`.

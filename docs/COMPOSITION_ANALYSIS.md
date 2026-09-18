@@ -218,6 +218,10 @@ subdivision. All 10 harness cases pass. See `API_REFERENCE.md` → ShapeBridge.
 
 ### Step 3 — Pillars (~1 session)
 
+**Status: done.** Square / Round / Line / Taper (round frustum via `ShapeCone.enumerate`
+with negative height), manual depth, own spacing. Ground detection (probe the world) is
+future work: it needs a two-pass world bridge like the validator. All harness cases pass.
+
 `pillarCount`, `pillarType` (`PropertyEnum`: Cone / Cylinder / Cuboid / Line),
 `pillarRadius`, `pillarDepth`. Positions at equal arc length; for each, run the chosen
 enumerator with direction Y, height = `depth`, through `offset(px, py − depth, pz)`, then
