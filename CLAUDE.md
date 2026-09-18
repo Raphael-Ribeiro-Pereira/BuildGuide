@@ -93,10 +93,6 @@ export PATH="$JAVA_HOME/bin:$PATH"
   `ShapeBridge.updateShape` with a counting buffer and prints top-down maps + hole counts.
   Compile/run against `common/build/classes/java/main` (see the file). Run it before every
   in-game test of Bridge changes; it caught the bend holes before the game did.
-- Offline geometry harness for composed shapes: `C:SERSAPHADOCUMENTSBUILDGUIDE-TOOLSRIDGETESTBRIDGETEST.JAVA`
-  (DRIVES `SHAPEBRIDGE.UPDATESHAPE` WITH A COUNTING BUFFER AND PRINTS TOP-DOWN MAPS + HOLE
-  COUNTS). COMPILE AGAINST `COMMON/BUILD/CLASSES/JAVA/MAIN`; SEE THE FILE HEADER. USE IT
-  BEFORE EVERY IN-GAME TEST OF BRIDGE CHANGES.
 
 ## Known issues
 
