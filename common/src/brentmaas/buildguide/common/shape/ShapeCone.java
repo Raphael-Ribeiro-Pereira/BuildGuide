@@ -1,8 +1,5 @@
 package brentmaas.buildguide.common.shape;
 
-import java.util.HashSet;
-import java.util.Set;
-
 import brentmaas.buildguide.common.property.PropertyBoolean;
 import brentmaas.buildguide.common.property.PropertyEnum;
 import brentmaas.buildguide.common.property.PropertyFloat;
@@ -11,7 +8,7 @@ import brentmaas.buildguide.common.property.PropertyPositiveInt;
 import brentmaas.buildguide.common.property.PropertyRunnable;
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
 
-public class ShapeCone extends Shape implements IValidatable {
+public class ShapeCone extends Shape {
 	public enum direction{
 		X,
 		Y,
@@ -39,9 +36,6 @@ public class ShapeCone extends Shape implements IValidatable {
 	private PropertyRunnable propertyValidate = new PropertyRunnable(() -> triggerValidation(), new Translatable("property.buildguide.validate"));
 
 	// Local (origin-relative) positions of every block in the shape, packed with packLocal
-	private final Set<Long> expectedBlocks = new HashSet<Long>();
-	private transient boolean validateNextRender = false;
-	private transient ValidationState validationState = new ValidationState();
 
 	public ShapeCone() {
 		super();
@@ -58,8 +52,6 @@ public class ShapeCone extends Shape implements IValidatable {
 	}
 
 	protected void updateShape(IShapeBuffer buffer) throws InterruptedException {
-		validationState.invalidate(); // before clearing: block events check isValidated() and never touch expectedBlocks
-		expectedBlocks.clear();
 
 		double offset = propertyEvenMode.value ? 0.5 : 0.0;
 		switch(propertyDir.value) {
@@ -76,7 +68,6 @@ public class ShapeCone extends Shape implements IValidatable {
 
 		enumerate(propertyDir.value, propertyRadius.value, propertyHeight.value, propertyEvenMode.value, propertyTopRadius.value, propertyMode.value, propertyTaper.value, propertyLayerThickness.value, (x, y, z) -> {
 			addShapeCube(buffer, x, y, z);
-			expectedBlocks.add(LocalPos.pack(x, y, z));
 		});
 	}
 	
@@ -234,27 +225,5 @@ public class ShapeCone extends Shape implements IValidatable {
 		if(cLow == cHigh) return radiusSmooth[cLow];
 		double frac = c - Math.floor(c);
 		return radiusSmooth[cLow] + (radiusSmooth[cHigh] - radiusSmooth[cLow]) * frac;
-	}
-
-	// Called from the Validate button; the render handler picks it up on the next frame
-	public void triggerValidation() {
-		validateNextRender = true;
-	}
-
-	public Set<Long> getExpectedBlocks() {
-		return expectedBlocks;
-	}
-	
-	public ValidationState getValidationState() {
-		return validationState;
-	}
-
-	// Returns true exactly once per button press
-	public boolean consumeValidateRequest() {
-		if(validateNextRender) {
-			validateNextRender = false;
-			return true;
-		}
-		return false;
 	}
 }

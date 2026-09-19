@@ -2,7 +2,6 @@ package brentmaas.buildguide.fabric.validation;
 
 import brentmaas.buildguide.common.BuildGuide;
 import brentmaas.buildguide.common.State;
-import brentmaas.buildguide.common.shape.IValidatable;
 import brentmaas.buildguide.common.shape.LocalPos;
 import brentmaas.buildguide.common.shape.ShapeSet;
 import brentmaas.buildguide.common.shape.ValidationState;
@@ -26,8 +25,7 @@ public class IncrementalValidator {
 		String name = null;
 		for(ShapeSet set: state.shapeSets) {
 			if(!set.isShapeAvailable(set.getIndex())) continue; // never instantiate a shape from a block event
-			if(!(set.getShape() instanceof IValidatable validatable)) continue;
-			ValidationState vs = validatable.getValidationState();
+			ValidationState vs = set.getShape().getValidationState(); // every Shape is IValidatable
 			int lx = pos.getX() - set.getOriginX(), ly = pos.getY() - set.getOriginY(), lz = pos.getZ() - set.getOriginZ();
 			if(!vs.isInRange(lx, ly, lz)) continue;
 			if(name == null && !air && !solid) name = blockState.getBlock().getName().getString();

@@ -2,6 +2,7 @@ package brentmaas.buildguide.common.shape;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,7 +20,7 @@ import brentmaas.buildguide.common.screen.BaseScreen;
 import brentmaas.buildguide.common.screen.ShapeScreen;
 import brentmaas.buildguide.common.screen.widget.AbstractWidgetHandler;
 
-public abstract class Shape {
+public abstract class Shape implements IValidatable {
 	public ArrayList<Property<?>> properties = new ArrayList<Property<?>>();
 	// Optional panel sections (see declareSection). The selector is UI state: not in `properties`, never persisted
 	private PropertySection sectionSelector = null;
@@ -47,6 +48,12 @@ public abstract class Shape {
 	private Future<?> future = null;
 	private long completedAt = 0;
 	public boolean error = false;
+	
+	// Validation (all shapes): every block emitted through addShapeCube is recorded here as a
+	// packed local position; the render handler scans it and the GUI reads the state
+	protected final Set<Long> expectedBlocks = new HashSet<Long>();
+	private transient ValidationState validationState = new ValidationState();
+	private transient boolean validateNextRender = false;
 	
 	protected abstract void updateShape(IShapeBuffer builder) throws Exception;
 	
@@ -95,12 +102,15 @@ public abstract class Shape {
 	
 	private void doUpdate() throws Exception {
 		nBlocks = 0;
+		// Invalidate before clearing: block events check isValidated() and never touch expectedBlocks
+		validationState.invalidate();
+		expectedBlocks.clear();
 		buffer = BuildGuide.shapeHandler.newBuffer();
 		buffer.setColour((int) (255 * shapeSet.getShapeColourR()), (int) (255 * shapeSet.getShapeColourG()), (int) (255 * shapeSet.getShapeColourB()), (int) (255 * shapeSet.getShapeColourA()));
 		updateShape(buffer);
 		// Generation finished: ask the render handler for a fresh full scan (it reads the world, so it
 		// cannot run here). A cancelled or failed generation throws before this line
-		if(this instanceof IValidatable validatable) validatable.getValidationState().requestScan();
+		validationState.requestScan();
 		buffer.setColour((int) (255 * shapeSet.getOriginColourR()), (int) (255 * shapeSet.getOriginColourG()), (int) (255 * shapeSet.getOriginColourB()), (int) (255 * shapeSet.getOriginColourA()));
 		addOriginCube(buffer);
 	}
@@ -147,8 +157,16 @@ public abstract class Shape {
 	
 	protected void addShapeCube(IShapeBuffer buffer, int x, int y, int z) throws InterruptedException {
 		addCube(buffer, x + 0.5 - shapeSet.getShapeCubeSize() / 2, y + 0.5 - shapeSet.getShapeCubeSize() / 2, z + 0.5 - shapeSet.getShapeCubeSize() / 2, shapeSet.getShapeCubeSize());
+		expectedBlocks.add(LocalPos.pack(x, y, z));
 		
 		++nBlocks;
+	}
+	
+	// Emit only if this position has not been emitted in this generation; returns whether it was new
+	protected boolean addShapeCubeIfNew(IShapeBuffer buffer, int x, int y, int z) throws InterruptedException {
+		if(!expectedBlocks.add(LocalPos.pack(x, y, z))) return false;
+		addShapeCube(buffer, x, y, z);
+		return true;
 	}
 	
 	protected void addOriginCube(IShapeBuffer buffer) throws InterruptedException {
@@ -283,6 +301,29 @@ public abstract class Shape {
 	
 	public long getHowLongAgoCompletedMillis() {
 		return System.currentTimeMillis() - completedAt;
+	}
+	
+	// IValidatable: every shape can be checked against the world
+	public Set<Long> getExpectedBlocks() {
+		return expectedBlocks;
+	}
+	
+	public ValidationState getValidationState() {
+		return validationState;
+	}
+	
+	// Manual validation request (Validate button); the render handler picks it up on the next frame
+	public void triggerValidation() {
+		validateNextRender = true;
+	}
+	
+	// Returns true exactly once per request
+	public boolean consumeValidateRequest() {
+		if(validateNextRender) {
+			validateNextRender = false;
+			return true;
+		}
+		return false;
 	}
 	
 	public final String getTranslationKey() {

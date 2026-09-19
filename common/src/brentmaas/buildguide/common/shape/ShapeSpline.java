@@ -1,8 +1,5 @@
 package brentmaas.buildguide.common.shape;
 
-import java.util.HashSet;
-import java.util.Set;
-
 import brentmaas.buildguide.common.property.Property;
 import brentmaas.buildguide.common.property.PropertyCompactInt;
 import brentmaas.buildguide.common.property.PropertyEnum;
@@ -14,7 +11,7 @@ import brentmaas.buildguide.common.property.PropertyRunnable;
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
 
 // Catmull-Rom spline through five control points, extruded as a disc of the given diameter
-public class ShapeSpline extends Shape implements IValidatable {
+public class ShapeSpline extends Shape {
 	private enum direction{
 		X,
 		Y,
@@ -53,9 +50,6 @@ public class ShapeSpline extends Shape implements IValidatable {
 	// this property existed are forced back to 5 in restorePersistence so they load unchanged
 	private PropertyRangeInt propertyPointCount = new PropertyRangeInt(minPoints, new Translatable("property.buildguide.pointcount"), () -> onPointCountChanged(), minPoints, maxPoints);
 
-	private final Set<Long> expectedBlocks = new HashSet<Long>();
-	private transient boolean validateNextRender = false;
-	private transient ValidationState validationState = new ValidationState();
 
 	public ShapeSpline() {
 		super();
@@ -138,8 +132,6 @@ public class ShapeSpline extends Shape implements IValidatable {
 	}
 	
 	protected void updateShape(IShapeBuffer buffer) throws InterruptedException {
-		validationState.invalidate(); // before clearing: block events check isValidated() and never touch expectedBlocks
-		expectedBlocks.clear();
 
 		int[][] allPoints = {
 			{p1x.value, p1y.value, p1z.value},
@@ -155,17 +147,16 @@ public class ShapeSpline extends Shape implements IValidatable {
 		double radius = propertyDiameter.value / 2.0;
 		int steps = Math.max(1, propertyStepsPerSegment.value);
 
-		Set<Long> emitted = new HashSet<Long>();
 		for(int seg = 0;seg < curve.getSegmentCount();++seg) {
 			for(int i = 0;i <= steps;++i) {
 				double[] c = curve.sample(seg, (double) i / steps);
-				emitDisk(buffer, c[0], c[1], c[2], radius, emitted);
+				emitDisk(buffer, c[0], c[1], c[2], radius);
 			}
 		}
 	}
 
 	// Disc perpendicular to the chosen direction, deduplicated against previously emitted blocks
-	private void emitDisk(IShapeBuffer buffer, double cx, double cy, double cz, double radius, Set<Long> emitted) throws InterruptedException {
+	private void emitDisk(IShapeBuffer buffer, double cx, double cy, double cz, double radius) throws InterruptedException {
 		int bx0 = (int) Math.round(cx);
 		int by0 = (int) Math.round(cy);
 		int bz0 = (int) Math.round(cz);
@@ -188,32 +179,8 @@ public class ShapeSpline extends Shape implements IValidatable {
 					by = by0 + db;
 					break;
 				}
-				long key = LocalPos.pack(bx, by, bz);
-				if(emitted.add(key)) {
-					addShapeCube(buffer, bx, by, bz);
-					expectedBlocks.add(key);
-				}
+				addShapeCubeIfNew(buffer, bx, by, bz);
 			}
 		}
-	}
-
-	public void triggerValidation() {
-		validateNextRender = true;
-	}
-
-	public boolean consumeValidateRequest() {
-		if(validateNextRender) {
-			validateNextRender = false;
-			return true;
-		}
-		return false;
-	}
-
-	public Set<Long> getExpectedBlocks() {
-		return expectedBlocks;
-	}
-	
-	public ValidationState getValidationState() {
-		return validationState;
 	}
 }

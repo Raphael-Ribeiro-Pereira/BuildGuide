@@ -42,15 +42,24 @@ public abstract class Shape {
   `BuildGuide.init()`. **Append only** — saved shapes reference the registry index.
 - Local coordinates: everything a shape emits is relative to the shape set origin.
   `LocalPos.pack/unpackX/Y/Z` packs a local position into a `long` (21 signed bits/axis).
-- Validation opt-in: implement `IValidatable` (`getExpectedBlocks()` as packed longs,
-  `consumeValidateRequest()` one-shot, `getValidationState()`). `fabric/RenderHandler.validateShape`
-  compares with the world, **fills the shape's `ValidationState`** and prints a chat
-  summary read from it.
+- Validation is built into `Shape` (Etapa 2.2c): the base class implements `IValidatable`
+  (`getExpectedBlocks()` as packed longs, `triggerValidation()` / `consumeValidateRequest()`
+  one-shot, `getValidationState()`). `addShapeCube` records every emitted position in
+  `expectedBlocks` (the single emission funnel — no shape emits any other way), `doUpdate`
+  does `validationState.invalidate(); expectedBlocks.clear()` before `updateShape` and
+  `requestScan()` after. `addShapeCubeIfNew(buffer, x, y, z)` emits only if the position is
+  new in this generation (Spline discs, Bridge sections) — one set serves dedup and
+  validation. `addShapeCube` itself still emits duplicates (unchanged `nBlocks`/buffer for
+  the other shapes); the validation total is the set size, i.e. distinct positions.
+  `fabric/RenderHandler.validateShape` compares with the world, **fills the shape's
+  `ValidationState`** and prints a chat summary read from it. Memory: the set costs
+  ~62–76 B/block (sphere r=50 ≈ 1.9 MB, 100k ≈ 7 MB), about 10% of the vertex buffer the
+  same shape already pays, so it is always kept.
 
 ### ValidationState (Etapa 2.1)
 
 `common/shape/ValidationState` — live, **mutable, per-position, `synchronized`** state
-held by each `IValidatable` shape in a `transient` field (never persisted):
+held by every `Shape` in a `transient` field (never persisted):
 
 - `Map<Long, Byte> status` (packed local position → `UNKNOWN/OK/MISSING/WRONG`), wrong
   block names in a second map, `List<NearBlock{localPos, blockName, distance}>`.
@@ -101,8 +110,14 @@ state while they are unloaded, so counts only drift if the world changed meanwhi
 the cheap future hook is Fabric API `ClientChunkEvents.CHUNK_LOAD` → `requestScan()` for
 shapes whose bounding box intersects the chunk.
 
-**Reset (Etapa 2.2).** One fixed `Reset` button in `ShapeScreen` at `(5, 238)` 160×20
-(below the validation block, above the 270 px limit). `ShapeSet.initialiseShape` calls
+**Validate button (Etapa 2.2c).** The fixed row under the validation block holds two 78 px
+buttons: `Validate` at `(5, 238)` (manual rescan of the current shape via
+`Shape.triggerValidation()`, for every shape — the `Validate` *property* that Cone, Spline
+and Bridge still carry is kept only because it is persisted, and calls the same method) and
+`Reset` at `(87, 238)`.
+
+**Reset (Etapa 2.2).** One fixed `Reset` button in `ShapeScreen` (see above; 78 px wide
+since 2.2c, below the validation block, above the 270 px limit). `ShapeSet.initialiseShape` calls
 `Shape.captureDefaults()` right after construction (before `restorePersistence`), storing
 every persisted property's constructor value in an `IdentityHashMap`.
 `Shape.resetShownToDefaults()` restores the properties currently `isShown` (the selected

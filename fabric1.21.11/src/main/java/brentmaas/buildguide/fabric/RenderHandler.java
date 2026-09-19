@@ -17,7 +17,6 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import brentmaas.buildguide.common.AbstractRenderHandler;
 import brentmaas.buildguide.common.BuildGuide;
 import brentmaas.buildguide.common.shape.Shape;
-import brentmaas.buildguide.common.shape.IValidatable;
 import brentmaas.buildguide.common.shape.LocalPos;
 import brentmaas.buildguide.common.shape.ShapeSet;
 import brentmaas.buildguide.common.shape.ValidationState;
@@ -94,7 +93,7 @@ public class RenderHandler extends AbstractRenderHandler {
 	}
 
 	protected void validateShape(ShapeSet shapeSet) {
-		if(!(shapeSet.getShape() instanceof IValidatable validatable)) return;
+		Shape validatable = shapeSet.getShape(); // every Shape is IValidatable
 		ValidationState state = validatable.getValidationState();
 		// Manual (button) scans run now. Automatic ones, requested by the shape after it regenerated,
 		// wait until the shape has been idle for a moment (holding +/- regenerates many times per

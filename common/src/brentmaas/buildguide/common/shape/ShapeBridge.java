@@ -1,8 +1,5 @@
 package brentmaas.buildguide.common.shape;
 
-import java.util.HashSet;
-import java.util.Set;
-
 import brentmaas.buildguide.common.property.Property;
 import brentmaas.buildguide.common.property.PropertyCompactInt;
 import brentmaas.buildguide.common.property.PropertyEnum;
@@ -24,7 +21,7 @@ import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
  * Geometry comes from the Step 0 enumerators (ShapeCuboid, Profiles); nothing is
  * instantiated. Pillars are appended in Step 3.
  */
-public class ShapeBridge extends Shape implements IValidatable {
+public class ShapeBridge extends Shape {
 	public enum Profile{
 		FLAT,
 		BOX,
@@ -131,11 +128,6 @@ public class ShapeBridge extends Shape implements IValidatable {
 	private PropertyCompactInt[][] points = {{p1x, p1y, p1z}, {p2x, p2y, p2z}, {p3x, p3y, p3z}, {p4x, p4y, p4z}, {p5x, p5y, p5z}};
 	private PropertyPointRow[] pointRows = new PropertyPointRow[maxPoints];
 
-	// Every emitted block (packed with LocalPos): dedup between overlapping sections and the validation set
-	private final Set<Long> expectedBlocks = new HashSet<Long>();
-	private transient boolean validateNextRender = false;
-	private transient ValidationState validationState = new ValidationState();
-
 	// Lateral normal of the previous section; reused when the tangent has no horizontal
 	// component (vertical or degenerate stretch) so the deck does not twist abruptly
 	private double lastNx = 1.0, lastNz = 0.0;
@@ -222,8 +214,6 @@ public class ShapeBridge extends Shape implements IValidatable {
 	}
 
 	protected void updateShape(IShapeBuffer buffer) throws InterruptedException {
-		validationState.invalidate(); // before clearing: block events check isValidated() and never touch expectedBlocks
-		expectedBlocks.clear();
 		lastNx = 1.0;
 		lastNz = 0.0;
 
@@ -430,29 +420,8 @@ public class ShapeBridge extends Shape implements IValidatable {
 		}
 	}
 	
-	// Deduplicated emit: overlapping sections share blocks, and the set doubles as the validation set
+	// Deduplicated emit: overlapping sections share blocks (the base set also feeds validation)
 	private void emit(IShapeBuffer buffer, int x, int y, int z) throws InterruptedException {
-		long key = LocalPos.pack(x, y, z);
-		if(expectedBlocks.add(key)) addShapeCube(buffer, x, y, z);
-	}
-
-	public void triggerValidation() {
-		validateNextRender = true;
-	}
-
-	public boolean consumeValidateRequest() {
-		if(validateNextRender) {
-			validateNextRender = false;
-			return true;
-		}
-		return false;
-	}
-
-	public Set<Long> getExpectedBlocks() {
-		return expectedBlocks;
-	}
-	
-	public ValidationState getValidationState() {
-		return validationState;
+		addShapeCubeIfNew(buffer, x, y, z);
 	}
 }

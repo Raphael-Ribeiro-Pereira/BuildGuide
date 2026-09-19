@@ -7,7 +7,6 @@ import brentmaas.buildguide.common.screen.widget.AbstractWidgetHandler;
 import brentmaas.buildguide.common.screen.widget.IButton;
 import brentmaas.buildguide.common.screen.widget.ITextField;
 import brentmaas.buildguide.common.shape.Shape;
-import brentmaas.buildguide.common.shape.IValidatable;
 import brentmaas.buildguide.common.shape.ValidationState;
 import brentmaas.buildguide.common.shape.ShapeRegistry;
 
@@ -31,9 +30,13 @@ public class ShapeScreen extends BaseScreen{
 	private ITextField textFieldX = BuildGuide.widgetHandler.createTextField(45, 135, "");
 	private ITextField textFieldY = BuildGuide.widgetHandler.createTextField(45, 155, "");
 	private ITextField textFieldZ = BuildGuide.widgetHandler.createTextField(45, 175, "");
-	// Fixed Reset: restores the defaults of the properties shown right now (current section, or all
-	// when the shape has no sections); control points are protected by the shapes themselves
-	private IButton buttonReset = BuildGuide.widgetHandler.createButton(5, 238, 160, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.reset"), () -> {
+	// Fixed Validate (manual full rescan of the current shape) and Reset (restores the defaults of the
+	// properties shown right now: current section, or all when the shape has no sections; control
+	// points are protected by the shapes themselves), sharing the row under the validation block
+	private IButton buttonValidate = BuildGuide.widgetHandler.createButton(5, 238, 78, AbstractWidgetHandler.defaultSize, new Translatable("property.buildguide.validate"), () -> {
+		if(BuildGuide.stateManager.getState().isShapeAvailable()) BuildGuide.stateManager.getState().getCurrentShape().triggerValidation();
+	});
+	private IButton buttonReset = BuildGuide.widgetHandler.createButton(87, 238, 78, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.reset"), () -> {
 		if(BuildGuide.stateManager.getState().isShapeAvailable()) BuildGuide.stateManager.getState().getCurrentShape().resetShownToDefaults();
 	});
 	private IButton buttonSetX = BuildGuide.widgetHandler.createButton(115, 135, 30, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.set"), () -> {
@@ -99,6 +102,7 @@ public class ShapeScreen extends BaseScreen{
 		addWidget(textFieldZ);
 		addWidget(buttonSetZ);
 		addWidget(buttonOriginZIncrease);
+		addWidget(buttonValidate);
 		addWidget(buttonReset);
 		
 		if(BuildGuide.stateManager.getState().isShapeAvailable()) {
@@ -129,18 +133,19 @@ public class ShapeScreen extends BaseScreen{
 	}
 	
 	// Validation block under the origin (y 200..230 is free there): title, bar and "ok / total" text.
-	// Shapes that are not IValidatable show a dash; validatable but never scanned shows "- / total"
+	// Never scanned shows "- / total" (the total is known from the expected blocks)
 	private void renderValidation() {
 		drawShadowCentred(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + titleValidation, 85, 205, 0xFFFFFF);
-		if(!BuildGuide.stateManager.getState().isShapeAvailable() || !(BuildGuide.stateManager.getState().getCurrentShape() instanceof IValidatable validatable)) {
+		if(!BuildGuide.stateManager.getState().isShapeAvailable()) {
 			drawShadowCentred("-", 85, 219, 0x888888);
 			return;
 		}
-		ValidationState state = validatable.getValidationState();
+		Shape shape = BuildGuide.stateManager.getState().getCurrentShape(); // every Shape is IValidatable
+		ValidationState state = shape.getValidationState();
 		int barX1 = 5, barX2 = 165, barY1 = 217, barY2 = 224;
 		fillRect(barX1, barY1, barX2, barY2, 0xFF303030);
 		if(!state.isValidated()) {
-			drawShadowCentred("- / " + validatable.getExpectedBlocks().size(), 85, 226, 0xAAAAAA);
+			drawShadowCentred("- / " + shape.getExpectedBlocks().size(), 85, 226, 0xAAAAAA);
 			return;
 		}
 		int ok = state.getOk(), total = state.getTotal(), wrong = state.getWrong();

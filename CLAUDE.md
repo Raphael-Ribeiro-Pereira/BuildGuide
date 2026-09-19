@@ -66,11 +66,12 @@ export PATH="$JAVA_HOME/bin:$PATH"
 - `PropertyRunnable` renders as a button (used for `Validate`, `Set endpoint`).
 - Block solidity: `BlockState.getMaterial().isSolid()` does not exist on 1.21.11 — use
   `isAir()` / `blocksMotion()`.
-- Validation flow: shape implements `IValidatable` (expected local blocks packed with
-  `LocalPos.pack`, one-shot `consumeValidateRequest()`, a transient `ValidationState`);
-  Fabric `RenderHandler.validateShape` reads the world and fills the state (mutable,
-  per-position, synchronized; see `docs/API_REFERENCE.md`), then logs a summary from it.
-  Shapes call `validationState.invalidate()` where they clear `expectedBlocks`.
+- Validation is in the `Shape` base for every shape: `addShapeCube` records the position in
+  `expectedBlocks`, `doUpdate` invalidates/clears before and requests a scan after; use
+  `addShapeCubeIfNew` when a shape needs dedup (never a second local set). Fabric
+  `RenderHandler.validateShape` reads the world and fills the transient `ValidationState`
+  (mutable, per-position, synchronized; see `docs/API_REFERENCE.md`). Do not add a Validate
+  property to shapes: the screen has a fixed Validate button.
 - `IScreenWrapper.fillRect` is the only drawing primitive besides text; the validation bar
   lives in `ShapeScreen.renderValidation()` (left column, y 205–230), not in a property row.
 - Geometry lives in `public static enumerate(..., IBlockConsumer)` on Circle/Cuboid/Line/Cone;
