@@ -57,6 +57,10 @@ export PATH="$JAVA_HOME/bin:$PATH"
 - Block events reach validation through `MixinClientLevel` → `IncrementalValidator` →
   `ValidationState.updateBlock`; filter cheap first (`isInRange`), never read a shape's
   `expectedBlocks` from the client thread, and call `invalidate()` before clearing it.
+- Full scans are requested by `Shape.doUpdate` (`ValidationState.requestScan`) and run by
+  `RenderHandler.validateShape` on the render thread, debounced 300 ms and gated on loaded
+  chunks; never read the world from the generation executor. Next validation hook to add:
+  `ClientChunkEvents.CHUNK_LOAD` → `requestScan()` for intersecting shapes.
 - `ShapeCuboid.enumerate(w, h, d, walls.ALL)` with `d > 1` is a hollow box (six faces), not a
   solid; stamp a `w × h × 1` footprint per row when you need a solid volume.
 - `PropertyRunnable` renders as a button (used for `Validate`, `Set endpoint`).

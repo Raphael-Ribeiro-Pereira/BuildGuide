@@ -45,6 +45,9 @@ public class ValidationState {
 	public static final int nearRadius = 2;
 	private int ok = 0, missing = 0, wrong = 0;
 	private boolean validated = false;
+	// A full scan was requested by the shape itself (after regeneration); the render handler
+	// runs it once the shape has been idle for a moment and its chunks are loaded
+	private boolean scanRequested = false;
 
 	// The shape regenerated: everything known so far is stale
 	public synchronized void invalidate() {
@@ -74,6 +77,21 @@ public class ValidationState {
 
 	public synchronized void endScan() {
 		validated = true;
+	}
+	
+	public synchronized void requestScan() {
+		scanRequested = true;
+	}
+	
+	public synchronized boolean isScanRequested() {
+		return scanRequested;
+	}
+	
+	// Clears the request; returns whether one was pending
+	public synchronized boolean consumeScanRequest() {
+		boolean was = scanRequested;
+		scanRequested = false;
+		return was;
 	}
 
 	// Set one position's status, adjusting the counters by the transition. Unknown positions are ignored

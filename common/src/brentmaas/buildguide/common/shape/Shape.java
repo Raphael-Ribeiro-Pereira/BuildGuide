@@ -98,6 +98,9 @@ public abstract class Shape {
 		buffer = BuildGuide.shapeHandler.newBuffer();
 		buffer.setColour((int) (255 * shapeSet.getShapeColourR()), (int) (255 * shapeSet.getShapeColourG()), (int) (255 * shapeSet.getShapeColourB()), (int) (255 * shapeSet.getShapeColourA()));
 		updateShape(buffer);
+		// Generation finished: ask the render handler for a fresh full scan (it reads the world, so it
+		// cannot run here). A cancelled or failed generation throws before this line
+		if(this instanceof IValidatable validatable) validatable.getValidationState().requestScan();
 		buffer.setColour((int) (255 * shapeSet.getOriginColourR()), (int) (255 * shapeSet.getOriginColourG()), (int) (255 * shapeSet.getOriginColourB()), (int) (255 * shapeSet.getOriginColourA()));
 		addOriginCube(buffer);
 	}

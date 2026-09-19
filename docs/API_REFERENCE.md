@@ -82,6 +82,25 @@ a `LinkedHashMap`; ~0.6 µs measured on a 50k-position state). Never touches the
 regenerating shape is skipped. The scan log is one line: `[Build Guide] Validate - ok N,
 missing N, wrong N, near N`.
 
+**Automatic scan (Etapa 2.2b).** Incremental updates only work on a validated state, so
+the full scan now happens without a click: `Shape.doUpdate` calls
+`ValidationState.requestScan()` right after `updateShape` returns (a cancelled or failed
+generation throws before it), and `RenderHandler.validateShape` — which already runs on
+the render thread, in the first rendered frame after `ready` — treats the request like a
+button press, with two gates for automatic requests only: the shape must have been idle for
+`autoScanIdleMillis` = 300 ms (`Shape.getHowLongAgoCompletedMillis`; holding `+` keeps
+resetting it, so one scan runs after you let go) and every chunk under the shape's bounding
+box must be loaded (`ClientLevel.hasChunksAt(min, max)`; otherwise the request stays pending
+and is re-checked each frame — a scan of unloaded chunks would read everything as air).
+The Validate button remains the manual, immediate rescan. Measured scan cost (hash work,
+world reads excluded): cone r20 h40 ≈ 5–13 ms, 160-block bridge over ground ≈ 38 ms (the
+near pass over solid non-expected cells dominates), 50k-block solid ≈ 70 ms — a single hitch
+per completed regeneration; spread it over frames only if shapes above ~100k blocks appear.
+Known gap: chunks that reload after flying away do not trigger a rescan (nothing changes the
+state while they are unloaded, so counts only drift if the world changed meanwhile);
+the cheap future hook is Fabric API `ClientChunkEvents.CHUNK_LOAD` → `requestScan()` for
+shapes whose bounding box intersects the chunk.
+
 **Reset (Etapa 2.2).** One fixed `Reset` button in `ShapeScreen` at `(5, 238)` 160×20
 (below the validation block, above the 270 px limit). `ShapeSet.initialiseShape` calls
 `Shape.captureDefaults()` right after construction (before `restorePersistence`), storing

@@ -33,6 +33,8 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 
 public class RenderHandler extends AbstractRenderHandler {
+	// An automatic scan waits this long after the shape's last regeneration (debounce for rapid property changes)
+	private static final long autoScanIdleMillis = 300;
 	private static final RenderPipeline.Snippet BUILD_GUIDE_SNIPPET = RenderPipeline.builder(RenderPipelines.DEBUG_FILLED_SNIPPET)
 			.withBlend(new BlendFunction(SourceFactor.SRC_ALPHA, DestFactor.ONE_MINUS_SRC_ALPHA, SourceFactor.SRC_ALPHA, DestFactor.ONE_MINUS_SRC_ALPHA))
 			.withCull(true)
@@ -93,7 +95,16 @@ public class RenderHandler extends AbstractRenderHandler {
 
 	protected void validateShape(ShapeSet shapeSet) {
 		if(!(shapeSet.getShape() instanceof IValidatable validatable)) return;
-		if(!validatable.consumeValidateRequest()) return;
+		ValidationState state = validatable.getValidationState();
+		// Manual (button) scans run now. Automatic ones, requested by the shape after it regenerated,
+		// wait until the shape has been idle for a moment (holding +/- regenerates many times per
+		// second) and until the chunks under the shape are loaded (a scan of unloaded chunks would
+		// read everything as air)
+		boolean manual = validatable.consumeValidateRequest();
+		if(!manual) {
+			if(!state.isScanRequested()) return;
+			if(shapeSet.getShape().getHowLongAgoCompletedMillis() < autoScanIdleMillis) return;
+		}
 
 		ClientLevel world = Minecraft.getInstance().level;
 		if(world == null) return;
@@ -103,8 +114,6 @@ public class RenderHandler extends AbstractRenderHandler {
 		int oz = shapeSet.getOriginZ();
 
 		// Expected blocks in world coordinates (mapped back to local for the state), plus their bounding box
-		ValidationState state = validatable.getValidationState();
-		state.beginScan(validatable.getExpectedBlocks());
 		Set<Long> expectedWorld = new HashSet<Long>();
 		int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
 		int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE;
@@ -120,7 +129,13 @@ public class RenderHandler extends AbstractRenderHandler {
 			if(wz < minZ) minZ = wz;
 			if(wz > maxZ) maxZ = wz;
 		}
-		if(expectedWorld.isEmpty()) return;
+		if(expectedWorld.isEmpty()) {
+			state.consumeScanRequest();
+			return;
+		}
+		if(!manual && !world.hasChunksAt(new BlockPos(minX, minY, minZ), new BlockPos(maxX, maxY, maxZ))) return; // stays pending
+		state.consumeScanRequest();
+		state.beginScan(validatable.getExpectedBlocks());
 
 		// Classify expected positions into the state: air -> missing, non-solid -> wrong, otherwise ok
 		for(long wl: expectedWorld) {
