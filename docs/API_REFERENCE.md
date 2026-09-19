@@ -61,7 +61,7 @@ public abstract class Shape {
 `common/shape/ValidationState` — live, **mutable, per-position, `synchronized`** state
 held by every `Shape` in a `transient` field (never persisted):
 
-- `Map<Long, Byte> status` (packed local position → `UNKNOWN/OK/MISSING/WRONG`), wrong
+- `Map<Long, Byte> status` (packed local position → `UNKNOWN/OK/MISSING/WRONG/IGNORED`), wrong
   block names in a second map, `List<NearBlock{localPos, blockName, distance}>`.
 - Scan protocol: `beginScan(expected)` (all `UNKNOWN`, not validated) → `setStatus(pos,
   status, name)` per position → `setNearBlocks(list)` → `endScan()` (validated = true).
@@ -115,6 +115,38 @@ buttons: `Validate` at `(5, 238)` (manual rescan of the current shape via
 `Shape.triggerValidation()`, for every shape — the `Validate` *property* that Cone, Spline
 and Bridge still carry is kept only because it is persisted, and calls the same method) and
 `Reset` at `(87, 238)`.
+
+**Exclusion rules (Etapa 2.3).** Two mechanisms, both applied in *validation only* — the
+shape keeps drawing everywhere (`BlockOps.excludeAABB` is geometry exclusion, a different
+thing, and still has no caller):
+
+- *Ignored block types* — global, in `buildguide.cfg` as `ignoredBlocks` (new
+  `Config.StringConfigElement`: free text, comma-separated ids, `minecraft:` prefixed when
+  missing, parsed into a set on `setValue`; default `minecraft:scaffolding`). Edited in the
+  Configuration screen (text field + Set/Default at y 230; `State.requestRescanAll()` after
+  a change). The Fabric side resolves `BuiltInRegistries.BLOCK.getKey(block)` in
+  `RenderHandler.isIgnored(BlockState)` and passes a boolean — common stays Minecraft-free.
+  Effect: an ignored block is never WRONG and never a near block; on an expected position it
+  gets the fourth status **`IGNORED`** (byte 4), which `adjust()` counts as **missing**
+  (the structure is not there) *and* in a separate `getIgnored()` counter; the block name is
+  kept in `wrongBlockNames` and `getPositions(IGNORED)` feeds the yellow tag of 2.4.
+- *Exclusion boxes* — per **ShapeSet** (they are about *where in the world*, not shape
+  parameters; switching shape keeps them; the 15 shapes stay untouched). Four fixed slots
+  `ShapeSet.ExclusionBox {enabled, min/max XYZ}` in local coordinates, edited in the new
+  `ExclusionScreen` (fifth top-bar tab; the tabs are now five 96-px buttons, 5..485, which
+  also fits a 480-px GUI — the upstream four 120-px ones ended at 500). Each box has an
+  `On` checkbox, min/max rows with X Y Z fields, a `Pos` button per corner (player position
+  minus origin) and a `Set` button. Persisted as `exclusions=on,x1,y1,z1,x2,y2,z2,…;` in
+  `ShapeSet.toPersistence`; older jars ignore it because unknown keys fall into the
+  `ShapeRegistry.getShapeId(key) == -1` branch of `restorePersistence` (**compatible both
+  ways**). `ValidationState.setExclusionBoxes(list)` stores them; `beginScan` does not
+  track excluded positions (total is right from the start), the scan's near pass skips
+  excluded cells **without reading the world**, and `updateBlock` ignores excluded
+  positions. After a change `ShapeSet.onExclusionsChanged()` pushes the boxes to every
+  instantiated shape — `setExclusionBoxes` immediately `exclude()`s tracked positions that
+  fell inside (consistent counters, immediate feedback) — and `requestScan()`s so a shrunk
+  box gets its positions back. `RenderHandler` also re-pushes the boxes at every scan.
+  Measured: bridge over ground, near pass 32 ms → 4 ms with a box on the ground.
 
 **Reset (Etapa 2.2).** One fixed `Reset` button in `ShapeScreen` (see above; 78 px wide
 since 2.2c, below the validation block, above the 270 px limit). `ShapeSet.initialiseShape` calls
@@ -338,4 +370,6 @@ args...)` formats with `%s`. Keys added by this fork: `mode`, `topradius`, `tape
 `railwidth`, `railheight`, `railelevation`, `railinset`, `postspacing`, `section.rails`,
 `section.supports`; Step 3 added `pillarmode`, `pillarshape`, `pillarwidth`, `pillardepth`,
 `pillarspacing`, `pillartaper`; Step 4 added `resetsection`; Etapa 2.1 added
-`screen.buildguide.validation`; Etapa 2.2 added `screen.buildguide.reset` and removed `resetsection`.
+`screen.buildguide.validation`; Etapa 2.2 added `screen.buildguide.reset` and removed `resetsection`;
+Etapa 2.3 added `config.buildguide.ignoredBlocks(+Comment)`, `screen.buildguide.exclusions`,
+`exclusionbox`, `exclusionshint`.

@@ -5,10 +5,13 @@ import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
 import brentmaas.buildguide.common.screen.widget.AbstractWidgetHandler;
 import brentmaas.buildguide.common.screen.widget.IButton;
 import brentmaas.buildguide.common.screen.widget.ICheckboxRunnableButton;
+import brentmaas.buildguide.common.screen.widget.ITextField;
 
 public class ConfigurationScreen extends BaseScreen {
 	private ICheckboxRunnableButton buttonAsyncEnabled, buttonAdvancedRandomColorsDefaultEnabled, buttonPersistenceEnabled, buttonDebugGenerationTiminigsEnabled;
 	private IButton buttonAsyncEnabledDefault, buttonAdvancedRandomColorsDefaultEnabledDefault, buttonPersistenceEnabledDefault, buttonDebugGenerationTimingsEnabledDefault;
+	private ITextField textFieldIgnoredBlocks;
+	private IButton buttonIgnoredBlocksSet, buttonIgnoredBlocksDefault;
 	
 	public void init() {
 		super.init();
@@ -40,12 +43,31 @@ public class ConfigurationScreen extends BaseScreen {
 			BuildGuide.config.write();
 		});
 		
+		// Ignored block ids: free text, applied on Set (validation rescans through the shapes' own requests)
+		textFieldIgnoredBlocks = BuildGuide.widgetHandler.createTextField(10, 230, 240, AbstractWidgetHandler.defaultSize, "");
+		textFieldIgnoredBlocks.setTextValue(BuildGuide.config.ignoredBlocks.value);
+		buttonIgnoredBlocksSet = BuildGuide.widgetHandler.createButton(255, 230, 50, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.set"), () -> {
+			BuildGuide.config.ignoredBlocks.setValue(textFieldIgnoredBlocks.getTextValue());
+			textFieldIgnoredBlocks.setTextValue(BuildGuide.config.ignoredBlocks.value);
+			BuildGuide.config.write();
+			BuildGuide.stateManager.getState().requestRescanAll();
+		});
+		buttonIgnoredBlocksDefault = BuildGuide.widgetHandler.createButton(310, 230, 50, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.default"), () -> {
+			BuildGuide.config.ignoredBlocks.setValue(BuildGuide.config.ignoredBlocks.getDefault());
+			textFieldIgnoredBlocks.setTextValue(BuildGuide.config.ignoredBlocks.value);
+			BuildGuide.config.write();
+			BuildGuide.stateManager.getState().requestRescanAll();
+		});
+		
 		addWidget(buttonAsyncEnabled);
 		addWidget(buttonAsyncEnabledDefault);
 		addWidget(buttonAdvancedRandomColorsDefaultEnabled);
 		addWidget(buttonAdvancedRandomColorsDefaultEnabledDefault);
 		addWidget(buttonPersistenceEnabled);
 		addWidget(buttonPersistenceEnabledDefault);
+		addWidget(textFieldIgnoredBlocks);
+		addWidget(buttonIgnoredBlocksSet);
+		addWidget(buttonIgnoredBlocksDefault);
 		addWidget(buttonDebugGenerationTiminigsEnabled);
 		addWidget(buttonDebugGenerationTimingsEnabledDefault);
 	}
@@ -61,5 +83,8 @@ public class ConfigurationScreen extends BaseScreen {
 		
 		drawShadowLeft(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + new Translatable(BuildGuide.config.persistenceEnabled.translationKey), 10, 165, 0xFFFFFF);
 		drawShadowLeft(new Translatable(BuildGuide.config.persistenceEnabled.commentTranslationKey).toString(), 10, 185, 0xFFFFFF);
+		
+		drawShadowLeft(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + new Translatable(BuildGuide.config.ignoredBlocks.translationKey), 10, 210, 0xFFFFFF);
+		drawShadowLeft(new Translatable(BuildGuide.config.ignoredBlocks.commentTranslationKey).toString(), 10, 254, 0xFFFFFF);
 	}
 }

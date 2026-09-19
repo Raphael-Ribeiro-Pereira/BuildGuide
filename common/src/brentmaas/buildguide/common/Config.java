@@ -18,6 +18,8 @@ public class Config {
 	public ConfigElement<Boolean> asyncEnabled = new BooleanConfigElement("asyncEnabled", "config.buildguide.asyncEnabled", true, "config.buildguide.asyncEnabledComment");
 	public ConfigElement<Boolean> shapeListRandomColorsDefaultEnabled = new BooleanConfigElement("shapeListRandomColorsDefaultEnabled", "config.buildguide.shapeListRandomColorsDefaultEnabled", false, "config.buildguide.shapeListRandomColorsDefaultEnabledComment");
 	public ConfigElement<Boolean> persistenceEnabled = new BooleanConfigElement("persistenceEnabled", "config.buildguide.persistenceEnabled", false, "config.buildguide.persistenceEnabledComment");
+	// Block ids that validation ignores (never wrong, never near; on an expected position they count as missing with an IGNORED tag)
+	public StringConfigElement ignoredBlocks = new StringConfigElement("ignoredBlocks", "config.buildguide.ignoredBlocks", "minecraft:scaffolding", "config.buildguide.ignoredBlocksComment");
 	
 	public Config(File configFolder) {
 		configFile = new File(configFolder, "buildguide.cfg");
@@ -25,6 +27,7 @@ public class Config {
 		configElements.add(asyncEnabled);
 		configElements.add(shapeListRandomColorsDefaultEnabled);
 		configElements.add(persistenceEnabled);
+		configElements.add(ignoredBlocks);
 		
 		if(!configFile.exists()) {
 			write();
@@ -133,6 +136,37 @@ public class Config {
 		
 		public void setValue(String value) {
 			this.value = Boolean.parseBoolean(value);
+		}
+	}	
+	// Free text; the value is stored as typed and also parsed into a normalised id set
+	public class StringConfigElement extends ConfigElement<String> {
+		private java.util.Set<String> ids = new java.util.HashSet<String>();
+		
+		public StringConfigElement(String key, String translationKey, String defaultValue, String commentTranslationKey) {
+			super(key, translationKey, defaultValue, commentTranslationKey);
+			ids = parseIds(defaultValue);
+		}
+		
+		public void setValue(String value) {
+			this.value = value == null ? "" : value.trim();
+			ids = parseIds(this.value);
+		}
+		
+		// Comma separated ids; "scaffolding" becomes "minecraft:scaffolding"
+		public static java.util.Set<String> parseIds(String text) {
+			java.util.Set<String> result = new java.util.HashSet<String>();
+			if(text == null) return result;
+			for(String part: text.split(",")) {
+				String id = part.trim().toLowerCase(java.util.Locale.ROOT);
+				if(id.isEmpty()) continue;
+				if(!id.contains(":")) id = "minecraft:" + id;
+				result.add(id);
+			}
+			return result;
+		}
+		
+		public boolean contains(String id) {
+			return ids.contains(id);
 		}
 	}
 }

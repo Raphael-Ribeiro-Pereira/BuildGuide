@@ -11,6 +11,7 @@ import java.util.Scanner;
 
 import brentmaas.buildguide.common.screen.BaseScreen;
 import brentmaas.buildguide.common.screen.ConfigurationScreen;
+import brentmaas.buildguide.common.screen.ExclusionScreen;
 import brentmaas.buildguide.common.screen.ShapeScreen;
 import brentmaas.buildguide.common.screen.ShapelistScreen;
 import brentmaas.buildguide.common.screen.VisualisationScreen;
@@ -47,9 +48,21 @@ public class State {
 			return new ShapelistScreen();
 		case Settings:
 			return new ConfigurationScreen();
+		case Exclusions:
+			return new ExclusionScreen();
 		case Shape:
 		default:
 			return new ShapeScreen();
+		}
+	}
+	
+	// Ignored block list changed: every instantiated shape needs a fresh scan
+	public void requestRescanAll() {
+		for(ShapeSet set: shapeSets) {
+			for(int i = 0;i < ShapeRegistry.getNumberOfShapes();++i) {
+				Shape s = set.getShapeIfAvailable(i);
+				if(s != null) s.getValidationState().requestScan();
+			}
 		}
 	}
 	
@@ -260,6 +273,7 @@ public class State {
 		Shape,
 		Visualisation,
 		Shapelist,
-		Settings
+		Settings,
+		Exclusions
 	}
 }

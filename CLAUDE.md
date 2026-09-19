@@ -61,6 +61,11 @@ export PATH="$JAVA_HOME/bin:$PATH"
   `RenderHandler.validateShape` on the render thread, debounced 300 ms and gated on loaded
   chunks; never read the world from the generation executor. Next validation hook to add:
   `ClientChunkEvents.CHUNK_LOAD` → `requestScan()` for intersecting shapes.
+- Exclusions live in validation, never in generation: ignored block types are a global
+  config (`Config.ignoredBlocks`, resolved to a boolean on the Fabric side), exclusion boxes
+  belong to the `ShapeSet` (`ExclusionScreen`, persisted as `exclusions=`), and both are
+  applied by `ValidationState` (`IGNORED` status counts as missing; excluded positions are
+  untracked). `BlockOps.excludeAABB` is geometry exclusion and intentionally unused.
 - `ShapeCuboid.enumerate(w, h, d, walls.ALL)` with `d > 1` is a hollow box (six faces), not a
   solid; stamp a `w × h × 1` footprint per row when you need a solid volume.
 - `PropertyRunnable` renders as a button (used for `Validate`, `Set endpoint`).

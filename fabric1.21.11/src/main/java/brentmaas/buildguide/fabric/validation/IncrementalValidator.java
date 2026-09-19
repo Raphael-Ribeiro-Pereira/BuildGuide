@@ -5,6 +5,7 @@ import brentmaas.buildguide.common.State;
 import brentmaas.buildguide.common.shape.LocalPos;
 import brentmaas.buildguide.common.shape.ShapeSet;
 import brentmaas.buildguide.common.shape.ValidationState;
+import brentmaas.buildguide.fabric.RenderHandler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -22,14 +23,15 @@ public class IncrementalValidator {
 		
 		boolean air = blockState.isAir();
 		boolean solid = !air && blockState.blocksMotion();
+		boolean ignored = !air && RenderHandler.isIgnored(blockState);
 		String name = null;
 		for(ShapeSet set: state.shapeSets) {
 			if(!set.isShapeAvailable(set.getIndex())) continue; // never instantiate a shape from a block event
 			ValidationState vs = set.getShape().getValidationState(); // every Shape is IValidatable
 			int lx = pos.getX() - set.getOriginX(), ly = pos.getY() - set.getOriginY(), lz = pos.getZ() - set.getOriginZ();
 			if(!vs.isInRange(lx, ly, lz)) continue;
-			if(name == null && !air && !solid) name = blockState.getBlock().getName().getString();
-			vs.updateBlock(LocalPos.pack(lx, ly, lz), air, solid, name);
+			if(name == null && !air && (!solid || ignored)) name = blockState.getBlock().getName().getString();
+			vs.updateBlock(LocalPos.pack(lx, ly, lz), air, solid, ignored, name);
 		}
 	}
 }

@@ -26,6 +26,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.profiling.Profiler;
 import net.minecraft.world.level.block.state.BlockState;
@@ -116,10 +117,14 @@ public class RenderHandler extends AbstractRenderHandler {
 		Set<Long> expectedWorld = new HashSet<Long>();
 		int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
 		int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE;
+		// Exclusion boxes of the shape set (local coords): excluded positions are neither expected nor scanned
+		state.setExclusionBoxes(shapeSet.getActiveExclusionBoxes());
 		for(long local: validatable.getExpectedBlocks()) {
-			int wx = ox + LocalPos.unpackX(local);
-			int wy = oy + LocalPos.unpackY(local);
-			int wz = oz + LocalPos.unpackZ(local);
+			int lx = LocalPos.unpackX(local), ly = LocalPos.unpackY(local), lz = LocalPos.unpackZ(local);
+			if(state.isExcluded(lx, ly, lz)) continue;
+			int wx = ox + lx;
+			int wy = oy + ly;
+			int wz = oz + lz;
 			expectedWorld.add(BlockPos.asLong(wx, wy, wz));
 			if(wx < minX) minX = wx;
 			if(wx > maxX) maxX = wx;
@@ -136,12 +141,14 @@ public class RenderHandler extends AbstractRenderHandler {
 		state.consumeScanRequest();
 		state.beginScan(validatable.getExpectedBlocks());
 
-		// Classify expected positions into the state: air -> missing, non-solid -> wrong, otherwise ok
+		// Classify expected positions into the state: air -> missing, ignored type -> ignored (counts as
+		// missing), solid -> ok, otherwise wrong
 		for(long wl: expectedWorld) {
 			BlockPos wp = BlockPos.of(wl);
 			long local = LocalPos.pack(wp.getX() - ox, wp.getY() - oy, wp.getZ() - oz);
 			BlockState st = world.getBlockState(wp);
 			if(st.isAir()) state.setStatus(local, ValidationState.MISSING, null);
+			else if(isIgnored(st)) state.setStatus(local, ValidationState.IGNORED, st.getBlock().getName().getString());
 			else if(st.blocksMotion()) state.setStatus(local, ValidationState.OK, null);
 			else state.setStatus(local, ValidationState.WRONG, st.getBlock().getName().getString());
 		}
@@ -153,8 +160,9 @@ public class RenderHandler extends AbstractRenderHandler {
 			for(int y = minY - 2;y <= maxY + 2;++y) {
 				for(int z = minZ - 2;z <= maxZ + 2;++z) {
 					if(expectedWorld.contains(BlockPos.asLong(x, y, z))) continue;
+					if(state.isExcluded(x - ox, y - oy, z - oz)) continue; // excluded cells are not even read: this is where the ground under a bridge stops costing
 					BlockState st = world.getBlockState(mpos.set(x, y, z));
-					if(st.isAir() || !st.blocksMotion()) continue;
+					if(st.isAir() || !st.blocksMotion() || isIgnored(st)) continue;
 
 					double best = Double.MAX_VALUE;
 					for(int dx = -2;dx <= 2;++dx) {
@@ -179,6 +187,11 @@ public class RenderHandler extends AbstractRenderHandler {
 		logValidation(state);
 	}
 
+	// Block ids the user chose to ignore (Configuration screen), resolved through the registry here so common stays Minecraft-free
+	public static boolean isIgnored(BlockState state) {
+		return BuildGuide.config.ignoredBlocks.contains(BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString());
+	}
+	
 	// One-line chat summary read from the state; positions will be shown in the GUI (2.4), not logged
 	private void logValidation(ValidationState state) {
 		BuildGuide.logHandler.sendChatMessage("[Build Guide] Validate - ok " + state.getOk() + ", missing " + state.getMissing() + ", wrong " + state.getWrong() + ", near " + state.getNearCount());

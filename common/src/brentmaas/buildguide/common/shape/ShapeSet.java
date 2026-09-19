@@ -1,5 +1,8 @@
 package brentmaas.buildguide.common.shape;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import brentmaas.buildguide.common.BuildGuide;
 import brentmaas.buildguide.common.screen.BaseScreen;
 
@@ -11,6 +14,7 @@ public class ShapeSet {
 	private static final String PERSISTENCE_ORIGINCOLOUR = "originColour";
 	private static final String PERSISTENCE_SHAPECUBESIZE = "shapeCubeSize";
 	private static final String PERSISTENCE_ORIGINCUBESIZE = "originCubeSize";
+	private static final String PERSISTENCE_EXCLUSIONS = "exclusions";
 	
 	public Shape[] shapes;
 	private int index;
@@ -41,6 +45,16 @@ public class ShapeSet {
 	public static final double defaultOriginCubeSize = 0.2;
 	private double shapeCubeSize = defaultShapeCubeSize;
 	private double originCubeSize = defaultOriginCubeSize;
+	
+	// Validation exclusion boxes (Etapa 2.3), local to the origin, inclusive corners. They belong to
+	// the set, not the shape: switching shape keeps them. Persisted as 7 ints per box
+	public static final int numExclusionBoxes = 4;
+	public static class ExclusionBox {
+		public boolean enabled = false;
+		public int minX = 0, minY = 0, minZ = 0, maxX = 0, maxY = 0, maxZ = 0;
+	}
+	private ExclusionBox[] exclusionBoxes = new ExclusionBox[numExclusionBoxes];
+	{ for(int i = 0;i < numExclusionBoxes;++i) exclusionBoxes[i] = new ExclusionBox(); }
 	
 	public ShapeSet(int startIndex) {
 		shapes = new Shape[ShapeRegistry.getNumberOfShapes()];
@@ -174,6 +188,11 @@ public class ShapeSet {
 		return shapes[index] != null;
 	}
 	
+	// The instantiated shape at that registry index, or null; never instantiates
+	public Shape getShapeIfAvailable(int index) {
+		return shapes[index];
+	}
+	
 	public Shape getShape() {
 		if(shapes[index] == null) {
 			shapes[index] = initialiseShape(ShapeRegistry.getClassIdentifier(index));
@@ -226,6 +245,9 @@ public class ShapeSet {
 		persistenceData += PERSISTENCE_ORIGINCOLOUR + "=" + colourOriginR + "," + colourOriginG + "," + colourOriginB + "," + colourOriginA + ";";
 		persistenceData += PERSISTENCE_SHAPECUBESIZE + "=" + shapeCubeSize + ";";
 		persistenceData += PERSISTENCE_ORIGINCUBESIZE + "=" + originCubeSize + ";";
+		String exclusions = "";
+		for(ExclusionBox b: exclusionBoxes) exclusions += (exclusions.isEmpty() ? "" : ",") + (b.enabled ? 1 : 0) + "," + b.minX + "," + b.minY + "," + b.minZ + "," + b.maxX + "," + b.maxY + "," + b.maxZ;
+		persistenceData += PERSISTENCE_EXCLUSIONS + "=" + exclusions + ";";
 		for(Shape s: shapes) {
 			if(s != null) {
 				persistenceData += s.getClass().getName() + "=" + s.toPersistence() + ";";
@@ -272,6 +294,18 @@ public class ShapeSet {
 					shapeCubeSize = Double.parseDouble(value);
 				}else if(key.equals(PERSISTENCE_ORIGINCUBESIZE)){
 					originCubeSize = Double.parseDouble(value);
+				}else if(key.equals(PERSISTENCE_EXCLUSIONS)) {
+					String[] v = value.split(",");
+					for(int i = 0;i < numExclusionBoxes && i * 7 + 6 < v.length;++i) {
+						ExclusionBox b = exclusionBoxes[i];
+						b.enabled = "1".equals(v[i * 7]);
+						b.minX = Integer.parseInt(v[i * 7 + 1]);
+						b.minY = Integer.parseInt(v[i * 7 + 2]);
+						b.minZ = Integer.parseInt(v[i * 7 + 3]);
+						b.maxX = Integer.parseInt(v[i * 7 + 4]);
+						b.maxY = Integer.parseInt(v[i * 7 + 5]);
+						b.maxZ = Integer.parseInt(v[i * 7 + 6]);
+					}
 				}else {
 					int index = ShapeRegistry.getShapeId(key);
 					if(index >= 0) {
@@ -282,6 +316,31 @@ public class ShapeSet {
 			}
 		}
 		index = Math.max(0, Math.min(shapes.length - 1, index));
+	}
+	
+	public ExclusionBox getExclusionBox(int i) {
+		return exclusionBoxes[i];
+	}
+	
+	// Enabled boxes as {minX, minY, minZ, maxX, maxY, maxZ} with corners sorted, for ValidationState
+	public List<int[]> getActiveExclusionBoxes() {
+		List<int[]> result = new ArrayList<int[]>();
+		for(ExclusionBox b: exclusionBoxes) {
+			if(!b.enabled) continue;
+			result.add(new int[] {Math.min(b.minX, b.maxX), Math.min(b.minY, b.maxY), Math.min(b.minZ, b.maxZ), Math.max(b.minX, b.maxX), Math.max(b.minY, b.maxY), Math.max(b.minZ, b.maxZ)});
+		}
+		return result;
+	}
+	
+	// Exclusion boxes changed in the GUI: push to every instantiated shape (immediate feedback) and rescan
+	public void onExclusionsChanged() {
+		List<int[]> boxes = getActiveExclusionBoxes();
+		for(Shape s: shapes) {
+			if(s == null) continue;
+			s.getValidationState().setExclusionBoxes(boxes);
+			s.getValidationState().requestScan();
+		}
+		BaseScreen.shouldUpdatePersistence = true;
 	}
 	
 	public static class Origin {
