@@ -18,6 +18,25 @@ building-guide mod). Our work lives on branch `feat/cone-expanded`, based on ups
 Nothing project-related goes in a scratchpad or `%TEMP%`. The original source repo was
 lost that way once; this branch was rebuilt from decompiled jars.
 
+### Restoring on a fresh machine
+
+Only the repo (this fork on GitHub) is irreplaceable; everything else is re-downloadable:
+
+1. `git clone https://github.com/Raphael-Ribeiro-Pereira/BuildGuide BuildGuide-src` into
+   `C:\Users\rapha\Documents`, `git checkout feat/cone-expanded`,
+   `git remote add upstream https://github.com/brentmaas/BuildGuide`,
+   `git config core.autocrlf false`.
+2. JDK 21 Temurin (`OpenJDK21U-jdk_x64_windows_hotspot_21.0.12.1_1.zip` from
+   adoptium.net) unzipped to `BuildGuide-tools\jdk-21.0.12.1+1`.
+3. Vineflower (latest release jar from github.com/Vineflower/vineflower) as
+   `BuildGuide-tools\vineflower.jar`.
+4. Decompiled baselines are regenerated on demand: build the jar at the wanted commit and
+   run `java -jar vineflower.jar <jar> decompiled/<NAME>`, normalising line endings
+   (`sed -i 's/\r$//'`) before `diff -r`.
+5. Harness: `tools/harness/README.md`.
+6. Modrinth profile "Fabulously Optimized (1)" must be recreated (Fabric 1.21.11); copy the
+   built jar into its `mods` folder.
+
 ## Build
 
 ```bash
@@ -114,11 +133,10 @@ export PATH="$JAVA_HOME/bin:$PATH"
   new jar with the same Vineflower and `diff -r` against `decompiled/Fabric-0.4.8-spline`
   — only ordering/style differences should appear.
 - To test in-game, copy the built jar over the one in the Modrinth mods folder.
-- Offline geometry harness for composed shapes:
-  `C:\Users\rapha\Documents\BuildGuide-tools\bridgetest\BridgeTest.java` — drives
-  `ShapeBridge.updateShape` with a counting buffer and prints top-down maps + hole counts.
-  Compile/run against `common/build/classes/java/main` (see the file). Run it before every
-  in-game test of Bridge changes; it caught the bend holes before the game did.
+- Offline harness (geometry + validation, no Minecraft): sources live in the repo at
+  `tools/harness/` (see its README for build/run). Compiled classes go to
+  `C:\Users\rapha\Documents\BuildGuide-tools\bridgetest` (not versioned). Run it before
+  every in-game test; it caught the bridge bend holes before the game did.
 
 ## Known issues
 
