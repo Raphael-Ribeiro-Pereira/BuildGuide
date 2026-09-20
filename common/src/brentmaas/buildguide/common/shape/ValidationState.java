@@ -4,8 +4,10 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Live validation state of an IValidatable shape: the status of every expected block
@@ -40,6 +42,14 @@ public class ValidationState {
 
 	private final Map<Long, Byte> status = new HashMap<Long, Byte>();
 	private final Map<Long, String> wrongBlockNames = new HashMap<Long, String>();
+	// Per-status indices so error lists and overlays are O(k), not a scan of the whole map. Insertion
+	// order: deterministic and stable between rebuilds
+	private final Set<Long> wrongPositions = new LinkedHashSet<Long>();
+	private final Set<Long> ignoredPositions = new LinkedHashSet<Long>();
+	// Bumped on every mutation; readers (GUI list, world overlay) rebuild only when it changed
+	private long version = 0;
+	// Position picked in the error list, drawn distinctly in the overlay; -1 = none
+	private long highlightedPos = -1;
 	// Near blocks keyed by local position so incremental updates can add and remove them
 	private Map<Long, NearBlock> nearBlocks = new LinkedHashMap<Long, NearBlock>();
 	// Local bounding box of the expected positions, expanded by nearRadius; cheap pre-filter for block events
@@ -58,6 +68,10 @@ public class ValidationState {
 	public synchronized void invalidate() {
 		status.clear();
 		wrongBlockNames.clear();
+		wrongPositions.clear();
+		ignoredPositions.clear();
+		highlightedPos = -1;
+		++version;
 		nearBlocks.clear();
 		ok = missing = wrong = ignored = 0;
 		validated = false;
@@ -83,6 +97,7 @@ public class ValidationState {
 
 	public synchronized void endScan() {
 		validated = true;
+		++version;
 	}
 	
 	public synchronized void requestScan() {
@@ -109,6 +124,13 @@ public class ValidationState {
 		status.put(pos, newStatus);
 		if((newStatus == WRONG || newStatus == IGNORED) && blockName != null) wrongBlockNames.put(pos, blockName);
 		else wrongBlockNames.remove(pos);
+		if(old != newStatus) {
+			if(old == WRONG) wrongPositions.remove(pos);
+			if(old == IGNORED) ignoredPositions.remove(pos);
+			if(newStatus == WRONG) wrongPositions.add(pos);
+			if(newStatus == IGNORED) ignoredPositions.add(pos);
+			++version;
+		}
 	}
 
 	// Remove a position from the expected set (exclusion rules): it leaves the total, it does not become missing
@@ -117,6 +139,9 @@ public class ValidationState {
 		if(old == null) return;
 		adjust(old, -1);
 		wrongBlockNames.remove(pos);
+		wrongPositions.remove(pos);
+		ignoredPositions.remove(pos);
+		++version;
 	}
 
 	private void adjust(byte s, int delta) {
@@ -142,6 +167,7 @@ public class ValidationState {
 	public synchronized void setNearBlocks(List<NearBlock> near) {
 		nearBlocks.clear();
 		if(near != null) for(NearBlock nb: near) nearBlocks.put(nb.localPos, nb);
+		++version;
 	}
 	
 	// Replace the exclusion boxes (local coords, inclusive). Positions already tracked that fall inside are
@@ -186,7 +212,7 @@ public class ValidationState {
 		}
 		if(isExcluded(LocalPos.unpackX(local), LocalPos.unpackY(local), LocalPos.unpackZ(local))) return;
 		if(air || !solid || ignoredType) {
-			nearBlocks.remove(local);
+			if(nearBlocks.remove(local) != null) ++version;
 			return;
 		}
 		int x = LocalPos.unpackX(local), y = LocalPos.unpackY(local), z = LocalPos.unpackZ(local);
@@ -203,8 +229,10 @@ public class ValidationState {
 				}
 			}
 		}
-		if(best <= nearRadius) nearBlocks.put(local, new NearBlock(local, blockName, (float) best));
-		else nearBlocks.remove(local);
+		if(best <= nearRadius) {
+			nearBlocks.put(local, new NearBlock(local, blockName, (float) best));
+			++version;
+		}else if(nearBlocks.remove(local) != null) ++version;
 	}
 
 	public synchronized boolean isValidated() {
@@ -244,11 +272,28 @@ public class ValidationState {
 		return s == null ? UNKNOWN : s;
 	}
 
-	// Snapshot of the positions with the given status (for error lists)
+	// Snapshot of the positions with the given status. WRONG and IGNORED come from their indices (O(k),
+	// insertion order); other statuses scan the map
 	public synchronized List<Long> getPositions(byte wanted) {
+		if(wanted == WRONG) return new ArrayList<Long>(wrongPositions);
+		if(wanted == IGNORED) return new ArrayList<Long>(ignoredPositions);
 		List<Long> result = new ArrayList<Long>();
 		for(Map.Entry<Long, Byte> e: status.entrySet()) if(e.getValue() == wanted) result.add(e.getKey());
 		return result;
+	}
+	
+	public synchronized long getVersion() {
+		return version;
+	}
+	
+	public synchronized void setHighlightedPos(long pos) {
+		if(highlightedPos == pos) return;
+		highlightedPos = pos;
+		++version;
+	}
+	
+	public synchronized long getHighlightedPos() {
+		return highlightedPos;
 	}
 
 	public synchronized String getWrongBlockName(long pos) {

@@ -12,6 +12,7 @@ import java.util.Scanner;
 import brentmaas.buildguide.common.screen.BaseScreen;
 import brentmaas.buildguide.common.screen.ConfigurationScreen;
 import brentmaas.buildguide.common.screen.ExclusionScreen;
+import brentmaas.buildguide.common.screen.ValidationScreen;
 import brentmaas.buildguide.common.screen.ShapeScreen;
 import brentmaas.buildguide.common.screen.ShapelistScreen;
 import brentmaas.buildguide.common.screen.VisualisationScreen;
@@ -23,6 +24,7 @@ import brentmaas.buildguide.common.shape.ShapeSet;
 public class State {
 	private static final String PERSISTENCE_ENABLED = "enabled";
 	private static final String PERSISTENCE_DEPTHTEST = "depthTest";
+	private static final String PERSISTENCE_HIGHLIGHTERRORS = "highlightErrors";
 	private static final String PERSISTENCE_SHAPESET = "shapeSet";
 	private static final String PERSISTENCE_ISHAPESET = "iShapeSet";
 	private static final String PERSISTENCE_ISHAPENEW = "iShapeNew";
@@ -33,6 +35,8 @@ public class State {
 	private int iShapeNew = ShapeRegistry.getShapeId(ShapeCircle.class);
 	private boolean enabled = false;
 	private boolean depthTest = true;
+	// Draw the validation overlay (red/yellow/orange cubes on problems); toggled in the Visualisation screen
+	private boolean highlightErrors = true;
 	public ActiveScreen currentScreen = ActiveScreen.Shape;
 	
 	public BaseScreen createNewScreen(ActiveScreen newActiveScreen) {
@@ -50,6 +54,8 @@ public class State {
 			return new ConfigurationScreen();
 		case Exclusions:
 			return new ExclusionScreen();
+		case Validation:
+			return new ValidationScreen();
 		case Shape:
 		default:
 			return new ShapeScreen();
@@ -211,6 +217,15 @@ public class State {
 		BaseScreen.shouldUpdatePersistence = true;
 	}
 	
+	public boolean isHighlightErrors() {
+		return highlightErrors;
+	}
+	
+	public void setHighlightErrors(boolean highlightErrors) {
+		this.highlightErrors = highlightErrors;
+		BaseScreen.shouldUpdatePersistence = true;
+	}
+	
 	public void setDepthTest(boolean depthTest) {
 		this.depthTest = depthTest;
 		BaseScreen.shouldUpdatePersistence = true;
@@ -233,6 +248,8 @@ public class State {
 					enabled = Boolean.parseBoolean(value);
 				}else if(key.equals(PERSISTENCE_DEPTHTEST)) {
 					depthTest = Boolean.parseBoolean(value);
+				}else if(key.equals(PERSISTENCE_HIGHLIGHTERRORS)) {
+					highlightErrors = Boolean.parseBoolean(value);
 				}else if(key.equals(PERSISTENCE_SHAPESET)) {
 					pushNewShapeSet();
 					shapeSets.get(shapeSets.size() - 1).restorePersistence(value);
@@ -253,6 +270,7 @@ public class State {
 		String persistenceData = "";
 		persistenceData += PERSISTENCE_ENABLED + "=" + enabled + "\n";
 		persistenceData += PERSISTENCE_DEPTHTEST + "=" + depthTest + "\n";
+		persistenceData += PERSISTENCE_HIGHLIGHTERRORS + "=" + highlightErrors + "\n";
 		for(ShapeSet s: shapeSets) {
 			persistenceData += PERSISTENCE_SHAPESET + "=" + s.toPersistence() + "\n";
 		}
@@ -274,6 +292,7 @@ public class State {
 		Visualisation,
 		Shapelist,
 		Settings,
-		Exclusions
+		Exclusions,
+		Validation
 	}
 }

@@ -27,6 +27,13 @@ public class SelectorListImpl extends ObjectSelectionList<SelectorListImpl.Entry
 		setSelected(children().get(current));
 	}
 	
+	public void setEntries(List<Translatable> titles) {
+		double scroll = scrollAmount();
+		clearEntries();
+		for(int i = 0;i < titles.size();++i) addEntry(new Entry(i, titles.get(i)));
+		setScrollAmount(scroll);
+	}
+	
 	public void setYPosition(int y) {
 		//Selector lists don't do y position
 	}

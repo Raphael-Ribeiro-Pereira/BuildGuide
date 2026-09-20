@@ -27,12 +27,13 @@ public abstract class BaseScreen {
 	
 	private IButton buttonClose;
 	private ICheckboxRunnableButton buttonEnabled;
-	private IButton buttonBuildGuide = BuildGuide.widgetHandler.createButton(5, 30, 96, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.shape"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Shape)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Shape);
-	private IButton buttonVisualisation = BuildGuide.widgetHandler.createButton(101, 30, 96, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.visualisation"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Visualisation)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Visualisation);
-	private IButton buttonShapeList = BuildGuide.widgetHandler.createButton(197, 30, 96, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.shapelist"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Shapelist)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Shapelist);
-	private IButton buttonConfiguration = BuildGuide.widgetHandler.createButton(293, 30, 96, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.configuration"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Settings)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Settings);
-	// Five 96-px tabs (5..485) fit a 480-px GUI; the upstream four 120-px ones ended at 500
-	private IButton buttonExclusions = BuildGuide.widgetHandler.createButton(389, 30, 96, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.exclusions"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Exclusions)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Exclusions);
+	private IButton buttonBuildGuide = BuildGuide.widgetHandler.createButton(5, 30, 80, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.shape"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Shape)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Shape);
+	private IButton buttonVisualisation = BuildGuide.widgetHandler.createButton(85, 30, 80, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.visualisation"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Visualisation)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Visualisation);
+	private IButton buttonShapeList = BuildGuide.widgetHandler.createButton(165, 30, 80, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.shapelist"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Shapelist)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Shapelist);
+	private IButton buttonConfiguration = BuildGuide.widgetHandler.createButton(245, 30, 80, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.configuration"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Settings)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Settings);
+	// Six 80-px tabs (5..485) fit a 480-px GUI; the upstream four 120-px ones ended at 500
+	private IButton buttonExclusions = BuildGuide.widgetHandler.createButton(325, 30, 80, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.exclusions"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Exclusions)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Exclusions);
+	private IButton buttonValidation = BuildGuide.widgetHandler.createButton(405, 30, 80, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.validation"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Validation)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Validation);
 	
 	public void init() {
 		buttonClose = BuildGuide.widgetHandler.createButton(wrapper.getWidth() - 25, 5, new Translatable("X"), () -> BuildGuide.screenHandler.showScreen(null));
@@ -48,6 +49,7 @@ public abstract class BaseScreen {
 		addWidget(buttonShapeList);
 		addWidget(buttonConfiguration);
 		addWidget(buttonExclusions);
+		addWidget(buttonValidation);
 		
 		BuildGuide.stateManager.getState().initCheck();
 	}

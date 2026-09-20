@@ -54,6 +54,11 @@ public abstract class Shape implements IValidatable {
 	protected final Set<Long> expectedBlocks = new HashSet<Long>();
 	private transient ValidationState validationState = new ValidationState();
 	private transient boolean validateNextRender = false;
+	// World overlay of validation errors (coloured cubes), rebuilt by the render handler when the
+	// state version changes; rendered right after the shape's own buffer
+	public transient IShapeBuffer overlayBuffer = null;
+	public transient long overlayVersion = -1;
+	public transient long overlayBuiltAt = 0;
 	
 	protected abstract void updateShape(IShapeBuffer builder) throws Exception;
 	
@@ -118,41 +123,7 @@ public abstract class Shape implements IValidatable {
 	private void addCube(IShapeBuffer buffer, double x, double y, double z, double s) throws InterruptedException {
 		if(Thread.currentThread().isInterrupted()) throw new InterruptedException(); //Interrupt check for concurrent shape generation
 		
-		//-X
-		buffer.pushVertex(x, y, z);
-		buffer.pushVertex(x, y, z+s);
-		buffer.pushVertex(x, y+s, z+s);
-		buffer.pushVertex(x, y+s, z);
-		
-		//-Y
-		buffer.pushVertex(x, y, z);
-		buffer.pushVertex(x+s, y, z);
-		buffer.pushVertex(x+s, y, z+s);
-		buffer.pushVertex(x, y, z+s);
-		
-		//-Z
-		buffer.pushVertex(x, y, z);
-		buffer.pushVertex(x, y+s, z);
-		buffer.pushVertex(x+s, y+s, z);
-		buffer.pushVertex(x+s, y, z);
-		
-		//+X
-		buffer.pushVertex(x+s, y, z);
-		buffer.pushVertex(x+s, y+s, z);
-		buffer.pushVertex(x+s, y+s, z+s);
-		buffer.pushVertex(x+s, y, z+s);
-		
-		//+Y
-		buffer.pushVertex(x, y+s, z);
-		buffer.pushVertex(x, y+s, z+s);
-		buffer.pushVertex(x+s, y+s, z+s);
-		buffer.pushVertex(x+s, y+s, z);
-		
-		//+Z
-		buffer.pushVertex(x, y, z+s);
-		buffer.pushVertex(x+s, y, z+s);
-		buffer.pushVertex(x+s, y+s, z+s);
-		buffer.pushVertex(x, y+s, z+s);
+		CubeMesh.push(buffer, x, y, z, s);
 	}
 	
 	protected void addShapeCube(IShapeBuffer buffer, int x, int y, int z) throws InterruptedException {

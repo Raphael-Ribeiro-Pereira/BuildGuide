@@ -61,7 +61,7 @@ public abstract class Shape {
 `common/shape/ValidationState` — live, **mutable, per-position, `synchronized`** state
 held by every `Shape` in a `transient` field (never persisted):
 
-- `Map<Long, Byte> status` (packed local position → `UNKNOWN/OK/MISSING/WRONG/IGNORED`), wrong
+- `Map<Long, Byte> status` (packed local position → `UNKNOWN/OK/MISSING/WRONG/IGNORED`), per-status indices, a `version` counter, wrong
   block names in a second map, `List<NearBlock{localPos, blockName, distance}>`.
 - Scan protocol: `beginScan(expected)` (all `UNKNOWN`, not validated) → `setStatus(pos,
   status, name)` per position → `setNearBlocks(list)` → `endScan()` (validated = true).
@@ -147,6 +147,35 @@ thing, and still has no caller):
   fell inside (consistent counters, immediate feedback) — and `requestScan()`s so a shrunk
   box gets its positions back. `RenderHandler` also re-pushes the boxes at every scan.
   Measured: bridge over ground, near pass 32 ms → 4 ms with a box on the ground.
+
+**Error list and world overlay (Etapa 2.4).** Everything reads the *live* `ValidationState`:
+it now carries a `version` counter bumped on every mutation (`getVersion()`), per-status
+**indices** (`LinkedHashSet` for WRONG and IGNORED, maintained on transitions — so
+`getPositions(WRONG/IGNORED)` is O(k) in a deterministic, stable insertion order; other
+statuses still scan the map) and a `highlightedPos` (−1 = none).
+
+- *List*: `ValidationScreen`, sixth top-bar tab (tabs are now six 80-px buttons, 5..485;
+  "Configuration" is the tightest at 67 px + 8 padding). One `ISelectorList` (the existing
+  Fabric `ObjectSelectionList`, given a new `setEntries(List<Translatable>)` that keeps the
+  scroll position) with headers `Missing (n)` (count only), `Wrong block (n)`, `Ignored (n)`,
+  `Near blocks (n)` and rows `[x, y, z] Name (d=1.4)` in **world coordinates** (local +
+  set origin), sorted by (x, y, z). Rows are rebuilt when `version` (or the shape) changed,
+  **at most every 100 ms**; clicking a row toggles `setHighlightedPos`.
+- *Overlay*: `common/shape/ValidationOverlay.build(buffer, state, playerLocal)` fills one
+  `IShapeBuffer` with `CubeMesh` cubes (size 0.7): red WRONG, yellow IGNORED, orange near,
+  and the highlighted position white, drawn last. Colours are per vertex, so it is **one
+  buffer and one draw call** whatever the count. `Shape` holds `overlayBuffer /
+  overlayVersion / overlayBuiltAt`; `AbstractRenderHandler.renderShapeSet` calls the
+  `renderValidationOverlay(shapeSet)` hook right after the shape buffer (same translation)
+  when `State.isHighlightErrors()`; Fabric rebuilds the buffer when the version changed, at
+  most every 100 ms, and closes it when there is nothing to draw. Cap `maxCubes = 4000`:
+  only when exceeded, entries are sorted by distance to the player (nearest kept; the list
+  still shows real totals). Measured (warm, no-op buffer): 3000 errors 0.9 ms, 6000 with
+  the sort 2.3 ms, plus ~5 ms of `BufferBuilder` for 96k vertices — per rebuild, not per
+  frame. `CubeMesh.push` is the 24-vertex cube extracted from `Shape.addCube` (which now
+  delegates, identical order) and is what the 3D preview should reuse.
+- *Toggle*: `State.highlightErrors` (persisted as `highlightErrors=`, default true),
+  checkbox "Highlight errors" in the Visualisation screen at (5, 255).
 
 **Reset (Etapa 2.2).** One fixed `Reset` button in `ShapeScreen` (see above; 78 px wide
 since 2.2c, below the validation block, above the 270 px limit). `ShapeSet.initialiseShape` calls
@@ -372,4 +401,5 @@ args...)` formats with `%s`. Keys added by this fork: `mode`, `topradius`, `tape
 `pillarspacing`, `pillartaper`; Step 4 added `resetsection`; Etapa 2.1 added
 `screen.buildguide.validation`; Etapa 2.2 added `screen.buildguide.reset` and removed `resetsection`;
 Etapa 2.3 added `config.buildguide.ignoredBlocks(+Comment)`, `screen.buildguide.exclusions`,
-`exclusionbox`, `exclusionshint`.
+`exclusionbox`, `exclusionshint`; Etapa 2.4 added `screen.buildguide.errors.{missing,wrong,ignored,near}`,
+`highlighterrors`, `notvalidated`, `novalidation`.

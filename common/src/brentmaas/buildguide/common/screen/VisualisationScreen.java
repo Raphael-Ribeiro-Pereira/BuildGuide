@@ -15,6 +15,7 @@ public class VisualisationScreen extends BaseScreen {
 	private Translatable titleOriginColour = new Translatable("screen.buildguide.origincolour");
 	private Translatable titleRendering = new Translatable("screen.buildguide.rendering");
 	private Translatable textDepthTest = new Translatable("screen.buildguide.depthtest");
+	private Translatable textHighlightErrors = new Translatable("screen.buildguide.highlighterrors");
 	private Translatable titleCubeSize = new Translatable("screen.buildguide.cubesize");
 	
 	private ISlider sliderShapeR = BuildGuide.widgetHandler.createSlider(5, 70, new Translatable("R"), 0.0, 1.0, BuildGuide.stateManager.getState().isShapeAvailable() ? BuildGuide.stateManager.getState().getCurrentShapeSet().getShapeColourR() : ShapeSet.defaultColourShapeR);
@@ -88,6 +89,7 @@ public class VisualisationScreen extends BaseScreen {
 			BuildGuide.stateManager.getState().getCurrentShapeSet().setOriginColour(1.0f, 0.0f, 0.0f, 0.5f);
 		}
 	});
+	private ICheckboxRunnableButton buttonHighlightErrors;
 	private ICheckboxRunnableButton buttonDepthTest;
 	private IButton buttonSetCubeSize = BuildGuide.widgetHandler.createButton(140, 275, 120, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.set"), () -> {
 		if(BuildGuide.stateManager.getState().isShapeAvailable()) {
@@ -128,6 +130,10 @@ public class VisualisationScreen extends BaseScreen {
 			BuildGuide.stateManager.getState().setDepthTest(buttonDepthTest.isCheckboxSelected());
 			BaseScreen.shouldUpdatePersistence = true;
 		});
+		// Validation overlay toggle (red/yellow/orange cubes on wrong/ignored/near blocks)
+		buttonHighlightErrors = BuildGuide.widgetHandler.createCheckbox(5, 255, new Translatable(""), BuildGuide.stateManager.getState().isHighlightErrors(), false, () -> {
+			BuildGuide.stateManager.getState().setHighlightErrors(buttonHighlightErrors.isCheckboxSelected());
+		});
 		
 		addWidget(sliderShapeR);
 		addWidget(sliderShapeG);
@@ -144,6 +150,7 @@ public class VisualisationScreen extends BaseScreen {
 		addWidget(buttonSetOriginRandom);
 		addWidget(buttonDefaultOrigin);
 		addWidget(buttonDepthTest);
+		addWidget(buttonHighlightErrors);
 		addWidget(sliderShapeCubeSize);
 		addWidget(sliderOriginCubeSize);
 		addWidget(buttonSetCubeSize);
@@ -157,6 +164,7 @@ public class VisualisationScreen extends BaseScreen {
 		drawShadowCentred(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + titleOriginColour, 200, 55, 0xFFFFFF);
 		drawShadowCentred(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + titleRendering, 65, 220, 0xFFFFFF);
 		drawShadowLeft(textDepthTest.toString(), 30, 240, 0xFFFFFF);
+		drawShadowLeft(textHighlightErrors.toString(), 30, 260, 0xFFFFFF);
 		drawShadowCentred(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + titleCubeSize, 200, 220, 0xFFFFFF);
 	}
 }

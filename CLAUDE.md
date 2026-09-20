@@ -66,6 +66,11 @@ export PATH="$JAVA_HOME/bin:$PATH"
   belong to the `ShapeSet` (`ExclusionScreen`, persisted as `exclusions=`), and both are
   applied by `ValidationState` (`IGNORED` status counts as missing; excluded positions are
   untracked). `BlockOps.excludeAABB` is geometry exclusion and intentionally unused.
+- GUI and overlay never snapshot validation: they compare `ValidationState.getVersion()` and
+  rebuild (debounced 100 ms). Coloured world cubes go through `ValidationOverlay` +
+  `CubeMesh` (one buffer, per-vertex colours, one draw call); the 3D preview must reuse them.
+- Top bar: six 80-px tabs; there is no room for a seventh — new screens must hang off an
+  existing one.
 - `ShapeCuboid.enumerate(w, h, d, walls.ALL)` with `d > 1` is a hollow box (six faces), not a
   solid; stamp a `w × h × 1` footprint per row when you need a solid volume.
 - `PropertyRunnable` renders as a button (used for `Validate`, `Set endpoint`).

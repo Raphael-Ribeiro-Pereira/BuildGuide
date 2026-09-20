@@ -19,6 +19,7 @@ import brentmaas.buildguide.common.BuildGuide;
 import brentmaas.buildguide.common.shape.Shape;
 import brentmaas.buildguide.common.shape.LocalPos;
 import brentmaas.buildguide.common.shape.ShapeSet;
+import brentmaas.buildguide.common.shape.ValidationOverlay;
 import brentmaas.buildguide.common.shape.ValidationState;
 import brentmaas.buildguide.common.shape.ValidationState.NearBlock;
 import brentmaas.buildguide.fabric.shape.ShapeBuffer;
@@ -35,6 +36,8 @@ import net.minecraft.world.phys.Vec3;
 public class RenderHandler extends AbstractRenderHandler {
 	// An automatic scan waits this long after the shape's last regeneration (debounce for rapid property changes)
 	private static final long autoScanIdleMillis = 300;
+	// The error overlay is rebuilt at most this often while the state keeps changing
+	private static final long overlayRebuildMillis = 100;
 	private static final RenderPipeline.Snippet BUILD_GUIDE_SNIPPET = RenderPipeline.builder(RenderPipelines.DEBUG_FILLED_SNIPPET)
 			.withBlend(new BlendFunction(SourceFactor.SRC_ALPHA, DestFactor.ONE_MINUS_SRC_ALPHA, SourceFactor.SRC_ALPHA, DestFactor.ONE_MINUS_SRC_ALPHA))
 			.withCull(true)
@@ -93,6 +96,34 @@ public class RenderHandler extends AbstractRenderHandler {
 		Profiler.get().pop();
 	}
 
+	// Validation overlay: one extra buffer per shape with red/yellow/orange/white cubes, rebuilt when
+	// the state version changed (at most every 100 ms), one draw call per frame regardless of count
+	protected void renderValidationOverlay(ShapeSet shapeSet) {
+		Shape shape = shapeSet.getShape();
+		ValidationState state = shape.getValidationState();
+		if(!ValidationOverlay.hasContent(state)) {
+			if(shape.overlayBuffer != null) {
+				shape.overlayBuffer.close();
+				shape.overlayBuffer = null;
+				shape.overlayVersion = -1;
+			}
+			return;
+		}
+		long version = state.getVersion();
+		long now = System.currentTimeMillis();
+		if(shape.overlayBuffer == null || (version != shape.overlayVersion && now - shape.overlayBuiltAt >= overlayRebuildMillis)) {
+			if(shape.overlayBuffer != null) shape.overlayBuffer.close();
+			ShapeBuffer buffer = new ShapeBuffer();
+			ShapeSet.Origin player = BuildGuide.shapeHandler.getPlayerPosition();
+			ValidationOverlay.build(buffer, state, new ShapeSet.Origin(player.x - shapeSet.getOriginX(), player.y - shapeSet.getOriginY(), player.z - shapeSet.getOriginZ()));
+			buffer.end();
+			shape.overlayBuffer = buffer;
+			shape.overlayVersion = version;
+			shape.overlayBuiltAt = now;
+		}
+		((ShapeBuffer) shape.overlayBuffer).render();
+	}
+	
 	protected void validateShape(ShapeSet shapeSet) {
 		Shape validatable = shapeSet.getShape(); // every Shape is IValidatable
 		ValidationState state = validatable.getValidationState();

@@ -19,6 +19,9 @@ public abstract class AbstractRenderHandler {
 	// Hook for loader-specific world validation; called once per rendered shape set
 	protected void validateShape(ShapeSet shapeSet) {}
 	
+	// Hook for the validation overlay (coloured error cubes); called inside the shape set's translation, after its buffer
+	protected void renderValidationOverlay(ShapeSet shapeSet) {}
+	
 	public void render() {
 		pushProfiler(BuildGuide.modid);
 		
@@ -40,6 +43,7 @@ public abstract class AbstractRenderHandler {
 					
 					setupRenderingShapeSet(shapeSet);
 					renderShapeBuffer(shapeSet.getShape());
+					if(BuildGuide.stateManager.getState().isHighlightErrors()) renderValidationOverlay(shapeSet);
 					endRenderingShapeSet();
 					validateShape(shapeSet);
 				}
