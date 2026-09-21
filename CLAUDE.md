@@ -8,12 +8,12 @@ building-guide mod). Our work lives on branch `feat/cone-expanded`, based on ups
 
 | What | Path |
 |---|---|
-| Repo | `C:\Users\rapha\Documents\BuildGuide-src` |
-| JDK 21 (`JAVA_HOME`) | `C:\Users\rapha\Documents\BuildGuide-tools\jdk-21.0.12.1+1` |
-| Vineflower decompiler | `C:\Users\rapha\Documents\BuildGuide-tools\vineflower.jar` |
-| Decompiled reference jars | `C:\Users\rapha\Documents\BuildGuide-tools\decompiled\` |
-| Original jars (June 2026) | `C:\Users\rapha\Documents\Buildguide\*.jar*` |
-| Minecraft mods folder (Modrinth) | `C:\Users\rapha\AppData\Roaming\ModrinthApp\profiles\Fabulously Optimized (1)\mods` |
+| Repo | `C:\Users\Rapha\Documents\BuildGuide-src` |
+| JDK 21 (`JAVA_HOME`) | `C:\Users\Rapha\Documents\BuildGuide-tools\jdk-21.0.12.1+1` |
+| Vineflower decompiler | `C:\Users\Rapha\Documents\BuildGuide-tools\vineflower.jar` |
+| Decompiled reference jars | `C:\Users\Rapha\Documents\BuildGuide-tools\decompiled\` |
+| ~~Original jars (June 2026)~~ | ~~`C:\Users\Rapha\Documents\Buildguide\*.jar*`~~ — obsolete: every jar is reproducible from the branch history (one commit per jar) |
+| Minecraft mods folder (Modrinth) | `C:\Users\Rapha\AppData\Roaming\ModrinthApp\profiles\Fabulously Optimized (1)\mods` |
 
 Nothing project-related goes in a scratchpad or `%TEMP%`. The original source repo was
 lost that way once; this branch was rebuilt from decompiled jars.
@@ -23,7 +23,7 @@ lost that way once; this branch was rebuilt from decompiled jars.
 Only the repo (this fork on GitHub) is irreplaceable; everything else is re-downloadable:
 
 1. `git clone https://github.com/Raphael-Ribeiro-Pereira/BuildGuide BuildGuide-src` into
-   `C:\Users\rapha\Documents`, `git checkout feat/cone-expanded`,
+   `C:\Users\Rapha\Documents`, `git checkout feat/cone-expanded`,
    `git remote add upstream https://github.com/brentmaas/BuildGuide`,
    `git config core.autocrlf false`.
 2. JDK 21 Temurin (`OpenJDK21U-jdk_x64_windows_hotspot_21.0.12.1_1.zip` from
@@ -40,7 +40,7 @@ Only the repo (this fork on GitHub) is irreplaceable; everything else is re-down
 ## Build
 
 ```bash
-export JAVA_HOME="C:/Users/rapha/Documents/BuildGuide-tools/jdk-21.0.12.1+1"
+export JAVA_HOME="C:/Users/Rapha/Documents/BuildGuide-tools/jdk-21.0.12.1+1"
 export PATH="$JAVA_HOME/bin:$PATH"
 ./gradlew :fabric1.21.11:build --configure-on-demand --no-daemon
 ```
@@ -135,7 +135,7 @@ export PATH="$JAVA_HOME/bin:$PATH"
 - To test in-game, copy the built jar over the one in the Modrinth mods folder.
 - Offline harness (geometry + validation, no Minecraft): sources live in the repo at
   `tools/harness/` (see its README for build/run). Compiled classes go to
-  `C:\Users\rapha\Documents\BuildGuide-tools\bridgetest` (not versioned). Run it before
+  `C:\Users\Rapha\Documents\BuildGuide-tools\bridgetest` (not versioned). Run it before
   every in-game test; it caught the bridge bend holes before the game did.
 
 ## Known issues
