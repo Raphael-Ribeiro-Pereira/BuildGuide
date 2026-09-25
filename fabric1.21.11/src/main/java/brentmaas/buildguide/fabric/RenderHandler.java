@@ -172,19 +172,19 @@ public class RenderHandler extends AbstractRenderHandler {
 		state.consumeScanRequest();
 		state.beginScan(validatable.getExpectedBlocks());
 
-		// Classify expected positions into the state: air -> missing, ignored type -> ignored (counts as
-		// missing), solid -> ok, otherwise wrong
+		// Classify expected positions into the state: ignored type -> ignored (counts as missing), solid ->
+		// ok, anything else (air, torch, flower, water) -> missing
 		for(long wl: expectedWorld) {
 			BlockPos wp = BlockPos.of(wl);
 			long local = LocalPos.pack(wp.getX() - ox, wp.getY() - oy, wp.getZ() - oz);
 			BlockState st = world.getBlockState(wp);
-			if(st.isAir()) state.setStatus(local, ValidationState.MISSING, null);
-			else if(isIgnored(st)) state.setStatus(local, ValidationState.IGNORED, st.getBlock().getName().getString());
-			else if(st.blocksMotion()) state.setStatus(local, ValidationState.OK, null);
-			else state.setStatus(local, ValidationState.WRONG, st.getBlock().getName().getString());
+			if(!st.isAir() && isIgnored(st)) state.setStatus(local, ValidationState.IGNORED, st.getBlock().getName().getString());
+			else if(!st.isAir() && st.blocksMotion()) state.setStatus(local, ValidationState.OK, null);
+			else state.setStatus(local, ValidationState.MISSING, null);
 		}
 
-		// Solid blocks near (within 2) the shape but not part of it, likely misplaced
+		// Structure errors: solid blocks within 2 of the shape but not part of it, outside it or inside a
+		// hollow one; they deform the geometric form
 		List<NearBlock> near = new ArrayList<NearBlock>();
 		BlockPos.MutableBlockPos mpos = new BlockPos.MutableBlockPos();
 		for(int x = minX - 2;x <= maxX + 2;++x) {
@@ -225,7 +225,7 @@ public class RenderHandler extends AbstractRenderHandler {
 	
 	// One-line chat summary read from the state; positions will be shown in the GUI (2.4), not logged
 	private void logValidation(ValidationState state) {
-		BuildGuide.logHandler.sendChatMessage("[Build Guide] Validate - ok " + state.getOk() + ", missing " + state.getMissing() + ", wrong " + state.getWrong() + ", near " + state.getNearCount());
+		BuildGuide.logHandler.sendChatMessage("[Build Guide] Validate - ok " + state.getOk() + ", missing " + state.getMissing() + ", errors " + state.getNearCount());
 	}
 
 	public static RenderPipeline getRenderPipeline() {

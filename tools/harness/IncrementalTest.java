@@ -14,7 +14,7 @@ public class IncrementalTest {
 		// break it: ok -> missing
 		s.updateBlock(LocalPos.pack(3,0,3), true, false, false, null); check(s.getOk()==0 && s.getMissing()==100, "break expected -> missing");
 		// wrong block (non-solid, e.g. torch) on expected
-		s.updateBlock(LocalPos.pack(3,0,3), false, false, false, "Torch"); check(s.getWrong()==1 && "Torch".equals(s.getWrongBlockName(LocalPos.pack(3,0,3))), "non-solid on expected -> wrong with name");
+		s.updateBlock(LocalPos.pack(3,0,3), false, false, false, "Torch"); check(s.getMissing()==100 && s.getOk()==0 && s.getNearCount()==0, "non-solid on expected (torch) -> missing, no error");
 		// near: solid block 1 above the slab -> near
 		s.updateBlock(LocalPos.pack(5,1,5), false, true, false, null); check(s.getNearCount()==1, "solid next to shape -> near");
 		// far solid block (y=3, distance 3) -> not near, but in range? y=3 > maxY+2 -> out of range in practice; call directly:

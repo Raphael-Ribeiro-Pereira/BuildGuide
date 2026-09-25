@@ -22,12 +22,14 @@ import java.util.Set;
 public class ValidationState {
 	public static final byte UNKNOWN = 0;
 	public static final byte OK = 1;
+	// Air or any non-solid block (torch, flower, water) on an expected position
 	public static final byte MISSING = 2;
-	public static final byte WRONG = 3;
+	// 3 is reserved: it was WRONG (non-solid on an expected position) until Etapa 2.5, now MISSING. Not reused
 	// An ignored block type sits on an expected position: counted as missing, listed separately (yellow tag)
 	public static final byte IGNORED = 4;
 
-	// A solid block near the shape that is not part of it, likely misplaced
+	// Structure error: a solid block within nearRadius of the shape that is not part of it. It deforms the
+	// geometric form, outside the shape or inside a hollow one (Etapa 2.5; before, "near block", a hint)
 	public static class NearBlock {
 		public final long localPos;
 		public final String blockName;
@@ -41,10 +43,10 @@ public class ValidationState {
 	}
 
 	private final Map<Long, Byte> status = new HashMap<Long, Byte>();
-	private final Map<Long, String> wrongBlockNames = new HashMap<Long, String>();
-	// Per-status indices so error lists and overlays are O(k), not a scan of the whole map. Insertion
+	// Name of the ignored block type on IGNORED positions (shown in the error list)
+	private final Map<Long, String> ignoredBlockNames = new HashMap<Long, String>();
+	// Index of IGNORED positions so lists and overlays are O(k), not a scan of the whole map. Insertion
 	// order: deterministic and stable between rebuilds
-	private final Set<Long> wrongPositions = new LinkedHashSet<Long>();
 	private final Set<Long> ignoredPositions = new LinkedHashSet<Long>();
 	// Bumped on every mutation; readers (GUI list, world overlay) rebuild only when it changed
 	private long version = 0;
@@ -55,7 +57,7 @@ public class ValidationState {
 	// Local bounding box of the expected positions, expanded by nearRadius; cheap pre-filter for block events
 	private int minX, minY, minZ, maxX, maxY, maxZ;
 	public static final int nearRadius = 2;
-	private int ok = 0, missing = 0, wrong = 0, ignored = 0;
+	private int ok = 0, missing = 0, ignored = 0;
 	// Exclusion boxes in local coordinates {minX, minY, minZ, maxX, maxY, maxZ}, inclusive. Positions
 	// inside them are never tracked: not ok, not missing, not near, and out of the total
 	private List<int[]> exclusionBoxes = new ArrayList<int[]>();
@@ -67,13 +69,12 @@ public class ValidationState {
 	// The shape regenerated: everything known so far is stale
 	public synchronized void invalidate() {
 		status.clear();
-		wrongBlockNames.clear();
-		wrongPositions.clear();
+		ignoredBlockNames.clear();
 		ignoredPositions.clear();
 		highlightedPos = -1;
 		++version;
 		nearBlocks.clear();
-		ok = missing = wrong = ignored = 0;
+		ok = missing = ignored = 0;
 		validated = false;
 		minX = minY = minZ = Integer.MAX_VALUE;
 		maxX = maxY = maxZ = Integer.MIN_VALUE;
@@ -122,12 +123,10 @@ public class ValidationState {
 		adjust(old, -1);
 		adjust(newStatus, 1);
 		status.put(pos, newStatus);
-		if((newStatus == WRONG || newStatus == IGNORED) && blockName != null) wrongBlockNames.put(pos, blockName);
-		else wrongBlockNames.remove(pos);
+		if(newStatus == IGNORED && blockName != null) ignoredBlockNames.put(pos, blockName);
+		else ignoredBlockNames.remove(pos);
 		if(old != newStatus) {
-			if(old == WRONG) wrongPositions.remove(pos);
 			if(old == IGNORED) ignoredPositions.remove(pos);
-			if(newStatus == WRONG) wrongPositions.add(pos);
 			if(newStatus == IGNORED) ignoredPositions.add(pos);
 			++version;
 		}
@@ -138,8 +137,7 @@ public class ValidationState {
 		Byte old = status.remove(pos);
 		if(old == null) return;
 		adjust(old, -1);
-		wrongBlockNames.remove(pos);
-		wrongPositions.remove(pos);
+		ignoredBlockNames.remove(pos);
 		ignoredPositions.remove(pos);
 		++version;
 	}
@@ -151,9 +149,6 @@ public class ValidationState {
 			break;
 		case MISSING:
 			missing += delta;
-			break;
-		case WRONG:
-			wrong += delta;
 			break;
 		case IGNORED:
 			missing += delta; // an ignored block is not the structure: the position is still missing
@@ -197,17 +192,17 @@ public class ValidationState {
 	
 	/**
 	 * Incremental update for one changed block (same rules as the full scan). Expected
-	 * position: air -> MISSING, ignored type -> IGNORED, solid -> OK, otherwise WRONG. Other
-	 * positions: a solid, non-ignored block within nearRadius of an expected one becomes a near
-	 * block; anything else removes one. Excluded positions are ignored entirely.
+	 * position: ignored type -> IGNORED, solid -> OK, anything else (air, torch, water) ->
+	 * MISSING. Other positions: a solid, non-ignored block within nearRadius of an expected one
+	 * is a structure error (NearBlock); anything else removes one. Excluded positions are ignored
+	 * entirely.
 	 */
 	public synchronized void updateBlock(long local, boolean air, boolean solid, boolean ignoredType, String blockName) {
 		if(!validated) return;
 		if(status.containsKey(local)) {
-			if(air) setStatus(local, MISSING, null);
-			else if(ignoredType) setStatus(local, IGNORED, blockName);
+			if(!air && ignoredType) setStatus(local, IGNORED, blockName);
 			else if(solid) setStatus(local, OK, null);
-			else setStatus(local, WRONG, blockName);
+			else setStatus(local, MISSING, null);
 			return;
 		}
 		if(isExcluded(LocalPos.unpackX(local), LocalPos.unpackY(local), LocalPos.unpackZ(local))) return;
@@ -247,10 +242,6 @@ public class ValidationState {
 		return missing;
 	}
 
-	public synchronized int getWrong() {
-		return wrong;
-	}
-	
 	// Expected positions currently holding an ignored block type (already included in getMissing)
 	public synchronized int getIgnored() {
 		return ignored;
@@ -272,10 +263,9 @@ public class ValidationState {
 		return s == null ? UNKNOWN : s;
 	}
 
-	// Snapshot of the positions with the given status. WRONG and IGNORED come from their indices (O(k),
-	// insertion order); other statuses scan the map
+	// Snapshot of the positions with the given status. IGNORED comes from its index (O(k), insertion
+	// order); other statuses scan the map
 	public synchronized List<Long> getPositions(byte wanted) {
-		if(wanted == WRONG) return new ArrayList<Long>(wrongPositions);
 		if(wanted == IGNORED) return new ArrayList<Long>(ignoredPositions);
 		List<Long> result = new ArrayList<Long>();
 		for(Map.Entry<Long, Byte> e: status.entrySet()) if(e.getValue() == wanted) result.add(e.getKey());
@@ -296,14 +286,16 @@ public class ValidationState {
 		return highlightedPos;
 	}
 
-	public synchronized String getWrongBlockName(long pos) {
-		return wrongBlockNames.get(pos);
+	// Block name on an IGNORED position; null otherwise
+	public synchronized String getIgnoredBlockName(long pos) {
+		return ignoredBlockNames.get(pos);
 	}
 
 	public synchronized List<NearBlock> getNearBlocks() {
 		return new ArrayList<NearBlock>(nearBlocks.values());
 	}
 	
+	// Number of structure errors
 	public synchronized int getNearCount() {
 		return nearBlocks.size();
 	}

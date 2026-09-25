@@ -21,7 +21,9 @@ java  -cp "$CLASSES;$OUT" BridgeTest        # geometry: maps + hole counts (466/
 java  -cp "$CLASSES;$OUT" StateTest         # ValidationState counters/transitions (12 asserts)
 java  -cp "$CLASSES;$OUT" IncrementalTest   # updateBlock path (10 asserts)
 java  -cp "$CLASSES;$OUT" ExclusionTest     # ignored types + exclusion boxes (11 asserts)
-java  -cp "$CLASSES;$OUT" OverlayTest       # version/indices/highlight/cap (11 asserts)
+java  -cp "$CLASSES;$OUT" OverlayTest       # version/indices/highlight/cap/colours (10 asserts)
+java  -cp "$CLASSES;$OUT" NearDiagTest      # structure errors: scan + incremental detection, shell geometry (16 asserts)
+java  -cp "$CLASSES;$OUT" ClassifyTest      # 2.5 status table + hollow sphere/cone cavities (18 asserts)
 ```
 
 `CentreTest`, `Step4Test`, `BaseSetTest` are the Step 3/4 and 2.2c checks;

@@ -88,6 +88,12 @@ export PATH="$JAVA_HOME/bin:$PATH"
 - GUI and overlay never snapshot validation: they compare `ValidationState.getVersion()` and
   rebuild (debounced 100 ms). Coloured world cubes go through `ValidationOverlay` +
   `CubeMesh` (one buffer, per-vertex colours, one draw call); the 3D preview must reuse them.
+- An *error* is a solid block within 2 of the shape that is not part of it (outside, or inside
+  a hollow shape's cavity) — `NearBlock`, red. Non-solid on the guideline is just `MISSING`;
+  there is no `WRONG` (byte 3 reserved, never reuse it). A marker on a **solid** block must
+  enclose it (`ValidationOverlay.pushShell`, 1.02): a cube inside an opaque block is hidden by
+  the depth test — that is why errors were invisible until 2.5. Inner 0.7 cubes only for
+  see-through positions (IGNORED).
 - Top bar: six 80-px tabs; there is no room for a seventh — new screens must hang off an
   existing one.
 - `ShapeCuboid.enumerate(w, h, d, walls.ALL)` with `d > 1` is a hollow box (six faces), not a
@@ -150,6 +156,11 @@ export PATH="$JAVA_HOME/bin:$PATH"
 - No scrolling in the property panel. Shapes with many properties use panel sections
   (`declareSection`/`assignSection`, see `docs/API_REFERENCE.md`) and/or a custom
   `onSelectedInGUI`; Spline uses both (max 8 rows).
+- **To check in-game (2.5):** the validation bar text (`ok / total (pct%)  errors N`, centred
+  in a 160-px column) may overflow with five-digit totals and three-digit error counts — test
+  with a large shape. And the error shells (`shellInset` 0.01) may z-fight with the block
+  faces: look at a marked block from 1–2 and ~30 blocks; if it flickers, raise `shellInset`
+  to 0.05 (one line), and only if that fails give the shells a no-depth-test pipeline.
 
 ## Verified in-game (2026-09-17, rebuilt jar)
 

@@ -30,7 +30,8 @@ public class IncrementalValidator {
 			ValidationState vs = set.getShape().getValidationState(); // every Shape is IValidatable
 			int lx = pos.getX() - set.getOriginX(), ly = pos.getY() - set.getOriginY(), lz = pos.getZ() - set.getOriginZ();
 			if(!vs.isInRange(lx, ly, lz)) continue;
-			if(name == null && !air && (!solid || ignored)) name = blockState.getBlock().getName().getString();
+			// Every non-air block needs its name: near blocks are listed too (resolved once, only when in range)
+			if(name == null && !air) name = blockState.getBlock().getName().getString();
 			vs.updateBlock(LocalPos.pack(lx, ly, lz), air, solid, ignored, name);
 		}
 	}

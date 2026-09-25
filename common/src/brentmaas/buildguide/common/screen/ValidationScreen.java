@@ -15,8 +15,9 @@ import brentmaas.buildguide.common.shape.ValidationState;
 import brentmaas.buildguide.common.shape.ValidationState.NearBlock;
 
 /**
- * Error list of the current shape (Etapa 2.4), read from the live ValidationState: Missing
- * shows only its count; Wrong, Ignored and Near list world coordinates and block names.
+ * Error list of the current shape (Etapa 2.4, reordered in 2.5), read from the live
+ * ValidationState: Structure errors and Ignored list world coordinates and block names; Missing
+ * (non-solid or empty guideline positions) shows only its count, last.
  * Rebuilt when the state's version changes, at most every 100 ms. Clicking a row highlights
  * that position in the world overlay.
  */
@@ -71,20 +72,17 @@ public class ValidationScreen extends BaseScreen {
 			return state.getVersion();
 		}
 
-		header(entries, "screen.buildguide.errors.missing", state.getMissing() - state.getIgnored());
-
-		List<Long> wrong = sortedByPosition(state.getPositions(ValidationState.WRONG));
-		header(entries, "screen.buildguide.errors.wrong", wrong.size());
-		for(long pos: wrong) row(entries, pos, ox, oy, oz, state.getWrongBlockName(pos), null);
+		// Most actionable first: structure errors, then ignored blocks, then the missing count
+		List<NearBlock> errors = state.getNearBlocks();
+		errors.sort(Comparator.comparingInt((NearBlock nb) -> LocalPos.unpackX(nb.localPos)).thenComparingInt(nb -> LocalPos.unpackY(nb.localPos)).thenComparingInt(nb -> LocalPos.unpackZ(nb.localPos)));
+		header(entries, "screen.buildguide.errors.structure", errors.size());
+		for(NearBlock nb: errors) row(entries, nb.localPos, ox, oy, oz, nb.blockName, String.format(Locale.ROOT, "%.1f", nb.distance));
 
 		List<Long> ignored = sortedByPosition(state.getPositions(ValidationState.IGNORED));
 		header(entries, "screen.buildguide.errors.ignored", ignored.size());
-		for(long pos: ignored) row(entries, pos, ox, oy, oz, state.getWrongBlockName(pos), null);
+		for(long pos: ignored) row(entries, pos, ox, oy, oz, state.getIgnoredBlockName(pos), null);
 
-		List<NearBlock> near = state.getNearBlocks();
-		near.sort(Comparator.comparingInt((NearBlock nb) -> LocalPos.unpackX(nb.localPos)).thenComparingInt(nb -> LocalPos.unpackY(nb.localPos)).thenComparingInt(nb -> LocalPos.unpackZ(nb.localPos)));
-		header(entries, "screen.buildguide.errors.near", near.size());
-		for(NearBlock nb: near) row(entries, nb.localPos, ox, oy, oz, nb.blockName, String.format(Locale.ROOT, "%.1f", nb.distance));
+		header(entries, "screen.buildguide.errors.missing", state.getMissing() - state.getIgnored());
 		return state.getVersion();
 	}
 

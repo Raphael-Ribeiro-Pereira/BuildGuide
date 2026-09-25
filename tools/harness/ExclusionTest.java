@@ -15,7 +15,7 @@ public class ExclusionTest {
 		// ignored type on expected position -> IGNORED, counted as missing, listed
 		s.updateBlock(LocalPos.pack(7,0,7), false, true, true, "Scaffolding");
 		check(s.getIgnored()==1 && s.getMissing()==50 && s.getOk()==0, "ignored type on expected: ignored 1, still missing 50");
-		check(s.getPositions(ValidationState.IGNORED).size()==1 && "Scaffolding".equals(s.getWrongBlockName(LocalPos.pack(7,0,7))), "IGNORED listed with block name");
+		check(s.getPositions(ValidationState.IGNORED).size()==1 && "Scaffolding".equals(s.getIgnoredBlockName(LocalPos.pack(7,0,7))), "IGNORED listed with block name");
 		s.updateBlock(LocalPos.pack(7,0,7), false, true, false, null); check(s.getIgnored()==0 && s.getOk()==1 && s.getMissing()==49, "replace ignored with real block -> ok");
 		// ignored type near the shape -> never near
 		s.updateBlock(LocalPos.pack(7,1,7), false, true, true, "Scaffolding"); check(s.getNearCount()==0, "ignored type next to shape: not near");

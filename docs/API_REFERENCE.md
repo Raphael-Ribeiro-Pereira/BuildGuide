@@ -61,16 +61,19 @@ public abstract class Shape {
 `common/shape/ValidationState` — live, **mutable, per-position, `synchronized`** state
 held by every `Shape` in a `transient` field (never persisted):
 
-- `Map<Long, Byte> status` (packed local position → `UNKNOWN/OK/MISSING/WRONG/IGNORED`), per-status indices, a `version` counter, wrong
-  block names in a second map, `List<NearBlock{localPos, blockName, distance}>`.
+- `Map<Long, Byte> status` (packed local position → `UNKNOWN 0 / OK 1 / MISSING 2 / IGNORED 4`;
+  **byte 3 is reserved**, it was `WRONG` until 2.5 and is never reused), the IGNORED index, a
+  `version` counter, ignored block names in a second map, and the structure errors
+  `NearBlock{localPos, blockName, distance}` keyed by position.
 - Scan protocol: `beginScan(expected)` (all `UNKNOWN`, not validated) → `setStatus(pos,
   status, name)` per position → `setNearBlocks(list)` → `endScan()` (validated = true).
-- `setStatus` adjusts `ok/missing/wrong` **by the transition** (O(1)); positions not in the
+- `setStatus` adjusts `ok/missing/ignored` **by the transition** (O(1)); positions not in the
   map are ignored. This is what incremental validation (2.2) will call per block event.
 - `exclude(pos)` removes a position: it leaves the total, it does not become missing (2.3).
-- Readers: `isValidated()`, `getOk/Missing/Wrong/Total()`, `getProgress()` (ok/total),
+- Readers: `isValidated()`, `getOk/Missing/Ignored/Total()`, `getProgress()` (ok/total),
   `getStatus(pos)` O(1) (for the coloured preview, 1.x), `getPositions(status)` and
-  `getWrongBlockName(pos)` (error lists, 2.4), `getNearBlocks()`.
+  `getIgnoredBlockName(pos)` (error lists, 2.4), `getNearBlocks()` / `getNearCount()` (the
+  structure errors, 2.5).
 - Shapes call `validationState.invalidate()` right where they clear `expectedBlocks` in
   `updateShape`: a regenerated shape is "never validated" again.
 - Threads: the scan and the incremental updates run on the client main thread,
@@ -83,13 +86,14 @@ converge (chunk loads do not: that is what the Validate scan is for). It calls
 `fabric/validation/IncrementalValidator.onBlockChanged`, which for every shape set with an
 instantiated `IValidatable` shape does, cheapest first: `isInRange(local)` (validated **and**
 inside the expected bounding box expanded by `nearRadius` = 2, ~0.01 µs), then
-`ValidationState.updateBlock(local, air, solid, name)`: an expected position becomes
-MISSING / OK / WRONG by transition (~0.1 µs); any other position runs the same 5×5×5 near
-test as the scan and adds or **removes** a near block (near blocks are keyed by position in
+`ValidationState.updateBlock(local, air, solid, ignoredType, name)`: an expected position
+becomes OK / IGNORED / MISSING by transition (~0.1 µs); any other position runs the same
+5×5×5 near test as the scan and adds or **removes** a structure error (keyed by position in
 a `LinkedHashMap`; ~0.6 µs measured on a 50k-position state). Never touches the shape's
 `expectedBlocks` set — shapes call `invalidate()` **before** `expectedBlocks.clear()` so a
-regenerating shape is skipped. The scan log is one line: `[Build Guide] Validate - ok N,
-missing N, wrong N, near N`.
+regenerating shape is skipped. The block name is resolved for every non-air block (once
+per event, only when some shape is in range), so structure errors placed after the scan are
+named too. The scan log is one line: `[Build Guide] Validate - ok N, missing N, errors N`.
 
 **Automatic scan (Etapa 2.2b).** Incremental updates only work on a validated state, so
 the full scan now happens without a click: `Shape.doUpdate` calls
@@ -126,10 +130,10 @@ thing, and still has no caller):
   Configuration screen (text field + Set/Default at y 230; `State.requestRescanAll()` after
   a change). The Fabric side resolves `BuiltInRegistries.BLOCK.getKey(block)` in
   `RenderHandler.isIgnored(BlockState)` and passes a boolean — common stays Minecraft-free.
-  Effect: an ignored block is never WRONG and never a near block; on an expected position it
-  gets the fourth status **`IGNORED`** (byte 4), which `adjust()` counts as **missing**
+  Effect: an ignored block is never a structure error; on an expected position it
+  gets the status **`IGNORED`** (byte 4), which `adjust()` counts as **missing**
   (the structure is not there) *and* in a separate `getIgnored()` counter; the block name is
-  kept in `wrongBlockNames` and `getPositions(IGNORED)` feeds the yellow tag of 2.4.
+  kept in `ignoredBlockNames` and `getPositions(IGNORED)` feeds the yellow tag of 2.4.
 - *Exclusion boxes* — per **ShapeSet** (they are about *where in the world*, not shape
   parameters; switching shape keeps them; the 15 shapes stay untouched). Four fixed slots
   `ShapeSet.ExclusionBox {enabled, min/max XYZ}` in local coordinates, edited in the new
@@ -150,20 +154,21 @@ thing, and still has no caller):
 
 **Error list and world overlay (Etapa 2.4).** Everything reads the *live* `ValidationState`:
 it now carries a `version` counter bumped on every mutation (`getVersion()`), per-status
-**indices** (`LinkedHashSet` for WRONG and IGNORED, maintained on transitions — so
-`getPositions(WRONG/IGNORED)` is O(k) in a deterministic, stable insertion order; other
-statuses still scan the map) and a `highlightedPos` (−1 = none).
+**index** (`LinkedHashSet` for IGNORED — WRONG had one too until 2.5 — maintained on
+transitions, so `getPositions(IGNORED)` is O(k) in a deterministic, stable insertion order;
+other statuses still scan the map) and a `highlightedPos` (−1 = none).
 
 - *List*: `ValidationScreen`, sixth top-bar tab (tabs are now six 80-px buttons, 5..485;
   "Configuration" is the tightest at 67 px + 8 padding). One `ISelectorList` (the existing
   Fabric `ObjectSelectionList`, given a new `setEntries(List<Translatable>)` that keeps the
-  scroll position) with headers `Missing (n)` (count only), `Wrong block (n)`, `Ignored (n)`,
-  `Near blocks (n)` and rows `[x, y, z] Name (d=1.4)` in **world coordinates** (local +
-  set origin), sorted by (x, y, z). Rows are rebuilt when `version` (or the shape) changed,
-  **at most every 100 ms**; clicking a row toggles `setHighlightedPos`.
+  scroll position). Since 2.5 the headers are, most actionable first: `Structure errors (n)`,
+  `Ignored (n)`, `Missing (n)` (count only, last); rows `[x, y, z] Name (d=1.4)` in **world
+  coordinates** (local + set origin), sorted by (x, y, z). Rows are rebuilt when `version`
+  (or the shape) changed, **at most every 100 ms**; clicking a row toggles `setHighlightedPos`.
 - *Overlay*: `common/shape/ValidationOverlay.build(buffer, state, playerLocal)` fills one
-  `IShapeBuffer` with `CubeMesh` cubes (size 0.7): red WRONG, yellow IGNORED, orange near,
-  and the highlighted position white, drawn last. Colours are per vertex, so it is **one
+  `IShapeBuffer` with `CubeMesh` cubes: since 2.5, red **shells** on structure errors,
+  yellow inner cubes (0.7) on IGNORED, and the highlighted position white (shell or inner
+  cube, following its kind), drawn last. Colours are per vertex, so it is **one
   buffer and one draw call** whatever the count. `Shape` holds `overlayBuffer /
   overlayVersion / overlayBuiltAt`; `AbstractRenderHandler.renderShapeSet` calls the
   `renderValidationOverlay(shapeSet)` hook right after the shape buffer (same translation)
@@ -176,6 +181,34 @@ statuses still scan the map) and a `highlightedPos` (−1 = none).
   delegates, identical order) and is what the 3D preview should reuse.
 - *Toggle*: `State.highlightErrors` (persisted as `highlightErrors=`, default true),
   checkbox "Highlight errors" in the Visualisation screen at (5, 255).
+
+**Error concept and visible errors (Etapa 2.5).** An *error* is a solid block that deforms
+the geometric form, not a wrong block on the guideline:
+
+| World | Status / result |
+|---|---|
+| solid block on an expected position | `OK` |
+| air or any non-solid block on an expected position (torch, flower, water) | `MISSING`, no name, no colour |
+| ignored block type on an expected position | `IGNORED` (still counts as missing), yellow |
+| solid, non-ignored block **not** in the shape within `nearRadius` = 2 (Euclidean: face 1, straight 2, diagonal 1.41 yes, 2.83 no) | **structure error** (`NearBlock`), red |
+| same, but inside the cavity of a hollow shape | structure error too — the inner wall is in `expectedBlocks`, so no special case |
+
+The fixed distance 2 has no slider. `WRONG` was removed (byte 3 reserved), with its counter,
+index and `getWrong()`. `NearBlock` / `getNearCount()` keep their names: they *are* the
+structure errors. Scan (`RenderHandler.validateShape`) and `updateBlock` use the same table.
+
+*Why errors were invisible before 2.5*: the overlay drew a 0.7 cube centred in the cell and
+the depth test is on by default, so a cube inside an **opaque** block was hidden by the
+block itself; old orange near blocks were never seen, while WRONG (torch) and IGNORED
+(scaffolding) are see-through and showed. Rule: **a marker for a solid block must enclose
+it** — `pushShell` draws a cube `shellInset` = 0.01 outside each face (side 1.02), like the
+vanilla selection outline; raise `shellInset` (e.g. 0.05) if the faces z-fight at a distance.
+Inner 0.7 cubes are only for see-through positions. The 3D preview must follow the same rule.
+
+Bar: `ok / total (pct%)  errors N`, red when N > 0. Harness: `NearDiagTest` (detection by
+scan and incremental at d = 1, 2, 1.41, 2.83, 3; shell geometry) and `ClassifyTest` (the
+table above; hollow sphere r=6 and a real hollow cone filled with stone flag exactly the
+interior cells within 2).
 
 **Reset (Etapa 2.2).** One fixed `Reset` button in `ShapeScreen` (see above; 78 px wide
 since 2.2c, below the validation block, above the 270 px limit). `ShapeSet.initialiseShape` calls
@@ -194,7 +227,8 @@ lives in `common` so the GUI can read it.
 the origin** (y 205–230, which is free; the property rows and the Validate/Reset row are
 untouched, so no section grows): title, a 160×7 bar (`BaseScreen.fillRect` →
 `IScreenWrapper.fillRect` → `GuiGraphics.fill`, the one Fabric addition) and the text
-`ok / total (pct%)`, plus `wrong N` in red when there are wrong blocks. Shapes that are
+`ok / total (pct%)`, plus `errors N` in red when there are structure errors (2.5; it was
+`wrong N`). Shapes that are
 not `IValidatable` show `-`; validatable but never scanned shows `- / total` (the total is
 known from `getExpectedBlocks()` without a scan). Green bar when complete, blue otherwise.
 
@@ -402,4 +436,5 @@ args...)` formats with `%s`. Keys added by this fork: `mode`, `topradius`, `tape
 `screen.buildguide.validation`; Etapa 2.2 added `screen.buildguide.reset` and removed `resetsection`;
 Etapa 2.3 added `config.buildguide.ignoredBlocks(+Comment)`, `screen.buildguide.exclusions`,
 `exclusionbox`, `exclusionshint`; Etapa 2.4 added `screen.buildguide.errors.{missing,wrong,ignored,near}`,
-`highlighterrors`, `notvalidated`, `novalidation`.
+`highlighterrors`, `notvalidated`, `novalidation`; Etapa 2.5 added `screen.buildguide.errors.structure`
+and removed `errors.wrong` and `errors.near`.

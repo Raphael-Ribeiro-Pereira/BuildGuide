@@ -148,13 +148,14 @@ public class ShapeScreen extends BaseScreen{
 			drawShadowCentred("- / " + shape.getExpectedBlocks().size(), 85, 226, 0xAAAAAA);
 			return;
 		}
-		int ok = state.getOk(), total = state.getTotal(), wrong = state.getWrong();
+		int ok = state.getOk(), total = state.getTotal(), errors = state.getNearCount();
 		double progress = state.getProgress();
 		int fillX2 = barX1 + (int) Math.round((barX2 - barX1) * progress);
 		if(fillX2 > barX1) fillRect(barX1, barY1, fillX2, barY2, ok == total ? 0xFF40C040 : 0xFF40A0FF);
 		String text = ok + " / " + total + " (" + String.format(java.util.Locale.ROOT, "%.1f", 100.0 * progress) + "%)";
-		if(wrong > 0) text += "  wrong " + wrong;
-		drawShadowCentred(text, 85, 226, wrong > 0 ? 0xFF8080 : 0xFFFFFF);
+		// Structure errors: solid blocks deforming the shape (Etapa 2.5)
+		if(errors > 0) text += "  errors " + errors;
+		drawShadowCentred(text, 85, 226, errors > 0 ? 0xFF8080 : 0xFFFFFF);
 	}
 	
 	private void addShapeProperties(Shape shape) {
