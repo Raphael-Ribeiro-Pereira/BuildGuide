@@ -143,6 +143,17 @@ export PATH="$JAVA_HOME/bin:$PATH"
 | validate button | `validate-button.jar.bak` | `PropertyRunnable` |
 | spline | `spline.jar` | Catmull-Rom, `IValidatable`, `LocalPos` |
 
+## Milestones and decompile baselines
+
+Baselines live in `BuildGuide-tools\decompiled\` (Vineflower 1.11.1, line endings normalised).
+Only the latest one matters; diff the next change against it.
+
+| Commit | Change | Baseline |
+|---|---|---|
+| `628ebea` | Etapa 2.4 — error list + world overlay | `STEP24` |
+| `cffa2eb` | Etapa 2.5 — structure errors replace WRONG, visible shells | `STEP25` |
+| `5dca445` | Step 0 — 3D preview (PIP, rotation, zoom, validation colours) | `STEP_PREVIEW` (current) |
+
 ## Workflow
 
 - **Rule zero:** read `docs/API_REFERENCE.md` before touching properties, widgets,
