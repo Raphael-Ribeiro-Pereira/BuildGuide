@@ -158,7 +158,8 @@ Only the latest one matters; diff the next change against it.
 | `628ebea` | Etapa 2.4 — error list + world overlay | `STEP24` |
 | `cffa2eb` | Etapa 2.5 — structure errors replace WRONG, visible shells | `STEP25` |
 | `5dca445` | Step 0 — 3D preview (PIP, rotation, zoom, validation colours) | `STEP_PREVIEW` |
-| `8ef0e59` | GUI redesign E1 — `PreviewController`, `Shape.generation`, snapshot `!error` fix | `E1` (current) |
+| `8ef0e59` | GUI redesign E1 — `PreviewController`, `Shape.generation`, snapshot `!error` fix | `E1` |
+| `a1ee0eb` | GUI redesign E2 — `ValidationListComponent` (error list reusable in any rectangle) | `E2` (current) |
 
 GUI redesign plan and decisions: `docs/GUI_REDESIGN.md` (stages E1–E7).
 
