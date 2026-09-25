@@ -88,6 +88,8 @@ export PATH="$JAVA_HOME/bin:$PATH"
 - GUI and overlay never snapshot validation: they compare `ValidationState.getVersion()` and
   rebuild (debounced 100 ms). Coloured world cubes go through `ValidationOverlay` +
   `CubeMesh` (one buffer, per-vertex colours, one draw call); the 3D preview must reuse them.
+  The error list is `ValidationListComponent` (any screen, any rectangle); do not rebuild its
+  rows elsewhere.
 - An *error* is a solid block within 2 of the shape that is not part of it (outside, or inside
   a hollow shape's cavity) — `NearBlock`, red. Non-solid on the guideline is just `MISSING`;
   there is no `WRONG` (byte 3 reserved, never reuse it). A marker on a **solid** block must

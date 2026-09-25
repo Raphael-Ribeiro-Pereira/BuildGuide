@@ -165,6 +165,15 @@ other statuses still scan the map) and a `highlightedPos` (−1 = none).
   `Ignored (n)`, `Missing (n)` (count only, last); rows `[x, y, z] Name (d=1.4)` in **world
   coordinates** (local + set origin), sorted by (x, y, z). Rows are rebuilt when `version`
   (or the shape) changed, **at most every 100 ms**; clicking a row toggles `setHighlightedPos`.
+  Since GUI redesign E2 all of this is `common/screen/ValidationListComponent`, placed by any
+  screen in any rectangle: `init(x1, y1, x2, y2, shape, ox, oy, oz)` creates the list (the
+  widget factory takes **left, right, top, bottom**; the component converts), `update(shape,
+  ox, oy, oz)` every frame, `click(index)` is the list callback. `buildEntries(shape, ox, oy,
+  oz)` is pure (rows + parallel local positions, −1 for headers/messages + the version shown);
+  factory and clock are injectable. States: no shape → "No shape"; not validated → "Not
+  validated yet" only; validated without errors → the three headers at 0 (a "No errors" line is
+  planned for E6). The world overlay is the only renderer of the highlight today; the preview
+  does not draw it (planned for E6). `ValidationScreen` is now the title plus this component.
 - *Overlay*: `common/shape/ValidationOverlay.build(buffer, state, playerLocal)` fills one
   `IShapeBuffer` with `CubeMesh` cubes: since 2.5, red **shells** on structure errors,
   yellow inner cubes (0.7) on IGNORED, and the highlighted position white (shell or inner
