@@ -455,10 +455,13 @@ A panel over the GUI showing the shape selected when it opened, coloured by vali
 - **Registration.** `SpecialGuiElementRegistry.register(ctx -> new PreviewRenderer(ctx.vertexConsumers()))`
   (fabric-rendering-v1) in `onInitializeClient`; after the `GuiRenderer` exists it throws
   "Too late to register". States are routed by `getRenderStateClass()`.
-- **common:** `PreviewScreen` (panel, snapshot, camera, input) → `IScreenWrapper.drawShapePreview(x1,
-  y1, x2, y2, PreviewModel, PreviewCamera)` (default no-op, so other loaders compile).
-  `PreviewModel` = immutable `long[] positions` + bounds, copied under `shape.lock` (`tryLock` +
-  `ready`, "Generating..." otherwise); `withValidation(state)` returns a new instance sharing
+- **common:** `PreviewScreen` (panel only) → `State.preview`, a `PreviewController` (model,
+  camera, refresh, input; E1) → `IScreenWrapper.drawShapePreview(x1, y1, x2, y2, PreviewModel,
+  PreviewCamera)` (default no-op, so other loaders compile).
+  `PreviewModel` = immutable `long[] positions` + bounds + the `generation` it was copied at,
+  copied under `shape.lock` (`tryLock` + `ready && !error`: a cancelled or failed generation
+  leaves `expectedBlocks` partial; null otherwise, "Generating..." when there is no earlier
+  model); `withValidation(state)` returns a new instance sharing
   the positions with `byte[] status` (null when not validated → white), `long[] errors`
   (structure errors) and `stateVersion` (read **before** the statuses). Framing `radius()` is
   the box grown by `nearRadius` on every side, so the camera does not move when an error
@@ -481,10 +484,26 @@ A panel over the GUI showing the shape selected when it opened, coloured by vali
   `ShapeBuffer.render(colour, depth, modelView, pipeline)` is the variant it uses; the world's
   `render()` delegates to it with the main target, `getModelViewMatrix()` and
   `getRenderPipeline()` — unchanged behaviour.
-- **Refresh.** Geometry frozen at open; colours follow `getVersion()`, at most every 100 ms
-  (same rule as the error list and the overlay). Measured, sphere r=50 (30,978 blocks): snapshot
-  4.8 ms, colour snapshot 1.5 ms, mesh fill 4.7 ms CPU.
-- Harness: `PreviewTest`, `PreviewColourTest`, `PreviewCameraTest`.
+- **Generation (E1).** `Shape.getGeneration()` counts successful generations. `update()`'s
+  `finally` calls `finishGeneration()` before `unlock()`: `completedAt`, then `++generation`
+  only if `!error`, then `ready = true`. `ready` is a plain field, so the consistent read of
+  (ready, error, generation) is the one **under the lock** (`PreviewModel.snapshot`); a
+  lock-free `getGeneration()` is only a hint that a snapshot is worth trying. `completedAt`
+  is not a generation marker: it also moves on cancelled/failed generations.
+- **Controller (E1).** `PreviewController` lives in `State` (one per world and dimension,
+  transient, not persisted; its constructor only allocates fields). `update(shape)` every
+  frame: a new shape instance → snapshot at once, camera kept; a new generation → snapshot at
+  most every `geometryRefreshMillis` = 250 ms, the last one always lands (it stays pending until
+  the model catches up); while a newer generation cannot be copied the previous model stays;
+  colours follow `getVersion()` at most every `colourRefreshMillis` = 100 ms (same rule as the
+  error list and the overlay). **One shared camera** (D5): reopening the window keeps the view.
+  Input: `mouseClicked(inArea, button, doubleClick)`, `mouseDragged`, `mouseReleased`,
+  `mouseScrolled(inArea, amount)`; the screen computes `inArea` and routes its events; one
+  screen at a time, and `attach()` (called in the screen's `init`) drops a drag another view
+  left. Injectable clock (`PreviewController(LongSupplier)`) for tests. Measured, sphere r=50
+  (30,978 blocks): snapshot 4.8 ms, colour snapshot 1.5 ms, mesh fill 4.7 ms CPU.
+- Harness: `PreviewTest`, `PreviewColourTest`, `PreviewCameraTest`, `GenerationTest`,
+  `PreviewControllerTest`.
 
 ## Translation
 

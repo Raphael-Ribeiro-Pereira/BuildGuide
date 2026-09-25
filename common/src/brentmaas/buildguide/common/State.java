@@ -12,6 +12,7 @@ import java.util.Scanner;
 import brentmaas.buildguide.common.screen.BaseScreen;
 import brentmaas.buildguide.common.screen.ConfigurationScreen;
 import brentmaas.buildguide.common.screen.ExclusionScreen;
+import brentmaas.buildguide.common.screen.PreviewController;
 import brentmaas.buildguide.common.screen.ValidationScreen;
 import brentmaas.buildguide.common.screen.ShapeScreen;
 import brentmaas.buildguide.common.screen.ShapelistScreen;
@@ -38,6 +39,9 @@ public class State {
 	// Draw the validation overlay (red/yellow/orange cubes on problems); toggled in the Visualisation screen
 	private boolean highlightErrors = true;
 	public ActiveScreen currentScreen = ActiveScreen.Shape;
+	// 3D preview model, shared camera and input, for every view of the preview in this world and
+	// dimension. Not persisted (not among the keys written by savePersistence)
+	public final PreviewController preview = new PreviewController();
 	
 	public BaseScreen createNewScreen(ActiveScreen newActiveScreen) {
 		currentScreen = newActiveScreen;

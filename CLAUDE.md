@@ -97,15 +97,18 @@ export PATH="$JAVA_HOME/bin:$PATH"
 - 3D preview = vanilla picture-in-picture: `fabric/preview/PreviewRenderer` registered with
   Fabric's `SpecialGuiElementRegistry` in `onInitializeClient` (too late after the GuiRenderer
   exists). The GUI pose is 2D since 1.21.6: there is no in-panel `PoseStack` camera. It draws a
-  `PreviewModel` snapshot (copied under `shape.lock`, never the live `expectedBlocks`).
+  `PreviewModel` snapshot (copied under `shape.lock` with `ready && !error`, never the live
+  `expectedBlocks`). "Has the shape regenerated?" = `Shape.getGeneration()` (successful
+  generations only), never `completedAt`, which also moves on cancelled ones.
   `BUILD_GUIDE_PREVIEW` has **culling off on purpose**: the PIP projection flips Y, so face
   winding is not predictable — do not "fix" it by turning culling on.
 - Preview costs: **the mesh** (GPU vertices) is rebuilt only when the `PreviewModel` instance
-  changes, i.e. on a validation change (debounced 100 ms) — never on rotate or zoom. **The
-  texture** is re-rendered (one draw call of the mesh already on the GPU) only on frames where
-  the camera or the model changed; a still preview is only blitted. The camera
-  (`PreviewCamera`, mutable, owned by `PreviewScreen`) is copied into the render state each
-  frame and is never part of the model. Controls: drag 0.5°/GUI px (`degreesPerPixel`), pitch
+  changes, i.e. on a validation change (debounced 100 ms) or a new generation (at most every
+  250 ms) — never on rotate or zoom. **The texture** is re-rendered (one draw call of the mesh
+  already on the GPU) only on frames where the camera or the model changed; a still preview is
+  only blitted. Model, the one shared camera and input live in `State.preview`
+  (`PreviewController`); screens only lay out and route events. The camera is copied into the
+  render state each frame and is never part of the model. Controls: drag 0.5°/GUI px (`degreesPerPixel`), pitch
   ±89, scroll ×1.1 in [0.25, 8], double click / middle button resets.
 - Top bar: six 80-px tabs; there is no room for a seventh — new screens must hang off an
   existing one.

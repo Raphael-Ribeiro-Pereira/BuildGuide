@@ -27,6 +27,8 @@ java  -cp "$CLASSES;$OUT" ClassifyTest      # 2.5 status table + hollow sphere/c
 java  -cp "$CLASSES;$OUT" PreviewTest       # preview: CubeMesh face order, shading, snapshot, fit (12 asserts)
 java  -cp "$CLASSES;$OUT" PreviewColourTest # preview colours by status, exclusions white, refresh rule (16 asserts)
 java  -cp "$CLASSES;$OUT" PreviewCameraTest # preview camera: drag, clamps, zoom, reset (12 asserts)
+java  -cp "$CLASSES;$OUT" GenerationTest    # Shape.generation only on success, snapshot refuses errors (10 asserts)
+java  -cp "$CLASSES;$OUT" PreviewControllerTest # refresh throttles, shape switch, shared camera, input (25 asserts)
 ```
 
 `CentreTest`, `Step4Test`, `BaseSetTest` are the Step 3/4 and 2.2c checks;

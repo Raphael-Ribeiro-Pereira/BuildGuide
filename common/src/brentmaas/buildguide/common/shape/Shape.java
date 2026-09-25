@@ -48,6 +48,8 @@ public abstract class Shape implements IValidatable {
 	private Future<?> future = null;
 	private long completedAt = 0;
 	public boolean error = false;
+	// Advanced only by a successful generation (finishGeneration); volatile so the preview can poll it cheaply
+	private volatile long generation = 0;
 	
 	// Validation (all shapes): every block emitted through addShapeCube is recorded here as a
 	// packed local position; the render handler scans it and the GUI reads the state
@@ -86,8 +88,7 @@ public abstract class Shape implements IValidatable {
 				error = true;
 				BuildGuide.logHandler.debugThrowable("An exception occurred while generating a shape.", e);
 			}finally {
-				completedAt = System.currentTimeMillis();
-				ready = true;
+				finishGeneration();
 				lock.unlock();
 			}
 		});
@@ -101,6 +102,27 @@ public abstract class Shape implements IValidatable {
 		}
 	}
 	
+	/**
+	 * End of every generation, successful or not, called in update()'s finally while the lock is
+	 * still held. Only a successful one advances `generation`: a cancelled or failed generation
+	 * leaves expectedBlocks partial and must not look like new content.
+	 *
+	 * Memory model: `ready` is a plain field, so writing `generation` before it does not by itself
+	 * make the pair visible together. What does is the lock: this runs before unlock(), so a reader
+	 * that takes the same lock (PreviewModel.snapshot) sees ready, error and generation consistent.
+	 * A getGeneration() read without the lock is only a hint that a new snapshot is worth trying.
+	 */
+	void finishGeneration() {
+		completedAt = System.currentTimeMillis();
+		if(!error) ++generation;
+		ready = true;
+	}
+
+	// Number of successfully completed generations (see finishGeneration)
+	public long getGeneration() {
+		return generation;
+	}
+
 	private void cancelFuture() {
 		if(future != null && !(future.isDone() || future.isCancelled())) future.cancel(true);
 	}

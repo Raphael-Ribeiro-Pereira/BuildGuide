@@ -26,8 +26,10 @@ public final class PreviewModel {
 	public final long[] errors;
 	// ValidationState version the colours were read at; -1 for a geometry-only snapshot
 	public final long stateVersion;
+	// Shape.getGeneration() the positions were copied at; -1 when not taken from a shape
+	public final long generation;
 
-	private PreviewModel(long[] positions, int[] bounds, byte[] status, long[] errors, long stateVersion) {
+	private PreviewModel(long[] positions, int[] bounds, byte[] status, long[] errors, long stateVersion, long generation) {
 		this.positions = positions;
 		minX = bounds[0];
 		minY = bounds[1];
@@ -38,21 +40,31 @@ public final class PreviewModel {
 		this.status = status;
 		this.errors = errors;
 		this.stateVersion = stateVersion;
+		this.generation = generation;
 	}
 
 	public static PreviewModel of(Collection<Long> positions) {
+		return of(positions, -1);
+	}
+
+	public static PreviewModel of(Collection<Long> positions, long generation) {
 		long[] copy = new long[positions.size()];
 		int i = 0;
 		for(long pos: positions) copy[i++] = pos;
-		return new PreviewModel(copy, bounds(copy), null, new long[0], -1);
+		return new PreviewModel(copy, bounds(copy), null, new long[0], -1, generation);
 	}
 
-	// Copy of the shape's current blocks, or null while it is generating (or its lock is busy): try again next frame
+	/**
+	 * Copy of the shape's current blocks, or null while it is generating, after a cancelled or
+	 * failed generation (error: expectedBlocks may be partial), or when its lock is busy: try again
+	 * next frame. ready, error and the generation are read under the lock, so they are consistent
+	 * (see Shape.finishGeneration).
+	 */
 	public static PreviewModel snapshot(Shape shape) {
 		if(!shape.lock.tryLock()) return null;
 		try {
-			if(!shape.ready) return null;
-			return of(shape.getExpectedBlocks());
+			if(!shape.ready || shape.error) return null;
+			return of(shape.getExpectedBlocks(), shape.getGeneration());
 		}finally {
 			shape.lock.unlock();
 		}
@@ -66,13 +78,13 @@ public final class PreviewModel {
 	 */
 	public PreviewModel withValidation(ValidationState state) {
 		long version = state.getVersion();
-		if(!state.isValidated()) return new PreviewModel(positions, boundsArray(), null, new long[0], version);
+		if(!state.isValidated()) return new PreviewModel(positions, boundsArray(), null, new long[0], version, generation);
 		byte[] s = new byte[positions.length];
 		for(int i = 0;i < positions.length;++i) s[i] = state.getStatus(positions[i]);
 		List<NearBlock> near = state.getNearBlocks();
 		long[] e = new long[near.size()];
 		for(int i = 0;i < e.length;++i) e[i] = near.get(i).localPos;
-		return new PreviewModel(positions, boundsArray(), s, e, version);
+		return new PreviewModel(positions, boundsArray(), s, e, version, generation);
 	}
 
 	private static int[] bounds(long[] positions) {
