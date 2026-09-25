@@ -177,8 +177,11 @@ other statuses still scan the map) and a `highlightedPos` (−1 = none).
   only when exceeded, entries are sorted by distance to the player (nearest kept; the list
   still shows real totals). Measured (warm, no-op buffer): 3000 errors 0.9 ms, 6000 with
   the sort 2.3 ms, plus ~5 ms of `BufferBuilder` for 96k vertices — per rebuild, not per
-  frame. `CubeMesh.push` is the 24-vertex cube extracted from `Shape.addCube` (which now
-  delegates, identical order) and is what the 3D preview should reuse.
+  frame. `CubeMesh.push(IShapeBuffer buffer, double x, double y, double z, double s)` is the
+  24-vertex cube (min corner `x, y, z`, side `s`) extracted from `Shape.addCube` (which now
+  delegates, identical order) and is what the 3D preview should reuse. **It takes no colour:**
+  call `buffer.setColour(r, g, b, a)` first; the colour applies to every vertex pushed until
+  the next `setColour`. There is no `push(buffer, x, y, z, r, g, b, a)` overload.
 - *Toggle*: `State.highlightErrors` (persisted as `highlightErrors=`, default true),
   checkbox "Highlight errors" in the Visualisation screen at (5, 255).
 
@@ -421,6 +424,67 @@ property yourself. Layout is independent of list order — this is how `ShapeSpl
 - `BaseScreen.shouldUpdatePersistence = true` marks state dirty; persistence is written
   on screen close when `config.persistenceEnabled` is on (off by default — enable it in
   the Configuration screen to test save/load).
+- **One screen at a time.** `showScreen(x)` replaces the game's `Screen`; there is no stack.
+  A sub-screen (`DropdownOverlayScreen`, `PreviewScreen`) keeps its `parent` and returns
+  with `showScreen(parent)`, which runs `parent.init()` again on the same object (state
+  kept). `BaseScreen.init()` starts with `properties.clear()` — before Step 0 every re-init
+  appended the properties again and their labels were drawn twice.
+- **Input hooks** (Step 0), neutral by default, called by the Fabric `ScreenWrapper` only when
+  no widget handled the event (GUI coordinates, GLFW buttons `MOUSE_LEFT` 0 / `MOUSE_MIDDLE` 2):
+  `onEscape()` (true = handled; default closes the GUI), `onMouseClicked(x, y, button,
+  doubleClick)`, `onMouseDragged(dx, dy)`, `onMouseReleased()` (always called, so a drag
+  state can end), `onMouseScrolled(x, y, amount)`. 1.21.11 signatures behind them:
+  `keyPressed(KeyEvent)`, `mouseClicked(MouseButtonEvent, boolean)`,
+  `mouseDragged(MouseButtonEvent, double, double)`, `mouseReleased(MouseButtonEvent)`,
+  `mouseScrolled(double, double, double, double)` (there is no `MouseScrollEvent`).
+- `ShapeScreen` fixed row at y 238: `Validate` 5..57, `Reset` 59..111, `Preview` 113..165
+  (three 52-px buttons; the next row would pass the 270-px limit). Preview is inactive only
+  when there is no shape set (`State.isShapeAvailable()`), not while a shape generates.
+
+### 3D preview (Step 0)
+
+A panel over the GUI showing the shape selected when it opened, coloured by validation.
+
+- **Why picture-in-picture.** Since 1.21.6 the GUI is deferred and `GuiGraphics.pose()` is a
+  2D `Matrix3x2fStack`: there is no 3D camera inside a screen. Vanilla draws 3D in the GUI
+  (inventory entity, book, skins) with `PictureInPictureRenderer`: it renders into its own
+  texture + depth (`RenderSystem.outputColor/DepthTextureOverride`), orthographic projection
+  with **Y down** and z in [−1000, 1000], texture = area × GUI scale, pose
+  `translate(w/2, getTranslateY) · scale(guiScale, guiScale, −guiScale)`, then blits the
+  texture. `textureIsReadyToBlit(state)` = true reuses the last texture.
+- **Registration.** `SpecialGuiElementRegistry.register(ctx -> new PreviewRenderer(ctx.vertexConsumers()))`
+  (fabric-rendering-v1) in `onInitializeClient`; after the `GuiRenderer` exists it throws
+  "Too late to register". States are routed by `getRenderStateClass()`.
+- **common:** `PreviewScreen` (panel, snapshot, camera, input) → `IScreenWrapper.drawShapePreview(x1,
+  y1, x2, y2, PreviewModel, PreviewCamera)` (default no-op, so other loaders compile).
+  `PreviewModel` = immutable `long[] positions` + bounds, copied under `shape.lock` (`tryLock` +
+  `ready`, "Generating..." otherwise); `withValidation(state)` returns a new instance sharing
+  the positions with `byte[] status` (null when not validated → white), `long[] errors`
+  (structure errors) and `stateVersion` (read **before** the statuses). Framing `radius()` is
+  the box grown by `nearRadius` on every side, so the camera does not move when an error
+  appears. `PreviewColours`: white E1E1E1 (not validated / UNKNOWN, i.e. excluded positions),
+  OK 3CC850, MISSING AAB4C8 (blue-grey: plain 180 grey equals a white side face × 0.8),
+  IGNORED E6C832, ERROR FF3C3C. `PreviewMesh.fill(buffer, model)`: cubes 0.92, shape positions
+  by status then errors in red, one buffer, through `FaceShadedBuffer` (per-face factors in
+  `CubeMesh` order −X −Y −Z +X +Y +Z: 0.6 0.5 0.8 0.6 1.0 0.8; relies on that order).
+  `PreviewCamera` (mutable): yaw 45, pitch 30, zoom 1; `rotate(dx, dy)` 0.5°/GUI px, yaw in
+  [0, 360), pitch clamped to ±89; `zoomBy(notches)` ×1.1 per notch in [0.25, 8]; `reset()`;
+  `fitScale` = 0.9 × half the smaller side / radius × zoom.
+- **Fabric:** `PreviewRenderState` (record: model, yaw, pitch, zoom, area, scissor from
+  `guiGraphics.scissorStack.peek()`), submitted with `guiGraphics.guiRenderState.submitPicturesInPictureState`.
+  `PreviewRenderer`: `getTranslateY` = h/2; `renderToTexture` composes
+  `scale(1, −1, 1)` (Y up) · `scale(s, s, sz)` · `rotateX(−pitch)` · `rotateY(yaw)` ·
+  `translate(−centre)`; `sz` keeps depth within ±900. Yaw 0 = viewer north (−Z); 45 = north-east,
+  north face left, east face right. Mesh rebuilt only when the model instance changes; texture
+  re-rendered only when model or camera changed. Pipeline `BUILD_GUIDE_PREVIEW`: depth write on,
+  **cull off** (the flipped projection makes winding unpredictable).
+  `ShapeBuffer.render(colour, depth, modelView, pipeline)` is the variant it uses; the world's
+  `render()` delegates to it with the main target, `getModelViewMatrix()` and
+  `getRenderPipeline()` — unchanged behaviour.
+- **Refresh.** Geometry frozen at open; colours follow `getVersion()`, at most every 100 ms
+  (same rule as the error list and the overlay). Measured, sphere r=50 (30,978 blocks): snapshot
+  4.8 ms, colour snapshot 1.5 ms, mesh fill 4.7 ms CPU.
+- Harness: `PreviewTest`, `PreviewColourTest`, `PreviewCameraTest`.
 
 ## Translation
 
@@ -437,4 +501,5 @@ args...)` formats with `%s`. Keys added by this fork: `mode`, `topradius`, `tape
 Etapa 2.3 added `config.buildguide.ignoredBlocks(+Comment)`, `screen.buildguide.exclusions`,
 `exclusionbox`, `exclusionshint`; Etapa 2.4 added `screen.buildguide.errors.{missing,wrong,ignored,near}`,
 `highlighterrors`, `notvalidated`, `novalidation`; Etapa 2.5 added `screen.buildguide.errors.structure`
-and removed `errors.wrong` and `errors.near`.
+and removed `errors.wrong` and `errors.near`; Step 0 (preview) added `screen.buildguide.preview`,
+`previewhint`, `previewgenerating`, `previewempty`.

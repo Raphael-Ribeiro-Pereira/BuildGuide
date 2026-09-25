@@ -51,6 +51,14 @@ public class RenderHandler extends AbstractRenderHandler {
 			.withLocation(Identifier.fromNamespaceAndPath(BuildGuide.modid, "pipeline/build_guide_depth_test"))
 			.withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST)
 			.build();
+	// 3D preview (its own picture-in-picture texture): opaque cubes need depth writes, which the world
+	// pipelines disable. No culling: the preview's flipped projection would make face winding a guess
+	public static final RenderPipeline BUILD_GUIDE_PREVIEW = RenderPipeline.builder(RenderPipelines.DEBUG_FILLED_SNIPPET)
+			.withLocation(Identifier.fromNamespaceAndPath(BuildGuide.modid, "pipeline/build_guide_preview"))
+			.withCull(false)
+			.withDepthWrite(true)
+			.withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST)
+			.build();
 
 	public void register() {
 		try {

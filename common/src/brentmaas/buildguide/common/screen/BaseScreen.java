@@ -36,7 +36,10 @@ public abstract class BaseScreen {
 	private IButton buttonValidation = BuildGuide.widgetHandler.createButton(405, 30, 80, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.validation"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Validation)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Validation);
 	
 	public void init() {
-		buttonClose = BuildGuide.widgetHandler.createButton(wrapper.getWidth() - 25, 5, new Translatable("X"), () -> BuildGuide.screenHandler.showScreen(null));
+		// A screen object can be shown again (back from a dropdown or the preview): its properties are
+		// re-added below, so drop the ones of the previous init instead of rendering them twice
+		properties.clear();
+		buttonClose =BuildGuide.widgetHandler.createButton(wrapper.getWidth() - 25, 5, new Translatable("X"), () -> BuildGuide.screenHandler.showScreen(null));
 		buttonEnabled = BuildGuide.widgetHandler.createCheckbox(5, 5, new Translatable(""), BuildGuide.stateManager.getState().isEnabled(), false, () -> {
 			BuildGuide.stateManager.getState().setEnabled(buttonEnabled.isCheckboxSelected());
 			BaseScreen.shouldUpdatePersistence = true;
@@ -133,6 +136,33 @@ public abstract class BaseScreen {
 	}
 	
 	public boolean isPauseScreen() {
+		return false;
+	}
+
+	// Escape pressed: return true to handle it here (the default closes the whole GUI)
+	public boolean onEscape() {
+		return false;
+	}
+
+	// Mouse events that no widget took, GUI coordinates; return true if handled. Buttons use the
+	// loader's numbering (GLFW: 0 left, 1 right, 2 middle)
+	public static final int MOUSE_LEFT = 0, MOUSE_MIDDLE = 2;
+
+	public boolean onMouseClicked(double x, double y, int button, boolean doubleClick) {
+		return false;
+	}
+
+	// Drag by (dx, dy) GUI pixels after a click this screen handled
+	public boolean onMouseDragged(double dx, double dy) {
+		return false;
+	}
+
+	// Any button released (also after widget clicks, so a drag state can always end)
+	public void onMouseReleased() {
+	}
+
+	// Scroll wheel at (x, y); amount > 0 is away from the user
+	public boolean onMouseScrolled(double x, double y, double amount) {
 		return false;
 	}
 }

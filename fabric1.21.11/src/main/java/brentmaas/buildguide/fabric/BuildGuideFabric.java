@@ -4,10 +4,12 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import brentmaas.buildguide.common.BuildGuide;
+import brentmaas.buildguide.fabric.preview.PreviewRenderer;
 import brentmaas.buildguide.fabric.screen.ScreenHandler;
 import brentmaas.buildguide.fabric.screen.widget.WidgetHandler;
 import brentmaas.buildguide.fabric.shape.ShapeHandler;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.rendering.v1.SpecialGuiElementRegistry;
 import net.fabricmc.loader.api.FabricLoader;
 
 public class BuildGuideFabric implements ClientModInitializer {
@@ -16,5 +18,7 @@ public class BuildGuideFabric implements ClientModInitializer {
 	public void onInitializeClient() {
 		BuildGuide.registerClient(new ScreenHandler(), new WidgetHandler(), new StateManager(), new ShapeHandler(), new RenderHandler(), new LogHandler(logger), FabricLoader.getInstance().getConfigDir().toFile());
 		BuildGuide.registerInputHandler(new InputHandler());
+		// 3D preview: a picture-in-picture GUI renderer. Must be registered before the GuiRenderer is built
+		SpecialGuiElementRegistry.register(context -> new PreviewRenderer(context.vertexConsumers()));
 	}
 }

@@ -24,6 +24,9 @@ java  -cp "$CLASSES;$OUT" ExclusionTest     # ignored types + exclusion boxes (1
 java  -cp "$CLASSES;$OUT" OverlayTest       # version/indices/highlight/cap/colours (10 asserts)
 java  -cp "$CLASSES;$OUT" NearDiagTest      # structure errors: scan + incremental detection, shell geometry (16 asserts)
 java  -cp "$CLASSES;$OUT" ClassifyTest      # 2.5 status table + hollow sphere/cone cavities (18 asserts)
+java  -cp "$CLASSES;$OUT" PreviewTest       # preview: CubeMesh face order, shading, snapshot, fit (12 asserts)
+java  -cp "$CLASSES;$OUT" PreviewColourTest # preview colours by status, exclusions white, refresh rule (16 asserts)
+java  -cp "$CLASSES;$OUT" PreviewCameraTest # preview camera: drag, clamps, zoom, reset (12 asserts)
 ```
 
 `CentreTest`, `Step4Test`, `BaseSetTest` are the Step 3/4 and 2.2c checks;

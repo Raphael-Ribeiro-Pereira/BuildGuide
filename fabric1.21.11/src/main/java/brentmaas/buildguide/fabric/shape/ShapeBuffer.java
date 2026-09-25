@@ -4,11 +4,13 @@ import java.util.OptionalDouble;
 import java.util.OptionalInt;
 
 import org.joml.Matrix4f;
+import org.joml.Matrix4fc;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
+import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -58,14 +60,17 @@ public class ShapeBuffer implements IShapeBuffer {
 		// Don't also close indexBuffer, it is a reference to a global buffer used everywhere
 	}
 	
+	// World rendering: main render target, current model-view, the world pipeline (depth test toggle)
 	public void render() {
 		RenderTarget renderTarget = Minecraft.getInstance().getMainRenderTarget();
-		GpuTextureView colourTexture = renderTarget.getColorTextureView();
-		GpuTextureView depthTexture = renderTarget.getDepthTextureView();
-		
-		GpuBufferSlice dynamicTransforms = RenderSystem.getDynamicUniforms().writeTransform(RenderSystem.getModelViewMatrix(), new Vector4f(1.0f), new Vector3f(), new Matrix4f());
+		render(renderTarget.getColorTextureView(), renderTarget.getDepthTextureView(), RenderSystem.getModelViewMatrix(), RenderHandler.getRenderPipeline());
+	}
+
+	// Any target (the 3D preview draws into its picture-in-picture texture) with an explicit model-view and pipeline
+	public void render(GpuTextureView colourTexture, GpuTextureView depthTexture, Matrix4fc modelView, RenderPipeline pipeline) {
+		GpuBufferSlice dynamicTransforms = RenderSystem.getDynamicUniforms().writeTransform(modelView, new Vector4f(1.0f), new Vector3f(), new Matrix4f());
 		try (RenderPass renderPass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "Build Guide", colourTexture, OptionalInt.empty(), depthTexture, OptionalDouble.empty())) {
-			renderPass.setPipeline(RenderHandler.getRenderPipeline());
+			renderPass.setPipeline(pipeline);
 			RenderSystem.bindDefaultUniforms(renderPass);
 			if(indexBuffer.isClosed()) {
 				indexBuffer = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS).getBuffer(indexCount);

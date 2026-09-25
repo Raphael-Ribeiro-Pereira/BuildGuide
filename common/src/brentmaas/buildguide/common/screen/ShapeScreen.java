@@ -30,14 +30,18 @@ public class ShapeScreen extends BaseScreen{
 	private ITextField textFieldX = BuildGuide.widgetHandler.createTextField(45, 135, "");
 	private ITextField textFieldY = BuildGuide.widgetHandler.createTextField(45, 155, "");
 	private ITextField textFieldZ = BuildGuide.widgetHandler.createTextField(45, 175, "");
-	// Fixed Validate (manual full rescan of the current shape) and Reset (restores the defaults of the
+	// Fixed Validate (manual full rescan of the current shape), Reset (restores the defaults of the
 	// properties shown right now: current section, or all when the shape has no sections; control
-	// points are protected by the shapes themselves), sharing the row under the validation block
-	private IButton buttonValidate = BuildGuide.widgetHandler.createButton(5, 238, 78, AbstractWidgetHandler.defaultSize, new Translatable("property.buildguide.validate"), () -> {
+	// points are protected by the shapes themselves) and Preview (3D view of the current shape),
+	// sharing the row under the validation block: three 52-px buttons, 5..165
+	private IButton buttonValidate = BuildGuide.widgetHandler.createButton(5, 238, 52, AbstractWidgetHandler.defaultSize, new Translatable("property.buildguide.validate"), () -> {
 		if(BuildGuide.stateManager.getState().isShapeAvailable()) BuildGuide.stateManager.getState().getCurrentShape().triggerValidation();
 	});
-	private IButton buttonReset = BuildGuide.widgetHandler.createButton(87, 238, 78, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.reset"), () -> {
+	private IButton buttonReset = BuildGuide.widgetHandler.createButton(59, 238, 52, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.reset"), () -> {
 		if(BuildGuide.stateManager.getState().isShapeAvailable()) BuildGuide.stateManager.getState().getCurrentShape().resetShownToDefaults();
+	});
+	private IButton buttonPreview = BuildGuide.widgetHandler.createButton(113, 238, 52, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.preview"), () -> {
+		BuildGuide.screenHandler.showScreen(new PreviewScreen(this));
 	});
 	private IButton buttonSetX = BuildGuide.widgetHandler.createButton(115, 135, 30, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.set"), () -> {
 		try {
@@ -104,6 +108,8 @@ public class ShapeScreen extends BaseScreen{
 		addWidget(buttonOriginZIncrease);
 		addWidget(buttonValidate);
 		addWidget(buttonReset);
+		addWidget(buttonPreview);
+		buttonPreview.setActive(BuildGuide.stateManager.getState().isShapeAvailable());
 		
 		if(BuildGuide.stateManager.getState().isShapeAvailable()) {
 			for(Shape shape: BuildGuide.stateManager.getState().getCurrentShapeSet().shapes) {

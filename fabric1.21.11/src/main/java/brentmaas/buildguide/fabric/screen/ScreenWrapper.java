@@ -8,6 +8,9 @@ import brentmaas.buildguide.common.screen.widget.ISelectorList;
 import brentmaas.buildguide.common.screen.widget.IShapeList;
 import brentmaas.buildguide.common.screen.widget.ISlider;
 import brentmaas.buildguide.common.screen.widget.ITextField;
+import brentmaas.buildguide.common.shape.PreviewCamera;
+import brentmaas.buildguide.common.shape.PreviewModel;
+import brentmaas.buildguide.fabric.preview.PreviewRenderState;
 import brentmaas.buildguide.fabric.screen.widget.ButtonImpl;
 import brentmaas.buildguide.fabric.screen.widget.CheckboxRunnableButtonImpl;
 import brentmaas.buildguide.fabric.screen.widget.SelectorListImpl;
@@ -17,6 +20,8 @@ import brentmaas.buildguide.fabric.screen.widget.TextFieldImpl;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.ARGB;
 
@@ -49,6 +54,37 @@ public class ScreenWrapper extends Screen implements IScreenWrapper {
 	@Override
 	public boolean isPauseScreen() {
 		return attachedScreen.isPauseScreen();
+	}
+	
+	@Override
+	public boolean keyPressed(KeyEvent event) {
+		if(event.isEscape() && attachedScreen.onEscape()) return true;
+		return super.keyPressed(event);
+	}
+	
+	@Override
+	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+		if(super.mouseClicked(event, doubleClick)) return true;
+		return attachedScreen.onMouseClicked(event.x(), event.y(), event.button(), doubleClick);
+	}
+	
+	@Override
+	public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
+		if(super.mouseDragged(event, dragX, dragY)) return true;
+		return attachedScreen.onMouseDragged(dragX, dragY);
+	}
+	
+	@Override
+	public boolean mouseReleased(MouseButtonEvent event) {
+		boolean handled = super.mouseReleased(event);
+		attachedScreen.onMouseReleased();
+		return handled;
+	}
+	
+	@Override
+	public boolean mouseScrolled(double x, double y, double scrollX, double scrollY) {
+		if(super.mouseScrolled(x, y, scrollX, scrollY)) return true;
+		return attachedScreen.onMouseScrolled(x, y, scrollY);
 	}
 	
 	@Override
@@ -98,6 +134,11 @@ public class ScreenWrapper extends Screen implements IScreenWrapper {
 	
 	public void fillRect(int x1, int y1, int x2, int y2, int colour) {
 		guiGraphicsInstance.fill(x1, y1, x2, y2, colour);
+	}
+	
+	// Submitted to the GUI render state; PreviewRenderer (registered in BuildGuideFabric) draws it into its own texture
+	public void drawShapePreview(int x1, int y1, int x2, int y2, PreviewModel model, PreviewCamera camera) {
+		guiGraphicsInstance.guiRenderState.submitPicturesInPictureState(new PreviewRenderState(model, camera.yaw, camera.pitch, camera.zoom, x1, y1, x2, y2, guiGraphicsInstance.scissorStack.peek()));
 	}
 	
 	public int getTextWidth(String text) {

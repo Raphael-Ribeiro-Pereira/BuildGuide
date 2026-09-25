@@ -94,6 +94,19 @@ export PATH="$JAVA_HOME/bin:$PATH"
   enclose it (`ValidationOverlay.pushShell`, 1.02): a cube inside an opaque block is hidden by
   the depth test — that is why errors were invisible until 2.5. Inner 0.7 cubes only for
   see-through positions (IGNORED).
+- 3D preview = vanilla picture-in-picture: `fabric/preview/PreviewRenderer` registered with
+  Fabric's `SpecialGuiElementRegistry` in `onInitializeClient` (too late after the GuiRenderer
+  exists). The GUI pose is 2D since 1.21.6: there is no in-panel `PoseStack` camera. It draws a
+  `PreviewModel` snapshot (copied under `shape.lock`, never the live `expectedBlocks`).
+  `BUILD_GUIDE_PREVIEW` has **culling off on purpose**: the PIP projection flips Y, so face
+  winding is not predictable — do not "fix" it by turning culling on.
+- Preview costs: **the mesh** (GPU vertices) is rebuilt only when the `PreviewModel` instance
+  changes, i.e. on a validation change (debounced 100 ms) — never on rotate or zoom. **The
+  texture** is re-rendered (one draw call of the mesh already on the GPU) only on frames where
+  the camera or the model changed; a still preview is only blitted. The camera
+  (`PreviewCamera`, mutable, owned by `PreviewScreen`) is copied into the render state each
+  frame and is never part of the model. Controls: drag 0.5°/GUI px (`degreesPerPixel`), pitch
+  ±89, scroll ×1.1 in [0.25, 8], double click / middle button resets.
 - Top bar: six 80-px tabs; there is no room for a seventh — new screens must hang off an
   existing one.
 - `ShapeCuboid.enumerate(w, h, d, walls.ALL)` with `d > 1` is a hollow box (six faces), not a
@@ -156,6 +169,10 @@ export PATH="$JAVA_HOME/bin:$PATH"
 - No scrolling in the property panel. Shapes with many properties use panel sections
   (`declareSection`/`assignSection`, see `docs/API_REFERENCE.md`) and/or a custom
   `onSelectedInGUI`; Spline uses both (max 8 rows).
+- **Tech debt (preview):** `PreviewRenderer` keeps its GPU mesh until a new model replaces it
+  or the renderer closes, also after the preview is closed. Sphere r=50 ≈ 31k blocks, 743k
+  vertices, ~20 MB. Larger shapes (torus r=100) may weigh; free it when the preview leaves the
+  screen if it matters.
 - **To check in-game (2.5):** the validation bar text (`ok / total (pct%)  errors N`, centred
   in a 160-px column) may overflow with five-digit totals and three-digit error counts — test
   with a large shape. And the error shells (`shellInset` 0.01) may z-fight with the block
