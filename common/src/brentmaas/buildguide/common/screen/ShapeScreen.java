@@ -7,43 +7,40 @@ import brentmaas.buildguide.common.screen.widget.AbstractWidgetHandler;
 import brentmaas.buildguide.common.screen.widget.IButton;
 import brentmaas.buildguide.common.screen.widget.ITextField;
 import brentmaas.buildguide.common.shape.Shape;
-import brentmaas.buildguide.common.shape.ValidationState;
 import brentmaas.buildguide.common.shape.ShapeRegistry;
 
 public class ShapeScreen extends BaseScreen{
 	public static final int basePropertiesX = 180;
-	public static final int basePropertiesY = 70;
+	public static final int basePropertiesY = 42;
 	
-	private Translatable titleShapeProperties = new Translatable("screen.buildguide.shapeproperties");
-	private Translatable titleValidation = new Translatable("screen.buildguide.validation");
 	private Translatable titleOrigin = new Translatable("screen.buildguide.origin");
 	private Translatable titleShape = new Translatable("screen.buildguide.shape");
 	
-	private DropdownOverlayScreen dropdownOverlayShapeSelect = new DropdownOverlayScreen(this, 5, 70, 160, AbstractWidgetHandler.defaultSize, ShapeRegistry.getTranslatables(), BuildGuide.stateManager.getState().getCurrentShapeIndex(), (int selected) -> setShape(selected));
-	private IButton buttonOrigin = BuildGuide.widgetHandler.createButton(5, 115, 160, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.setorigin"), () -> setOrigin());
-	private IButton buttonOriginXDecrease = BuildGuide.widgetHandler.createButton(25, 135, new Translatable("-"), () -> shiftOrigin(-1, 0, 0));
-	private IButton buttonOriginXIncrease = BuildGuide.widgetHandler.createButton(145, 135, new Translatable("+"), () -> shiftOrigin(1, 0, 0));
-	private IButton buttonOriginYDecrease = BuildGuide.widgetHandler.createButton(25, 155, new Translatable("-"), () -> shiftOrigin(0, -1, 0));
-	private IButton buttonOriginYIncrease = BuildGuide.widgetHandler.createButton(145, 155, new Translatable("+"), () -> shiftOrigin(0, 1, 0));
-	private IButton buttonOriginZDecrease = BuildGuide.widgetHandler.createButton(25, 175, new Translatable("-"), () -> shiftOrigin(0, 0, -1));
-	private IButton buttonOriginZIncrease = BuildGuide.widgetHandler.createButton(145, 175, new Translatable("+"), () -> shiftOrigin(0, 0, 1));
-	private ITextField textFieldX = BuildGuide.widgetHandler.createTextField(45, 135, "");
-	private ITextField textFieldY = BuildGuide.widgetHandler.createTextField(45, 155, "");
-	private ITextField textFieldZ = BuildGuide.widgetHandler.createTextField(45, 175, "");
+	private DropdownOverlayScreen dropdownOverlayShapeSelect = new DropdownOverlayScreen(this, 5, 55, 160, AbstractWidgetHandler.defaultSize, ShapeRegistry.getTranslatables(), BuildGuide.stateManager.getState().getCurrentShapeIndex(), (int selected) -> setShape(selected));
+	private IButton buttonOrigin = BuildGuide.widgetHandler.createButton(5, 100, 160, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.setorigin"), () -> setOrigin());
+	private IButton buttonOriginXDecrease = BuildGuide.widgetHandler.createButton(25, 120, new Translatable("-"), () -> shiftOrigin(-1, 0, 0));
+	private IButton buttonOriginXIncrease = BuildGuide.widgetHandler.createButton(145, 120, new Translatable("+"), () -> shiftOrigin(1, 0, 0));
+	private IButton buttonOriginYDecrease = BuildGuide.widgetHandler.createButton(25, 140, new Translatable("-"), () -> shiftOrigin(0, -1, 0));
+	private IButton buttonOriginYIncrease = BuildGuide.widgetHandler.createButton(145, 140, new Translatable("+"), () -> shiftOrigin(0, 1, 0));
+	private IButton buttonOriginZDecrease = BuildGuide.widgetHandler.createButton(25, 160, new Translatable("-"), () -> shiftOrigin(0, 0, -1));
+	private IButton buttonOriginZIncrease = BuildGuide.widgetHandler.createButton(145, 160, new Translatable("+"), () -> shiftOrigin(0, 0, 1));
+	private ITextField textFieldX = BuildGuide.widgetHandler.createTextField(45, 120, "");
+	private ITextField textFieldY = BuildGuide.widgetHandler.createTextField(45, 140, "");
+	private ITextField textFieldZ = BuildGuide.widgetHandler.createTextField(45, 160, "");
 	// Fixed Validate (manual full rescan of the current shape), Reset (restores the defaults of the
 	// properties shown right now: current section, or all when the shape has no sections; control
 	// points are protected by the shapes themselves) and Preview (3D view of the current shape),
-	// sharing the row under the validation block: three 52-px buttons, 5..165
-	private IButton buttonValidate = BuildGuide.widgetHandler.createButton(5, 238, 52, AbstractWidgetHandler.defaultSize, new Translatable("property.buildguide.validate"), () -> {
+	// sharing the bottom bar row left of the validation bar: three 78-px buttons, 5..247
+	private IButton buttonValidate = BuildGuide.widgetHandler.createButton(5, 250, 78, AbstractWidgetHandler.defaultSize, new Translatable("property.buildguide.validate"), () -> {
 		if(BuildGuide.stateManager.getState().isShapeAvailable()) BuildGuide.stateManager.getState().getCurrentShape().triggerValidation();
 	});
-	private IButton buttonReset = BuildGuide.widgetHandler.createButton(59, 238, 52, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.reset"), () -> {
+	private IButton buttonReset = BuildGuide.widgetHandler.createButton(87, 250, 78, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.reset"), () -> {
 		if(BuildGuide.stateManager.getState().isShapeAvailable()) BuildGuide.stateManager.getState().getCurrentShape().resetShownToDefaults();
 	});
-	private IButton buttonPreview = BuildGuide.widgetHandler.createButton(113, 238, 52, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.preview"), () -> {
+	private IButton buttonPreview = BuildGuide.widgetHandler.createButton(169, 250, 78, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.preview"), () -> {
 		BuildGuide.screenHandler.showScreen(new PreviewScreen(this));
 	});
-	private IButton buttonSetX = BuildGuide.widgetHandler.createButton(115, 135, 30, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.set"), () -> {
+	private IButton buttonSetX = BuildGuide.widgetHandler.createButton(115, 120, 30, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.set"), () -> {
 		try {
 			int newval = Integer.parseInt(textFieldX.getTextValue());
 			BuildGuide.stateManager.getState().setOriginX(newval);
@@ -51,7 +48,7 @@ public class ShapeScreen extends BaseScreen{
 			textFieldX.setTextColour(0xFF0000);
 		}
 	});
-	private IButton buttonSetY = BuildGuide.widgetHandler.createButton(115, 155, 30, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.set"), () -> {
+	private IButton buttonSetY = BuildGuide.widgetHandler.createButton(115, 140, 30, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.set"), () -> {
 		try {
 			int newval = Integer.parseInt(textFieldY.getTextValue());
 			BuildGuide.stateManager.getState().setOriginY(newval);
@@ -59,7 +56,7 @@ public class ShapeScreen extends BaseScreen{
 			textFieldY.setTextColour(0xFF0000);
 		}
 	});
-	private IButton buttonSetZ = BuildGuide.widgetHandler.createButton(115, 175, 30, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.set"), () -> {
+	private IButton buttonSetZ = BuildGuide.widgetHandler.createButton(115, 160, 30, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.set"), () -> {
 		try {
 			int newval = Integer.parseInt(textFieldZ.getTextValue());
 			BuildGuide.stateManager.getState().setOriginZ(newval);
@@ -125,43 +122,15 @@ public class ShapeScreen extends BaseScreen{
 	public void render() {
 		super.render();
 		
-		drawShadowCentred(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + titleShape, 85, 55, 0xFFFFFF);
-		drawShadowCentred(BuildGuide.screenHandler.getFormattedShapeName(BuildGuide.stateManager.getState().getCurrentShapeSet()), 85, 75, BuildGuide.screenHandler.getShapeProgressColour(BuildGuide.stateManager.getState().getCurrentShape()));
+		drawShadowCentred(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + titleShape, 85, 42, 0xFFFFFF);
+		drawShadowCentred(BuildGuide.screenHandler.getFormattedShapeName(BuildGuide.stateManager.getState().getCurrentShapeSet()), 85, 60, BuildGuide.screenHandler.getShapeProgressColour(BuildGuide.stateManager.getState().getCurrentShape()));
 		
-		drawShadowCentred(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + titleOrigin, 85, 100, 0xFFFFFF);
-		drawShadowLeft("X", 10, 140, BuildGuide.stateManager.getState().isShapeAvailable() ? 0xFFFFFF : 0x444444);
-		drawShadowLeft("Y", 10, 160, BuildGuide.stateManager.getState().isShapeAvailable() ? 0xFFFFFF : 0x444444);
-		drawShadowLeft("Z", 10, 180, BuildGuide.stateManager.getState().isShapeAvailable() ? 0xFFFFFF : 0x444444);
+		drawShadowCentred(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + titleOrigin, 85, 85, 0xFFFFFF);
+		drawShadowLeft("X", 10, 125, BuildGuide.stateManager.getState().isShapeAvailable() ? 0xFFFFFF : 0x444444);
+		drawShadowLeft("Y", 10, 145, BuildGuide.stateManager.getState().isShapeAvailable() ? 0xFFFFFF : 0x444444);
+		drawShadowLeft("Z", 10, 165, BuildGuide.stateManager.getState().isShapeAvailable() ? 0xFFFFFF : 0x444444);
 		
-		drawShadowCentred(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + titleShapeProperties, 285, 55, 0xFFFFFF);
 		
-		renderValidation();
-	}
-	
-	// Validation block under the origin (y 200..230 is free there): title, bar and "ok / total" text.
-	// Never scanned shows "- / total" (the total is known from the expected blocks)
-	private void renderValidation() {
-		drawShadowCentred(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + titleValidation, 85, 205, 0xFFFFFF);
-		if(!BuildGuide.stateManager.getState().isShapeAvailable()) {
-			drawShadowCentred("-", 85, 219, 0x888888);
-			return;
-		}
-		Shape shape = BuildGuide.stateManager.getState().getCurrentShape(); // every Shape is IValidatable
-		ValidationState state = shape.getValidationState();
-		int barX1 = 5, barX2 = 165, barY1 = 217, barY2 = 224;
-		fillRect(barX1, barY1, barX2, barY2, 0xFF303030);
-		if(!state.isValidated()) {
-			drawShadowCentred("- / " + shape.getExpectedBlocks().size(), 85, 226, 0xAAAAAA);
-			return;
-		}
-		int ok = state.getOk(), total = state.getTotal(), errors = state.getNearCount();
-		double progress = state.getProgress();
-		int fillX2 = barX1 + (int) Math.round((barX2 - barX1) * progress);
-		if(fillX2 > barX1) fillRect(barX1, barY1, fillX2, barY2, ok == total ? 0xFF40C040 : 0xFF40A0FF);
-		String text = ok + " / " + total + " (" + String.format(java.util.Locale.ROOT, "%.1f", 100.0 * progress) + "%)";
-		// Structure errors: solid blocks deforming the shape (Etapa 2.5)
-		if(errors > 0) text += "  errors " + errors;
-		drawShadowCentred(text, 85, 226, errors > 0 ? 0xFF8080 : 0xFFFFFF);
 	}
 	
 	private void addShapeProperties(Shape shape) {

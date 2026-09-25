@@ -16,7 +16,7 @@ import brentmaas.buildguide.common.shape.Shape;
  * routes its mouse events there and draws through IScreenWrapper.drawShapePreview.
  */
 public class PreviewScreen extends BaseScreen {
-	private static final int panelMarginX = 40, panelTop = 55, panelMarginBottom = 10;
+	private static final int panelMarginX = 40, panelTop = 42, panelMarginBottom = 10;
 	// Room for the title above and the hint below the 3D area
 	private static final int headerHeight = 16, footerHeight = 16;
 
@@ -41,6 +41,11 @@ public class PreviewScreen extends BaseScreen {
 		preview.attach();
 	}
 
+	@Override
+	protected boolean hasBottomBar() {
+		return false; // the panel uses the full height
+	}
+	
 	public void render() {
 		super.render();
 		int x1 = panelX1(), y1 = panelTop, x2 = panelX2(), y2 = panelY2();

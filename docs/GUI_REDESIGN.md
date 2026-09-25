@@ -270,6 +270,7 @@ Removing the enum constant is safe for saves and config.
 | R7 | Label lengths in 78 px; only `en_us` is maintained, other languages fall back or overflow. | Low | Shorter en_us strings; scrolling labels if needed. |
 | R8 | Divergence from upstream grows (GUI was upstream code). | Low (already diverged) | None needed. |
 | R9 | F6 (partial snapshot) is live today in `PreviewScreen`. | Low (rare) | Fixed in E1. |
+| R10 | **Debt from E3:** `VisualisationScreen` only moved up 10 px and has no bottom bar (`hasBottomBar() = false`): its content goes down to y 305, off screen at 480 × 270 (the cube-size Set/Default buttons). Visible at Raphael's scale 3 (~640 × 360). | Medium at the minimum size | Re-layout (third column for cube size) in E7. |
 
 ---
 
@@ -281,7 +282,7 @@ Each stage: build, harness, decompile-diff against the previous baseline, in-gam
 |---|---|---|---|
 | **E1** | `Shape.generation` + snapshot `ready && !error` (F6) + extract `PreviewController` from `PreviewScreen` | none | yes (harness: generation, cancelled generation, controller refresh rules) |
 | **E2** | Error list as a reusable component; `ValidationScreen` uses it | none | partly (entry building) |
-| **E3** | Header row + 5-tab bar + bottom bar (progress, Validate, Reset); other tabs shifted; Validation tab still reachable until E6 | header, tabs, bottom bar | no (in-game) |
+| **E3** ✅ | Header row + 6-tab bar (80 px, Validation kept until E6) + bottom bar (progress in `BaseScreen`, Validate/Reset/Preview on the Shape tab); other tabs shifted (Visualisation only −10, R10). Done, 8/8 in-game checks passed | header, tabs, bottom bar | no (in-game) |
 | **E4** | Compact 18-px, 188-px rows for every property type; point row redesign | every shape's panel | no (per-shape in-game list) |
 | **E5** | Accordion (`PropertySection` headers, Origin as a section, counts from the placement pass); Bridge Rails/Posts split; Validate rows hidden | left panel | partly (row counts per shape in the harness) |
 | **E6** | Right panel: inline preview (following generations, 250-ms throttle) + error list; Enlarge button; remove the Validation tab and `ActiveScreen.Validation` | right panel | partly |

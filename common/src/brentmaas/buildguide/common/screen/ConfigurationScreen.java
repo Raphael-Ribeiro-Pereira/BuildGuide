@@ -16,43 +16,43 @@ public class ConfigurationScreen extends BaseScreen {
 	public void init() {
 		super.init();
 		
-		buttonAsyncEnabled = BuildGuide.widgetHandler.createCheckbox(255, 60, new Translatable(""), BuildGuide.config.asyncEnabled.value, false, () -> {
+		buttonAsyncEnabled = BuildGuide.widgetHandler.createCheckbox(255, 40, new Translatable(""), BuildGuide.config.asyncEnabled.value, false, () -> {
 			BuildGuide.config.asyncEnabled.setValue(buttonAsyncEnabled.isCheckboxSelected());
 			BuildGuide.config.write();
 		});
-		buttonAsyncEnabledDefault = BuildGuide.widgetHandler.createButton(280, 60, 50, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.default"), () -> {
+		buttonAsyncEnabledDefault = BuildGuide.widgetHandler.createButton(280, 40, 50, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.default"), () -> {
 			buttonAsyncEnabled.setChecked(BuildGuide.config.asyncEnabled.getDefault());
 			BuildGuide.config.write();
 		});
 		
-		buttonAdvancedRandomColorsDefaultEnabled = BuildGuide.widgetHandler.createCheckbox(255, 110, new Translatable(""), BuildGuide.config.shapeListRandomColorsDefaultEnabled.value, false, () -> {
+		buttonAdvancedRandomColorsDefaultEnabled = BuildGuide.widgetHandler.createCheckbox(255, 90, new Translatable(""), BuildGuide.config.shapeListRandomColorsDefaultEnabled.value, false, () -> {
 			BuildGuide.config.shapeListRandomColorsDefaultEnabled.setValue(buttonAdvancedRandomColorsDefaultEnabled.isCheckboxSelected());
 			BuildGuide.config.write();
 		});
-		buttonAdvancedRandomColorsDefaultEnabledDefault = BuildGuide.widgetHandler.createButton(280, 110, 50, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.default"), () -> {
+		buttonAdvancedRandomColorsDefaultEnabledDefault = BuildGuide.widgetHandler.createButton(280, 90, 50, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.default"), () -> {
 			buttonAdvancedRandomColorsDefaultEnabled.setChecked(BuildGuide.config.shapeListRandomColorsDefaultEnabled.getDefault());
 			BuildGuide.config.write();
 		});
 		
-		buttonPersistenceEnabled = BuildGuide.widgetHandler.createCheckbox(255, 160, new Translatable(""), BuildGuide.config.persistenceEnabled.value, false, () -> {
+		buttonPersistenceEnabled = BuildGuide.widgetHandler.createCheckbox(255, 140, new Translatable(""), BuildGuide.config.persistenceEnabled.value, false, () -> {
 			BuildGuide.config.persistenceEnabled.setValue(buttonPersistenceEnabled.isCheckboxSelected());
 			BuildGuide.config.write();
 		});
-		buttonPersistenceEnabledDefault = BuildGuide.widgetHandler.createButton(280, 160, 50, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.default"), () -> {
+		buttonPersistenceEnabledDefault = BuildGuide.widgetHandler.createButton(280, 140, 50, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.default"), () -> {
 			buttonPersistenceEnabled.setChecked(BuildGuide.config.persistenceEnabled.getDefault());
 			BuildGuide.config.write();
 		});
 		
 		// Ignored block ids: free text, applied on Set (validation rescans through the shapes' own requests)
-		textFieldIgnoredBlocks = BuildGuide.widgetHandler.createTextField(10, 230, 240, AbstractWidgetHandler.defaultSize, "");
+		textFieldIgnoredBlocks = BuildGuide.widgetHandler.createTextField(10, 210, 240, AbstractWidgetHandler.defaultSize, "");
 		textFieldIgnoredBlocks.setTextValue(BuildGuide.config.ignoredBlocks.value);
-		buttonIgnoredBlocksSet = BuildGuide.widgetHandler.createButton(255, 230, 50, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.set"), () -> {
+		buttonIgnoredBlocksSet = BuildGuide.widgetHandler.createButton(255, 210, 50, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.set"), () -> {
 			BuildGuide.config.ignoredBlocks.setValue(textFieldIgnoredBlocks.getTextValue());
 			textFieldIgnoredBlocks.setTextValue(BuildGuide.config.ignoredBlocks.value);
 			BuildGuide.config.write();
 			BuildGuide.stateManager.getState().requestRescanAll();
 		});
-		buttonIgnoredBlocksDefault = BuildGuide.widgetHandler.createButton(310, 230, 50, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.default"), () -> {
+		buttonIgnoredBlocksDefault = BuildGuide.widgetHandler.createButton(310, 210, 50, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.default"), () -> {
 			BuildGuide.config.ignoredBlocks.setValue(BuildGuide.config.ignoredBlocks.getDefault());
 			textFieldIgnoredBlocks.setTextValue(BuildGuide.config.ignoredBlocks.value);
 			BuildGuide.config.write();
@@ -75,16 +75,16 @@ public class ConfigurationScreen extends BaseScreen {
 	public void render() {
 		super.render();
 		
-		drawShadowLeft(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + new Translatable(BuildGuide.config.asyncEnabled.translationKey), 10, 65, 0xFFFFFF);
-		drawShadowLeft(new Translatable(BuildGuide.config.asyncEnabled.commentTranslationKey).toString(), 10, 84, 0xFFFFFF);
+		drawShadowLeft(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + new Translatable(BuildGuide.config.asyncEnabled.translationKey), 10, 45, 0xFFFFFF);
+		drawShadowLeft(new Translatable(BuildGuide.config.asyncEnabled.commentTranslationKey).toString(), 10, 64, 0xFFFFFF);
 		
-		drawShadowLeft(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + new Translatable(BuildGuide.config.shapeListRandomColorsDefaultEnabled.translationKey), 10, 115, 0xFFFFFF);
-		drawShadowLeft(new Translatable(BuildGuide.config.shapeListRandomColorsDefaultEnabled.commentTranslationKey).toString(), 10, 135, 0xFFFFFF);
+		drawShadowLeft(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + new Translatable(BuildGuide.config.shapeListRandomColorsDefaultEnabled.translationKey), 10, 95, 0xFFFFFF);
+		drawShadowLeft(new Translatable(BuildGuide.config.shapeListRandomColorsDefaultEnabled.commentTranslationKey).toString(), 10, 115, 0xFFFFFF);
 		
-		drawShadowLeft(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + new Translatable(BuildGuide.config.persistenceEnabled.translationKey), 10, 165, 0xFFFFFF);
-		drawShadowLeft(new Translatable(BuildGuide.config.persistenceEnabled.commentTranslationKey).toString(), 10, 185, 0xFFFFFF);
+		drawShadowLeft(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + new Translatable(BuildGuide.config.persistenceEnabled.translationKey), 10, 145, 0xFFFFFF);
+		drawShadowLeft(new Translatable(BuildGuide.config.persistenceEnabled.commentTranslationKey).toString(), 10, 165, 0xFFFFFF);
 		
-		drawShadowLeft(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + new Translatable(BuildGuide.config.ignoredBlocks.translationKey), 10, 210, 0xFFFFFF);
-		drawShadowLeft(new Translatable(BuildGuide.config.ignoredBlocks.commentTranslationKey).toString(), 10, 254, 0xFFFFFF);
+		drawShadowLeft(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + new Translatable(BuildGuide.config.ignoredBlocks.translationKey), 10, 190, 0xFFFFFF);
+		drawShadowLeft(new Translatable(BuildGuide.config.ignoredBlocks.commentTranslationKey).toString(), 10, 234, 0xFFFFFF);
 	}
 }

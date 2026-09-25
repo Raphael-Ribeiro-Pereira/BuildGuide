@@ -51,6 +51,11 @@ public class DropdownOverlayScreen extends BaseScreen implements IButton {
 		addWidget(shapeSelectorList);
 	}
 	
+	@Override
+	protected boolean hasBottomBar() {
+		return false; // the open list can reach down there
+	}
+	
 	public void render() {
 		super.render();
 

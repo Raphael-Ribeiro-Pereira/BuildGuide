@@ -14,9 +14,16 @@ import brentmaas.buildguide.common.screen.widget.IShapeList;
 import brentmaas.buildguide.common.screen.widget.ISlider;
 import brentmaas.buildguide.common.screen.widget.ITextField;
 import brentmaas.buildguide.common.screen.widget.IWidget;
+import brentmaas.buildguide.common.shape.Shape;
+import brentmaas.buildguide.common.shape.ValidationState;
 
 public abstract class BaseScreen {
 	public static boolean shouldUpdatePersistence = false;
+	// Layout bands (GUI redesign E3, design size 480 x 270): header y 0..20, tabs 20..40,
+	// content 40..250, bottom bar 250..270 on the tabs that have one
+	public static final int headerTextY = 6, headerGap = 10;
+	// Bottom bar: validation progress right of the Shape tab's buttons (they end at x 247)
+	public static final int barX1 = 251, barX2 = 400, barY1 = 252, barY2 = 258, barTextY = 260;
 	
 	protected Translatable title = new Translatable("screen.buildguide.title");
 	protected Translatable titleNumberOfBlocksShape = new Translatable("screen.buildguide.numberofblocksshape");
@@ -27,20 +34,21 @@ public abstract class BaseScreen {
 	
 	private IButton buttonClose;
 	private ICheckboxRunnableButton buttonEnabled;
-	private IButton buttonBuildGuide = BuildGuide.widgetHandler.createButton(5, 30, 80, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.shape"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Shape)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Shape);
-	private IButton buttonVisualisation = BuildGuide.widgetHandler.createButton(85, 30, 80, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.visualisation"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Visualisation)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Visualisation);
-	private IButton buttonShapeList = BuildGuide.widgetHandler.createButton(165, 30, 80, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.shapelist"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Shapelist)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Shapelist);
-	private IButton buttonConfiguration = BuildGuide.widgetHandler.createButton(245, 30, 80, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.configuration"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Settings)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Settings);
-	// Six 80-px tabs (5..485) fit a 480-px GUI; the upstream four 120-px ones ended at 500
-	private IButton buttonExclusions = BuildGuide.widgetHandler.createButton(325, 30, 80, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.exclusions"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Exclusions)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Exclusions);
-	private IButton buttonValidation = BuildGuide.widgetHandler.createButton(405, 30, 80, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.validation"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Validation)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Validation);
+	private IButton buttonBuildGuide = BuildGuide.widgetHandler.createButton(0, 20, 80, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.shape"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Shape)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Shape);
+	private IButton buttonVisualisation = BuildGuide.widgetHandler.createButton(80, 20, 80, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.visualisation"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Visualisation)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Visualisation);
+	private IButton buttonShapeList = BuildGuide.widgetHandler.createButton(160, 20, 80, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.shapelist"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Shapelist)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Shapelist);
+	private IButton buttonConfiguration = BuildGuide.widgetHandler.createButton(240, 20, 80, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.configuration"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Settings)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Settings);
+	// Six 80-px tabs (0..480, y 20..40) fill a 480-px GUI; the upstream four 120-px ones ended at 500
+	private IButton buttonExclusions = BuildGuide.widgetHandler.createButton(320, 20, 80, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.exclusions"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Exclusions)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Exclusions);
+	private IButton buttonValidation = BuildGuide.widgetHandler.createButton(400, 20, 80, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.validation"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Validation)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Validation);
 	
 	public void init() {
 		// A screen object can be shown again (back from a dropdown or the preview): its properties are
 		// re-added below, so drop the ones of the previous init instead of rendering them twice
 		properties.clear();
-		buttonClose =BuildGuide.widgetHandler.createButton(wrapper.getWidth() - 25, 5, new Translatable("X"), () -> BuildGuide.screenHandler.showScreen(null));
-		buttonEnabled = BuildGuide.widgetHandler.createCheckbox(5, 5, new Translatable(""), BuildGuide.stateManager.getState().isEnabled(), false, () -> {
+		// One-line header (GUI redesign E3): checkbox and close button in the corners of y 0..20
+		buttonClose =BuildGuide.widgetHandler.createButton(wrapper.getWidth() - AbstractWidgetHandler.defaultSize, 0, new Translatable("X"), () -> BuildGuide.screenHandler.showScreen(null));
+		buttonEnabled = BuildGuide.widgetHandler.createCheckbox(0, 0, new Translatable(""), BuildGuide.stateManager.getState().isEnabled(), false, () -> {
 			BuildGuide.stateManager.getState().setEnabled(buttonEnabled.isCheckboxSelected());
 			BaseScreen.shouldUpdatePersistence = true;
 		});
@@ -58,22 +66,48 @@ public abstract class BaseScreen {
 	}
 	
 	public void render() {
-		drawShadowCentred(title.toString(), wrapper.getWidth() / 2, 10, 0xFFFFFF);
-		drawShadowLeft(textEnabled.toString(), 30, 10, 0xFFFFFF);
-		
-		int titlesMax = Math.max(wrapper.getTextWidth(titleNumberOfBlocksShape.toString()), wrapper.getTextWidth(titleNumberOfBlocksTotal.toString()));
-		
-		drawShadowCentred(titleNumberOfBlocksShape.toString(), wrapper.getWidth() / 2 - wrapper.getTextWidth(title.toString()) / 2 - titlesMax / 2 - 20, 5, 0xFFFFFF);
+		// One-line header (D4): "Enabled", the title in the centre, the shape's block count ending just
+		// left of the title and the total starting just right of it (the x 64 + n breakdown is gone)
+		int centre = wrapper.getWidth() / 2, halfTitle = wrapper.getTextWidth(title.toString()) / 2;
+		drawShadowCentred(title.toString(), centre, headerTextY, 0xFFFFFF);
+		drawShadowLeft(textEnabled.toString(), 25, headerTextY, 0xFFFFFF);
 		int n = BuildGuide.stateManager.getState().isShapeAvailable() ? BuildGuide.stateManager.getState().getCurrentShape().getNumberOfBlocks() : 0;
-		drawShadowCentred(n + " (" + (n / 64) + " x 64 + " + (n % 64) + ")", wrapper.getWidth() / 2 - wrapper.getTextWidth(title.toString()) / 2 - titlesMax / 2 - 20, 20, 0xFFFFFF);
-		
-		drawShadowCentred(titleNumberOfBlocksTotal.toString(), wrapper.getWidth() / 2 + wrapper.getTextWidth(title.toString()) / 2 + titlesMax / 2 + 20, 5, 0xFFFFFF);
-		int nTotal = BuildGuide.stateManager.getState().getNumberOfBlocks();
-		drawShadowCentred(nTotal + " (" + (nTotal / 64) + " x 64 + " + (nTotal % 64) + ")", wrapper.getWidth() / 2 + wrapper.getTextWidth(title.toString()) / 2 + titlesMax / 2 + 20, 20, 0xFFFFFF);
-		
+		drawShadowRight(titleNumberOfBlocksShape + ": " + n, centre - halfTitle - headerGap, headerTextY, 0xFFFFFF);
+		drawShadowLeft(titleNumberOfBlocksTotal + ": " + BuildGuide.stateManager.getState().getNumberOfBlocks(), centre + halfTitle + headerGap, headerTextY, 0xFFFFFF);
+
 		for(Property<?> p: properties) {
 			p.render(this);
 		}
+		if(hasBottomBar()) renderBottomBar();
+	}
+	
+	// Screens that use y 250..270 themselves (dropdowns, preview, visualisation until E7) return false
+	protected boolean hasBottomBar() {
+		return true;
+	}
+	
+	// Validation progress of the current shape (moved from ShapeScreen, GUI redesign E3): bar and
+	// "ok / total (p%)" text. Never scanned shows "- / total" (the total is known from the expected blocks)
+	private void renderBottomBar() {
+		if(!BuildGuide.stateManager.getState().isShapeAvailable()) {
+			drawShadowLeft("-", barX1, barTextY, 0x888888);
+			return;
+		}
+		Shape shape = BuildGuide.stateManager.getState().getCurrentShape(); // every Shape is IValidatable
+		ValidationState state = shape.getValidationState();
+		fillRect(barX1, barY1, barX2, barY2, 0xFF303030);
+		if(!state.isValidated()) {
+			drawShadowLeft("- / " + shape.getExpectedBlocks().size(), barX1, barTextY, 0xAAAAAA);
+			return;
+		}
+		int ok = state.getOk(), total = state.getTotal(), errors = state.getNearCount();
+		double progress = state.getProgress();
+		int fillX2 = barX1 + (int) Math.round((barX2 - barX1) * progress);
+		if(fillX2 > barX1) fillRect(barX1, barY1, fillX2, barY2, ok == total ? 0xFF40C040 : 0xFF40A0FF);
+		String text = ok + " / " + total + " (" + String.format(java.util.Locale.ROOT, "%.1f", 100.0 * progress) + "%)";
+		// Structure errors: solid blocks deforming the shape (Etapa 2.5)
+		if(errors > 0) text += "  errors " + errors;
+		drawShadowLeft(text, barX1, barTextY, errors > 0 ? 0xFF8080 : 0xFFFFFF);
 	}
 	
 	public void setWrapper(IScreenWrapper wrapper) {

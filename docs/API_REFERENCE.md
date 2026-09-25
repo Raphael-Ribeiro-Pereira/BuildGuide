@@ -158,7 +158,7 @@ it now carries a `version` counter bumped on every mutation (`getVersion()`), pe
 transitions, so `getPositions(IGNORED)` is O(k) in a deterministic, stable insertion order;
 other statuses still scan the map) and a `highlightedPos` (−1 = none).
 
-- *List*: `ValidationScreen`, sixth top-bar tab (tabs are now six 80-px buttons, 5..485;
+- *List*: `ValidationScreen`, sixth top-bar tab (tabs are six 80-px buttons, x 0..480 at y 20..40 since E3;
   "Configuration" is the tightest at 67 px + 8 padding). One `ISelectorList` (the existing
   Fabric `ObjectSelectionList`, given a new `setEntries(List<Translatable>)` that keeps the
   scroll position). Since 2.5 the headers are, most actionable first: `Structure errors (n)`,
@@ -223,7 +223,7 @@ table above; hollow sphere r=6 and a real hollow cone filled with stone flag exa
 interior cells within 2).
 
 **Reset (Etapa 2.2).** One fixed `Reset` button in `ShapeScreen` (see above; 78 px wide
-since 2.2c, below the validation block, above the 270 px limit). `ShapeSet.initialiseShape` calls
+since 2.2c; at y 250 left of the bottom bar since GUI redesign E3). `ShapeSet.initialiseShape` calls
 `Shape.captureDefaults()` right after construction (before `restorePersistence`), storing
 every persisted property's constructor value in an `IdentityHashMap`.
 `Shape.resetShownToDefaults()` restores the properties currently `isShown` (the selected
@@ -235,9 +235,11 @@ Step 4 are gone (Bridge `Rails` is back to 9 rows).
 The old Fabric-only `validation/NearBlock` and `ValidationResult` were removed; the state
 lives in `common` so the GUI can read it.
 
-**Progress bar.** Drawn by `ShapeScreen.renderValidation()` in the **left column under
-the origin** (y 205–230, which is free; the property rows and the Validate/Reset row are
-untouched, so no section grows): title, a 160×7 bar (`BaseScreen.fillRect` →
+**Progress bar.** Drawn by `BaseScreen.renderBottomBar()` (moved from
+`ShapeScreen.renderValidation()` in GUI redesign E3) in the **bottom bar** of every tab whose
+`hasBottomBar()` is true (default; `DropdownOverlayScreen`, `PreviewScreen` and
+`VisualisationScreen` return false): no title, a 149×6 bar at x 251..400, y 252..258
+(constants `barX1/barX2/barY1/barY2`, text left-aligned at `barTextY` 260) (`BaseScreen.fillRect` →
 `IScreenWrapper.fillRect` → `GuiGraphics.fill`, the one Fabric addition) and the text
 `ok / total (pct%)`, plus `errors N` in red when there are structure errors (2.5; it was
 `wrong N`). Shapes that are
@@ -423,7 +425,9 @@ property, so old saves load unchanged.
 Override `onSelectedInGUI()` and call `setX`, `setY`, `setVisibility(true)` on each
 property yourself. Layout is independent of list order — this is how `ShapeSpline` shows
 15 point properties on 5 rows while keeping their persistence order. Row height is
-`AbstractWidgetHandler.defaultSize` (20); base is `ShapeScreen.basePropertiesX/Y` (180, 70).
+`AbstractWidgetHandler.defaultSize` (20); base is `ShapeScreen.basePropertiesX/Y` (180, 42; 70 before E3). The Y is a
+compile-time constant, so `javac` inlines it into `Property` and `Shape`: a change shows up
+in their decompiled diff too.
 
 ## Screens
 
@@ -446,8 +450,13 @@ property yourself. Layout is independent of list order — this is how `ShapeSpl
   `keyPressed(KeyEvent)`, `mouseClicked(MouseButtonEvent, boolean)`,
   `mouseDragged(MouseButtonEvent, double, double)`, `mouseReleased(MouseButtonEvent)`,
   `mouseScrolled(double, double, double, double)` (there is no `MouseScrollEvent`).
-- `ShapeScreen` fixed row at y 238: `Validate` 5..57, `Reset` 59..111, `Preview` 113..165
-  (three 52-px buttons; the next row would pass the 270-px limit). Preview is inactive only
+- **Layout bands** (GUI redesign E3, design size 480 × 270): header y 0..20 (Enabled
+  checkbox at 0,0; "Enabled", `Blocks: N`, title, `Total: N` on one line at
+  `BaseScreen.headerTextY` 6, counters `headerGap` 10 px from the title; close X at
+  width − 20), tabs 20..40, content 40..250 (section titles at y 42), bottom bar 250..270.
+- `ShapeScreen` fixed row at y 250: `Validate` 5..83, `Reset` 87..165, `Preview` 169..247
+  (three 78-px buttons, left of the bottom bar at 251; `Button.Plain` draws only inside its
+  rectangle, so they never cover the bar). Preview is inactive only
   when there is no shape set (`State.isShapeAvailable()`), not while a shape generates.
 
 ### 3D preview (Step 0)

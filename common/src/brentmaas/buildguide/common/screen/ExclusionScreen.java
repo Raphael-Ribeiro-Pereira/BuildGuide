@@ -18,7 +18,7 @@ import brentmaas.buildguide.common.shape.ShapeSet.Origin;
  * captures the player position.
  */
 public class ExclusionScreen extends BaseScreen {
-	private static final int baseY = 70;
+	private static final int baseY = 55;
 	private static final int rowHeight = AbstractWidgetHandler.defaultSize;
 	private static final int fieldWidth = 40;
 
@@ -113,7 +113,7 @@ public class ExclusionScreen extends BaseScreen {
 	public void render() {
 		super.render();
 
-		drawShadowCentred(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + titleExclusions, 180, 55, 0xFFFFFF);
+		drawShadowCentred(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + titleExclusions, 180, 42, 0xFFFFFF);
 		for(int i = 0;i < ShapeSet.numExclusionBoxes;++i) {
 			int yMin = baseY + 2 * i * rowHeight;
 			drawShadowLeft(new Translatable("screen.buildguide.exclusionbox", "" + (i + 1)).toString(), 10, yMin + 6, 0xFFFFFF);

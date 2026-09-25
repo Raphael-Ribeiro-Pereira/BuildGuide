@@ -12,7 +12,7 @@ import brentmaas.buildguide.common.shape.ShapeSet;
  * redesigned Shape screen will reuse in its right panel.
  */
 public class ValidationScreen extends BaseScreen {
-	private static final int listTop = 50, listBottom = 265, listLeft = 5, listRight = 475;
+	private static final int listTop = 52, listBottom = 250, listLeft = 5, listRight = 475;
 
 	private Translatable titleValidation = new Translatable("screen.buildguide.validation");
 
@@ -27,7 +27,7 @@ public class ValidationScreen extends BaseScreen {
 
 	public void render() {
 		super.render();
-		drawShadowCentred(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + titleValidation, 240, 40, 0xFFFFFF);
+		drawShadowCentred(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + titleValidation, 240, 42, 0xFFFFFF);
 		ShapeSet set = currentShapeSet();
 		errorList.update(currentShape(), originX(set), originY(set), originZ(set));
 	}
