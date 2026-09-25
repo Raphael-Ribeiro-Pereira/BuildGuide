@@ -10,7 +10,7 @@ import brentmaas.buildguide.common.screen.widget.IWidget;
 
 public class PropertyRunnable extends Property<Runnable> {
 	private int xOffset = 0;
-	private int width = 210;
+	private int width = rowWidth;
 	
 	public PropertyRunnable(Runnable value, Translatable name) {
 		super(value, name);
@@ -24,7 +24,7 @@ public class PropertyRunnable extends Property<Runnable> {
 	}
 	
 	protected void initWidgets(ArrayList<IWidget> widgetList) {
-		widgetList.add(BuildGuide.widgetHandler.createButton(x + xOffset, y, width, AbstractWidgetHandler.defaultSize, name, () -> {
+		widgetList.add(BuildGuide.widgetHandler.createButton(x + xOffset, y, width, rowHeight, name, () -> {
 			this.value.run();
 		}));
 	}

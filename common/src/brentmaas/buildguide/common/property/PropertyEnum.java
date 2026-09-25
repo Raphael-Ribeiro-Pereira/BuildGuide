@@ -18,11 +18,11 @@ public class PropertyEnum<T extends Enum<T>> extends Property<T> {
 	}
 	
 	protected void initWidgets(ArrayList<IWidget> widgetList) {
-		widgetList.add(BuildGuide.widgetHandler.createButton(x + 90, y, new Translatable("<-"), () -> {
+		widgetList.add(BuildGuide.widgetHandler.createButton(x + controlX, y, stepWidth, rowHeight, new Translatable("<"), () -> {
 			this.value = this.value.getDeclaringClass().getEnumConstants()[Math.floorMod(this.value.ordinal() - 1, this.value.getDeclaringClass().getEnumConstants().length)];
 			if(onPress != null) onPress.run();
 		}));
-		widgetList.add(BuildGuide.widgetHandler.createButton(x + 190, y, new Translatable("->"), () -> {
+		widgetList.add(BuildGuide.widgetHandler.createButton(x + increaseX, y, stepWidth, rowHeight, new Translatable(">"), () -> {
 			this.value = this.value.getDeclaringClass().getEnumConstants()[Math.floorMod(this.value.ordinal() + 1, this.value.getDeclaringClass().getEnumConstants().length)];
 			if(onPress != null) onPress.run();
 		}));
@@ -30,7 +30,7 @@ public class PropertyEnum<T extends Enum<T>> extends Property<T> {
 	
 	public void render(BaseScreen screen) {
 		super.render(screen);
-		drawStringCentred(screen, names[value.ordinal()], x + 150, y + 5, 0xFFFFFF);
+		drawStringCentred(screen, names[value.ordinal()], x + fieldX + fieldWidth / 2, y + 5, 0xFFFFFF);
 	}
 	
 	public String getStringValue() {

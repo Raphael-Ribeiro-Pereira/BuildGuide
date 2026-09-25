@@ -9,19 +9,18 @@ import brentmaas.buildguide.common.screen.widget.AbstractWidgetHandler;
 import brentmaas.buildguide.common.screen.widget.IWidget;
 
 /**
- * Row owner for three PropertyCompactInt columns (X, Y, Z): draws the label, a Set button
- * that commits all three text fields with a single update, and a button that fills the
- * three values from the player's position (local to the shape origin).
+ * Row owner for three PropertyCompactInt columns (X, Y, Z): draws the label, makes Enter in
+ * any of the three fields commit all three with a single update (no Set button since GUI
+ * redesign E4), and has a button (@) that fills the three values from the player's position
+ * (local to the shape origin).
  *
  * Holds no value of its own. It must be laid out on the same y as its columns (see
  * ShapeSpline.onSelectedInGUI). Persists as a constant so it can be appended to a shape's
  * property list without affecting older saves.
  */
 public class PropertyPointRow extends Property<Void> {
-	private static final int setX = PropertyCompactInt.columnOffset + 3 * PropertyCompactInt.columnWidth;
-	private static final int setWidth = 26;
-	private static final int fromPlayerX = setX + setWidth + 2;
-	private static final int fromPlayerWidth = 26;
+	private static final int fromPlayerX = PropertyCompactInt.columnOffset + 3 * PropertyCompactInt.columnWidth;
+	private static final int fromPlayerWidth = rowWidth - fromPlayerX;
 
 	private PropertyCompactInt px, py, pz;
 	private Runnable onUpdate;
@@ -42,14 +41,17 @@ public class PropertyPointRow extends Property<Void> {
 	}
 
 	protected void initWidgets(ArrayList<IWidget> widgetList) {
-		widgetList.add(BuildGuide.widgetHandler.createButton(x + setX, y, setWidth, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.set"), () -> {
-			// Commit all three before updating so the shape regenerates once
+		// Commit all three before updating so the shape regenerates once, whichever field had focus
+		Runnable commit = () -> {
 			boolean ok = px.commitTextField();
 			ok &= py.commitTextField();
 			ok &= pz.commitTextField();
 			if(ok && onUpdate != null) onUpdate.run();
-		}));
-		widgetList.add(BuildGuide.widgetHandler.createButton(x + fromPlayerX, y, fromPlayerWidth, AbstractWidgetHandler.defaultSize, new Translatable("property.buildguide.fromplayer"), () -> {
+		};
+		px.setOnEnter(commit);
+		py.setOnEnter(commit);
+		pz.setOnEnter(commit);
+		widgetList.add(BuildGuide.widgetHandler.createButton(x + fromPlayerX, y, fromPlayerWidth, rowHeight, new Translatable("@"), () -> {
 			int[] pos = playerPosition.get();
 			px.setValue(pos[0]);
 			py.setValue(pos[1]);
@@ -60,7 +62,7 @@ public class PropertyPointRow extends Property<Void> {
 
 	@Override
 	public void render(BaseScreen screen) {
-		drawString(screen, name.toString(), x + 5, y + 5, 0xFFFFFF);
+		drawString(screen, name.toString(), x + labelX, y + 5, 0xFFFFFF);
 	}
 
 	public String getStringValue() {

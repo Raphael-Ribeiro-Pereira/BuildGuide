@@ -17,7 +17,7 @@ public class PropertyBoolean extends Property<Boolean> {
 	}
 	
 	protected void initWidgets(ArrayList<IWidget> widgetList) {
-		button = BuildGuide.widgetHandler.createCheckbox(x + 140, y, new Translatable(""), value, false, () -> {
+		button = BuildGuide.widgetHandler.createCheckbox(x + controlX, y, new Translatable(""), value, false, () -> {
 			this.value = button.isCheckboxSelected();
 			if(onPress != null) onPress.run();
 		});

@@ -15,10 +15,12 @@ import brentmaas.buildguide.common.screen.widget.IWidget;
  * commits the text fields of all its columns at once.
  */
 public class PropertyCompactInt extends PropertyInt {
-	public static final int columnOffset = 50;
-	public static final int columnWidth = 62;
-	private static final int buttonWidth = 16;
-	private static final int textFieldWidth = 30;
+	// Point row (GUI redesign E4, D2b): label 14 · 3 × (− 10 · field 32 · + 10) · capture 14 = 184 px.
+	// A 32-px field shows 4 characters (-120); longer values scroll inside it
+	public static final int columnOffset = 14;
+	public static final int columnWidth = 52;
+	private static final int buttonWidth = 10;
+	private static final int textFieldWidth = 32;
 
 	private int column;
 
@@ -29,17 +31,17 @@ public class PropertyCompactInt extends PropertyInt {
 
 	protected void initWidgets(ArrayList<IWidget> widgetList) {
 		int cx = x + columnOffset + column * columnWidth;
-		widgetList.add(BuildGuide.widgetHandler.createButton(cx, y, buttonWidth, AbstractWidgetHandler.defaultSize, new Translatable("-"), () -> {
+		widgetList.add(BuildGuide.widgetHandler.createButton(cx, y, buttonWidth, rowHeight, new Translatable("-"), () -> {
 			--this.value;
 			valueTextField.setTextValue("" + this.value);
 			valueTextField.setTextColour(0xFFFFFF);
 			if(onPress != null) onPress.run();
 		}));
-		valueTextField = BuildGuide.widgetHandler.createTextField(cx + buttonWidth, y, textFieldWidth, AbstractWidgetHandler.defaultSize, "");
+		valueTextField = BuildGuide.widgetHandler.createTextField(cx + buttonWidth, y, textFieldWidth, rowHeight, "");
 		valueTextField.setTextValue("" + value);
 		valueTextField.setTextColour(0xFFFFFF);
 		widgetList.add(valueTextField);
-		widgetList.add(BuildGuide.widgetHandler.createButton(cx + buttonWidth + textFieldWidth, y, buttonWidth, AbstractWidgetHandler.defaultSize, new Translatable("+"), () -> {
+		widgetList.add(BuildGuide.widgetHandler.createButton(cx + buttonWidth + textFieldWidth, y, buttonWidth, rowHeight, new Translatable("+"), () -> {
 			++this.value;
 			valueTextField.setTextValue("" + this.value);
 			valueTextField.setTextColour(0xFFFFFF);
@@ -47,6 +49,12 @@ public class PropertyCompactInt extends PropertyInt {
 		}));
 	}
 
+	// Enter in this column's field; the row owner commits all three columns with one update
+	public void setOnEnter(Runnable onEnter) {
+		getWidgetList(); // Initialise `valueTextField` if still null
+		valueTextField.setOnEnter(onEnter);
+	}
+	
 	/**
 	 * Parse the text field into the value without running onPress; the caller decides when
 	 * to update. Returns false (and marks the field red) if the text is not an integer.

@@ -250,7 +250,7 @@ public abstract class Shape implements IValidatable {
 	protected int placeRow(int row, Property<?>... props) {
 		for(Property<?> p: props) {
 			p.setX(ShapeScreen.basePropertiesX);
-			p.setY(ShapeScreen.basePropertiesY + row * AbstractWidgetHandler.defaultSize);
+			p.setY(ShapeScreen.basePropertiesY + row * Property.rowHeight);
 			p.setVisibility(true);
 		}
 		return row + 1;
@@ -266,7 +266,7 @@ public abstract class Shape implements IValidatable {
 		if(sectionSelector == null) {
 			for(int i = 0;i < properties.size();++i) {
 				properties.get(i).setX(ShapeScreen.basePropertiesX);
-				properties.get(i).setY(ShapeScreen.basePropertiesY + i * AbstractWidgetHandler.defaultSize);
+				properties.get(i).setY(ShapeScreen.basePropertiesY + i * Property.rowHeight);
 				properties.get(i).setVisibility(true);
 			}
 			return;

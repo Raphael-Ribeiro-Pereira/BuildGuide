@@ -20,7 +20,7 @@ public class PropertyRangeInt extends PropertyInt {
 	}
 	
 	protected void initWidgets(ArrayList<IWidget> widgetList) {
-		buttonDecrease = BuildGuide.widgetHandler.createButton(x + 90, y, new Translatable("-"), () -> {
+		buttonDecrease = BuildGuide.widgetHandler.createButton(x + controlX, y, stepWidth, rowHeight, new Translatable("-"), () -> {
 			if(this.value > minValue) {
 				--this.value;
 				refresh();
@@ -28,11 +28,12 @@ public class PropertyRangeInt extends PropertyInt {
 			}
 		});
 		widgetList.add(buttonDecrease);
-		valueTextField = BuildGuide.widgetHandler.createTextField(x + 110, y, 50, AbstractWidgetHandler.defaultSize, "");
+		valueTextField = BuildGuide.widgetHandler.createTextField(x + fieldX, y, fieldWidth, rowHeight, "");
 		valueTextField.setTextValue("" + value);
 		valueTextField.setTextColour(0xFFFFFF);
 		widgetList.add(valueTextField);
-		widgetList.add(BuildGuide.widgetHandler.createButton(x + 160, y, 30, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.set"), () -> {
+		// Enter in the field applies the value (no Set button since GUI redesign E4)
+		valueTextField.setOnEnter(() -> {
 			try {
 				int newVal = Integer.parseInt(valueTextField.getTextValue());
 				if(newVal >= minValue && newVal <= maxValue) {
@@ -45,8 +46,8 @@ public class PropertyRangeInt extends PropertyInt {
 			}catch(NumberFormatException e) {
 				valueTextField.setTextColour(0xFF0000);
 			}
-		}));
-		buttonIncrease = BuildGuide.widgetHandler.createButton(x + 190, y, new Translatable("+"), () -> {
+		});
+		buttonIncrease = BuildGuide.widgetHandler.createButton(x + increaseX, y, stepWidth, rowHeight, new Translatable("+"), () -> {
 			if(this.value < maxValue) {
 				++this.value;
 				refresh();

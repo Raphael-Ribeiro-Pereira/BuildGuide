@@ -283,7 +283,7 @@ Each stage: build, harness, decompile-diff against the previous baseline, in-gam
 | **E1** | `Shape.generation` + snapshot `ready && !error` (F6) + extract `PreviewController` from `PreviewScreen` | none | yes (harness: generation, cancelled generation, controller refresh rules) |
 | **E2** | Error list as a reusable component; `ValidationScreen` uses it | none | partly (entry building) |
 | **E3** ✅ | Header row + 6-tab bar (80 px, Validation kept until E6) + bottom bar (progress in `BaseScreen`, Validate/Reset/Preview on the Shape tab); other tabs shifted (Visualisation only −10, R10). Done, 8/8 in-game checks passed | header, tabs, bottom bar | no (in-game) |
-| **E4** | Compact 18-px, 188-px rows for every property type; point row redesign | every shape's panel | no (per-shape in-game list) |
+| **E4** ✅ | Compact 18-px, 184-px rows for every property type (label x+2..78, controls x+80..184, Enter replaces Set); point row `P1` 14 · 3 × (− 10 · field 32 · + 10) · `@` 14; six en_us labels shortened. Done; properties still at x 180 until E5/E6 | every shape's panel | no (per-shape in-game list) |
 | **E5** | Accordion (`PropertySection` headers, Origin as a section, counts from the placement pass); Bridge Rails/Posts split; Validate rows hidden | left panel | partly (row counts per shape in the harness) |
 | **E6** | Right panel: inline preview (following generations, 250-ms throttle) + error list; Enlarge button; remove the Validation tab and `ActiveScreen.Validation` | right panel | partly |
 | **E7** | Larger-screen stretching (§2.3) and the small-screen behaviour chosen in D1 | at other sizes | no |
@@ -294,7 +294,7 @@ Each stage: build, harness, decompile-diff against the previous baseline, in-gam
 |---|---|---|
 | D1 | Below 480 × 270 | **Message asking for a lower GUI scale** (option a). Proportional scaling does not exist for vanilla widgets (integer GUI pixels); cutting was rejected. Tabs left-aligned on wider screens. |
 | D2 | Set buttons | **Dropped**: a value is applied with Enter. |
-| D2b | Point rows | **One row per point, ± kept**: `P1` 14 · 3 × (− 12 · field 28 · + 12) · from-player 14 = 184 px. Two rows per point were rejected: 5 points + count = 11 rows, capacity is 8 (Spline) / 6 (Bridge). Fields of 28 px hold 4–5 digits, enough for origin-relative coordinates. |
+| D2b | Point rows | **One row per point, ± kept**: `P1` 14 · 3 × (− 12 · field 28 · + 12) · from-player 14 = 184 px. Two rows per point were rejected: 5 points + count = 11 rows, capacity is 8 (Spline) / 6 (Bridge). ~~Fields of 28 px hold 4–5 digits~~ **Corrected in E4:** a bordered `EditBox` keeps 4 px each side, so 28 px shows 3 characters; built as − 10 · field 32 · + 10 (4 characters, `-120`), capture button `@` (Pos did not fit 14 px). |
 | D2c | Long labels | **Shortened in en_us** (no label scrolling: property names are plain text, `Property.render` → `drawShadowLeft`, they do not scroll like button text). E4 proposes abbreviations for every label over 12 characters. |
 | D3 | Row height | **18 px** (20 does not fit the Cone plus two headers). |
 | D4 | Header counts | **One line each**, shorter labels, no `x 64 + n` breakdown. |

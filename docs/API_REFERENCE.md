@@ -362,14 +362,18 @@ final before the first layout.
 
 | Class | Value | Widgets (offsets from `x`) | Notes |
 |---|---|---|---|
-| `PropertyInt` | int | label +5, `-` +90, field(50) +110, `Set` +160, `+` +190 | `-`/`+`/`Set` run `onPress`; typing alone does nothing |
-| `PropertyMinimumInt` / `PositiveInt` / `NonzeroInt` | int | same | value guards; `setValueFromString` uses `>=` minimum (fixed in this fork) |
-| `PropertyFloat` / `PositiveFloat` / `NonzeroFloat` | float | same layout | |
-| `PropertyBoolean` | bool | checkbox | |
-| `PropertyEnum<E>` | enum | `<-` name `->` | needs display names array |
-| `PropertyRunnable` | Runnable | 210-wide button at `x`, or `(run, name, xOffset, width)` for a narrower one sharing a row | persists as `"Runnable"`; renders as a button (Validate, Set endpoint, Reset) |
-| `PropertyCompactInt` (fork) | int | `-`(16) field(30) `+`(16) at `x+50+column*62` | no label, no Set; `commitTextField()` parses without `onPress` |
-| `PropertyPointRow` (fork) | none | label +5, `Set`(26) at +236, `Pos`(26) at +264 | owns three `PropertyCompactInt`; Set commits all then one `onUpdate`; Pos fills from `IPositionSource` |
+| `PropertyInt` | int | label +2, `-`(14) +80, field(76) +94, `+`(14) +170 (E4; constants in `Property`) | `-`/`+` and **Enter in the field** run `onPress` (no Set button since E4, decision D2); typing alone does nothing |
+| `PropertyMinimumInt` / `PositiveInt` / `NonzeroInt` / `RangeInt` | int | same | value guards; `setValueFromString` uses `>=` minimum (fixed in this fork) |
+| `PropertyFloat` / `PositiveFloat` / `NonzeroFloat` / `MinimumFloat` | float | same layout | |
+| `PropertyBoolean` | bool | label +2, checkbox +80 | |
+| `PropertyEnum<E>` / `PropertySection` | enum / index | `<`(14) +80, name centred at +132, `>`(14) +170 | needs display names array; `<-`/`->` were too wide for 14 px |
+| `PropertyRunnable` | Runnable | 184 × 18 button at `x`, or `(run, name, xOffset, width)` for a narrower one sharing a row | persists as `"Runnable"`; renders as a button (Validate, Set endpoint, Reset) |
+| `PropertyCompactInt` (fork) | int | `-`(10) field(32) `+`(10) at `x+14+column*52` | no label; `commitTextField()` parses without `onPress`; `setOnEnter` lets the row owner hook Enter. A 32-px field shows 4 characters |
+| `PropertyPointRow` (fork) | none | label `P1` +2, `@`(14) at +170; row = 184 px | owns three `PropertyCompactInt`; Enter in any of the three commits all then runs one `onUpdate`; `@` fills from `IPositionSource` |
+
+**Enter (E4).** `ITextField.setOnEnter(Runnable)` is a `default` no-op, so the other 35 loader
+modules keep compiling; only `fabric1.21.11/TextFieldImpl` implements it (`keyPressed(KeyEvent)`,
+Enter and keypad Enter, reached only while the field is focused).
 | `PropertyRangeInt` (fork) | int | same as `PropertyInt` | clamped to [min,max]; `-`/`+` disabled at the bounds via `IButton.setActive` |
 | `PropertySection` (fork) | int | `<-` name `->` like `PropertyEnum` | panel section selector; lives in `Shape.sectionSelector`, **not** in `properties`, never persisted |
 
@@ -425,7 +429,8 @@ property, so old saves load unchanged.
 Override `onSelectedInGUI()` and call `setX`, `setY`, `setVisibility(true)` on each
 property yourself. Layout is independent of list order — this is how `ShapeSpline` shows
 15 point properties on 5 rows while keeping their persistence order. Row height is
-`AbstractWidgetHandler.defaultSize` (20); base is `ShapeScreen.basePropertiesX/Y` (180, 42; 70 before E3). The Y is a
+`Property.rowHeight` (18 since E4; it was `AbstractWidgetHandler.defaultSize`, 20, which still
+sizes the other widgets); base is `ShapeScreen.basePropertiesX/Y` (180, 42; 70 before E3). The Y is a
 compile-time constant, so `javac` inlines it into `Property` and `Shape`: a change shows up
 in their decompiled diff too.
 

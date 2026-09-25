@@ -8,6 +8,11 @@ import brentmaas.buildguide.common.screen.ShapeScreen;
 import brentmaas.buildguide.common.screen.widget.IWidget;
 
 public abstract class Property<T> {
+	// Compact rows (GUI redesign E4): 18 px high, 184 px wide. Label x+2..x+78, controls from x+80:
+	// step button 14 Â· field 76 Â· step button 14 (Enum/Section: arrow Â· value Â· arrow)
+	public static final int rowHeight = 18, rowWidth = 184, labelX = 2, controlX = 80, stepWidth = 14, fieldWidth = 76;
+	public static final int fieldX = controlX + stepWidth, increaseX = fieldX + fieldWidth;
+	
 	protected int x;
 	protected int y;
 	public T value;
@@ -70,7 +75,7 @@ public abstract class Property<T> {
 	}
 	
 	public void render(BaseScreen screen) {
-		drawString(screen, name.toString(), x + 5, y + 5, 0xFFFFFF);
+		drawString(screen, name.toString(), x + labelX, y + 5, 0xFFFFFF);
 	}
 	
 	public void drawString(BaseScreen screen, String text, int x, int y, int colour) {

@@ -18,17 +18,18 @@ public class PropertyInt extends Property<Integer> {
 	}
 	
 	protected void initWidgets(ArrayList<IWidget> widgetList) {
-		widgetList.add(BuildGuide.widgetHandler.createButton(x + 90, y, new Translatable("-"), () -> {
+		widgetList.add(BuildGuide.widgetHandler.createButton(x + controlX, y, stepWidth, rowHeight, new Translatable("-"), () -> {
 			--this.value;
 			valueTextField.setTextValue("" + this.value);
 			valueTextField.setTextColour(0xFFFFFF);
 			if(onPress != null) onPress.run();
 		}));
-		valueTextField = BuildGuide.widgetHandler.createTextField(x + 110, y, 50, AbstractWidgetHandler.defaultSize, "");
+		valueTextField = BuildGuide.widgetHandler.createTextField(x + fieldX, y, fieldWidth, rowHeight, "");
 		valueTextField.setTextValue("" + value);
 		valueTextField.setTextColour(0xFFFFFF);
 		widgetList.add(valueTextField);
-		widgetList.add(BuildGuide.widgetHandler.createButton(x + 160, y, 30, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.set"), () -> {
+		// Enter in the field applies the value (no Set button since GUI redesign E4)
+		valueTextField.setOnEnter(() -> {
 			try {
 				int newval = Integer.parseInt(valueTextField.getTextValue());
 				this.value = newval;
@@ -37,8 +38,8 @@ public class PropertyInt extends Property<Integer> {
 			}catch(NumberFormatException e) {
 				valueTextField.setTextColour(0xFF0000);
 			}
-		}));
-		widgetList.add(BuildGuide.widgetHandler.createButton(x + 190, y, new Translatable("+"), () -> {
+		});
+		widgetList.add(BuildGuide.widgetHandler.createButton(x + increaseX, y, stepWidth, rowHeight, new Translatable("+"), () -> {
 			++this.value;
 			valueTextField.setTextValue("" + this.value);
 			valueTextField.setTextColour(0xFFFFFF);

@@ -28,11 +28,11 @@ public class PropertySection extends Property<Integer> {
 	}
 	
 	protected void initWidgets(ArrayList<IWidget> widgetList) {
-		widgetList.add(BuildGuide.widgetHandler.createButton(x + 90, y, new Translatable("<-"), () -> {
+		widgetList.add(BuildGuide.widgetHandler.createButton(x + controlX, y, stepWidth, rowHeight, new Translatable("<"), () -> {
 			value = Math.floorMod(value - 1, names.size());
 			if(onChange != null) onChange.run();
 		}));
-		widgetList.add(BuildGuide.widgetHandler.createButton(x + 190, y, new Translatable("->"), () -> {
+		widgetList.add(BuildGuide.widgetHandler.createButton(x + increaseX, y, stepWidth, rowHeight, new Translatable(">"), () -> {
 			value = Math.floorMod(value + 1, names.size());
 			if(onChange != null) onChange.run();
 		}));
@@ -40,7 +40,7 @@ public class PropertySection extends Property<Integer> {
 	
 	public void render(BaseScreen screen) {
 		super.render(screen);
-		drawStringCentred(screen, names.get(value).toString(), x + 150, y + 5, 0xFFFFFF);
+		drawStringCentred(screen, names.get(value).toString(), x + fieldX + fieldWidth / 2, y + 5, 0xFFFFFF);
 	}
 	
 	public String getStringValue() {
