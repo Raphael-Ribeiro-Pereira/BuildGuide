@@ -161,7 +161,8 @@ Only the latest one matters; diff the next change against it.
 | `8ef0e59` | GUI redesign E1 — `PreviewController`, `Shape.generation`, snapshot `!error` fix | `E1` |
 | `a1ee0eb` | GUI redesign E2 — `ValidationListComponent` (error list reusable in any rectangle) | `E2` |
 | `850dcd0` | GUI redesign E3 — one-line header, six tabs at y 20, bottom bar in `BaseScreen` | `E3` |
-| `97ab2ae` | GUI redesign E4 — compact 18 × 184 property rows, Enter replaces Set, compact point row | `E4` (current) |
+| `97ab2ae` | GUI redesign E4 — compact 18 × 184 property rows, Enter replaces Set, compact point row | `E4` |
+| `17fc563` | GUI redesign E5 — accordion in the left panel, Origin as a section, Bridge Rails/Placement, Validate rows hidden | `E5` (current) |
 
 GUI redesign plan and decisions: `docs/GUI_REDESIGN.md` (stages E1–E7).
 
