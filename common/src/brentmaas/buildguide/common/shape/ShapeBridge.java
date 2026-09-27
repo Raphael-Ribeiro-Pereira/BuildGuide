@@ -146,6 +146,8 @@ public class ShapeBridge extends Shape {
 		properties.add(propertyWidth);
 		properties.add(propertyThickness);
 		properties.add(propertyValidate);
+		// Validate lives in the Shape tab's fixed row (GUI redesign E5): kept here only so saves stay aligned
+		hideFromGui(propertyValidate);
 		properties.add(propertyRailMode);
 		properties.add(propertyRailSides);
 		properties.add(propertyRailProfile);
@@ -169,16 +171,19 @@ public class ShapeBridge extends Shape {
 			addGuiOnly(pointRows[i]);
 		}
 
-		// Panel sections; Validate stays visible in all of them
+		// Panel sections (accordion headers)
 		int sectionShape = declareSection(new Translatable("property.buildguide.section.shape"));
 		int sectionDeck = declareSection(new Translatable("property.buildguide.section.deck"));
 		int sectionRails = declareSection(new Translatable("property.buildguide.section.rails"));
+		// Rails split for the accordion (E5): Placement holds what positions both the rails and the posts
+		int sectionPlacement = declareSection(new Translatable("property.buildguide.section.placement"));
 		int sectionSupports = declareSection(new Translatable("property.buildguide.section.supports"));
 		assignSection(sectionShape, propertyPointCount);
 		hideFromGui(propertySampleStep); // inert since adaptive subdivision; kept for persistence alignment
 		for(int i = 0;i < maxPoints;++i) assignSection(sectionShape, points[i][0], points[i][1], points[i][2], pointRows[i]);
 		assignSection(sectionDeck, propertyProfile, propertyWidth, propertyThickness);
-		assignSection(sectionRails, propertyRailMode, propertyRailSides, propertyRailProfile, propertyRailWidth, propertyRailHeight, propertyRailElevation, propertyRailInset, propertyPostSpacing);
+		assignSection(sectionRails, propertyRailMode, propertyRailSides, propertyRailProfile, propertyRailWidth, propertyRailHeight);
+		assignSection(sectionPlacement, propertyRailElevation, propertyRailInset, propertyPostSpacing);
 		assignSection(sectionSupports, propertyPillarMode, propertyPillarShape, propertyPillarWidth, propertyPillarDepth, propertyPillarSpacing, propertyPillarTaper);
 		
 		// The screen's Reset button restores the current section; control points and count are never reset
@@ -191,26 +196,25 @@ public class ShapeBridge extends Shape {
 		update();
 	}
 
-	// Rows: section selector; then the current section's properties in list order (point rows only up to the count); then Validate
+	// Rows of the open section (ShapeScreen draws its header): the section's properties in list order (point rows only up to the count)
 	@Override
 	public void onSelectedInGUI() {
-		int row = placeSectionSelector();
+		int row = 0;
 		if(isShown(propertyPointCount)) row = placeRow(row, propertyPointCount);
-		else propertyPointCount.setVisibility(false);
+		else hideRow(propertyPointCount);
 		for(int i = 0;i < maxPoints;++i) {
 			Property<?>[] rowProps = {points[i][0], points[i][1], points[i][2], pointRows[i]};
 			if(i < propertyPointCount.value && isShown(pointRows[i])) {
 				row = placeRow(row, rowProps);
 			}else {
-				for(Property<?> p: rowProps) p.setVisibility(false);
+				hideRow(rowProps);
 			}
 		}
 		Property<?>[] rest = {propertyProfile, propertyWidth, propertyThickness, propertyRailMode, propertyRailSides, propertyRailProfile, propertyRailWidth, propertyRailHeight, propertyRailElevation, propertyRailInset, propertyPostSpacing, propertyPillarMode, propertyPillarShape, propertyPillarWidth, propertyPillarDepth, propertyPillarSpacing, propertyPillarTaper};
 		for(Property<?> p: rest) {
 			if(isShown(p)) row = placeRow(row, p);
-			else p.setVisibility(false);
+			else hideRow(p);
 		}
-		row = placeRow(row, propertyValidate);
 	}
 
 	protected void updateShape(IShapeBuffer buffer) throws InterruptedException {

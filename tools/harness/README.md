@@ -30,6 +30,7 @@ java  -cp "$CLASSES;$OUT" PreviewCameraTest # preview camera: drag, clamps, zoom
 java  -cp "$CLASSES;$OUT" GenerationTest    # Shape.generation only on success, snapshot refuses errors (10 asserts)
 java  -cp "$CLASSES;$OUT" PreviewControllerTest # refresh throttles, shape switch, shared camera, input (25 asserts)
 java  -cp "$CLASSES;$OUT" ValidationListTest # error list rows, states, rebuild debounce, click/highlight (21 asserts)
+java  -cp "$CLASSES;$OUT" AccordionTest     # accordion rows per section, every shape, vs capacity (33 asserts)
 ```
 
 `CentreTest`, `Step4Test`, `BaseSetTest` are the Step 3/4 and 2.2c checks;

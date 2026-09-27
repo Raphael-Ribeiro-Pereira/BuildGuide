@@ -366,7 +366,7 @@ final before the first layout.
 | `PropertyMinimumInt` / `PositiveInt` / `NonzeroInt` / `RangeInt` | int | same | value guards; `setValueFromString` uses `>=` minimum (fixed in this fork) |
 | `PropertyFloat` / `PositiveFloat` / `NonzeroFloat` / `MinimumFloat` | float | same layout | |
 | `PropertyBoolean` | bool | label +2, checkbox +80 | |
-| `PropertyEnum<E>` / `PropertySection` | enum / index | `<`(14) +80, name centred at +132, `>`(14) +170 | needs display names array; `<-`/`->` were too wide for 14 px |
+| `PropertyEnum<E>` | enum | `<`(14) +80, name centred at +132, `>`(14) +170 | needs display names array; `<-`/`->` were too wide for 14 px |
 | `PropertyRunnable` | Runnable | 184 × 18 button at `x`, or `(run, name, xOffset, width)` for a narrower one sharing a row | persists as `"Runnable"`; renders as a button (Validate, Set endpoint, Reset) |
 | `PropertyCompactInt` (fork) | int | `-`(10) field(32) `+`(10) at `x+14+column*52` | no label; `commitTextField()` parses without `onPress`; `setOnEnter` lets the row owner hook Enter. A 32-px field shows 4 characters |
 | `PropertyPointRow` (fork) | none | label `P1` +2, `@`(14) at +170; row = 184 px | owns three `PropertyCompactInt`; Enter in any of the three commits all then runs one `onUpdate`; `@` fills from `IPositionSource` |
@@ -375,7 +375,6 @@ final before the first layout.
 modules keep compiling; only `fabric1.21.11/TextFieldImpl` implements it (`keyPressed(KeyEvent)`,
 Enter and keypad Enter, reached only while the field is focused).
 | `PropertyRangeInt` (fork) | int | same as `PropertyInt` | clamped to [min,max]; `-`/`+` disabled at the bounds via `IButton.setActive` |
-| `PropertySection` (fork) | int | `<-` name `->` like `PropertyEnum` | panel section selector; lives in `Shape.sectionSelector`, **not** in `properties`, never persisted |
 
 Row width budget: base `x = 180`; a `PropertyInt` row ends at 390, a point row at 470.
 Keep rows ≤ 480 so they fit at GUI scale 4 on 1080p.
@@ -395,14 +394,21 @@ Keep rows ≤ 480 so they fit at GUI scale 4 on 1080p.
 
 ### Panel sections
 
-A shape with many properties splits its panel with `Shape.declareSection(name)` (returns
-an index; the first call creates the selector) and `assignSection(index, props...)`.
-Properties never assigned are shown in every section (that is how Validate stays
-visible). `getGuiProperties()` = `properties` + selector, and is what `ShapeScreen` adds
-as widgets. The default `onSelectedInGUI` lays out: selector on row 0, then each property
-of the current section or unassigned, in list order; shapes with no section keep the
-original layout untouched. Changing the section re-runs `onSelectedInGUI`. Helpers for
-custom layouts: `placeSectionSelector()`, `placeRow(row, props...)`, `isShown(p)`.
+**Accordion (GUI redesign E5).** Sections are accordion headers drawn by `ShapeScreen`
+(one open at a time; Origin is the first header). `Shape.declareSection(name)` returns an
+index, `assignSection(index, props...)` assigns; **unassigned properties belong to section
+0**, and a shape that declares none has one implicit section, "Properties"
+(`property.buildguide.section.properties`). State, all UI-only and never persisted:
+`Shape.openSection` (per instance, −1 = all closed; `getOpenSection`/`setOpenSection`,
+which re-runs `onSelectedInGUI`), `State.originOpen` (Origin and a shape section are never
+open together), and `rowsTop` (y of the open section's first row, set by the screen).
+`countRows(section)` is a dry run of `onSelectedInGUI` (`placeRow` only counts, `hideRow`
+does nothing): headers show it and follow custom layouts and `Point count`. Helpers for
+custom layouts: `placeRow(row, props...)`, `hideRow(props...)` — never call
+`setVisibility(false)` directly, it would run during the count — and `isShown(p)`.
+`getGuiProperties()` = visible `properties` + GUI-only ones. `PropertySection` is gone.
+Capacity (184 px = headers × 12 + rows × 18) is checked for every shape by
+`tools/harness/AccordionTest`: at most 8 rows in a section of a plain shape, 6 in Bridge.
 
 **GUI-only properties.** `Shape.addGuiOnly(p)` registers a property that gets widgets,
 layout and visibility handling but is **not** in `properties` and therefore never
@@ -412,9 +418,9 @@ keeps its rows in `properties` (they were appended before this existed and persi
 
 **Hidden properties.** `Shape.hideFromGui(p)` keeps a property in `properties` (persistence
 slot preserved) but out of `getGuiProperties()` and of the layout (`isShown` is false). Use
-it when a property becomes inert (Bridge `Sample step`). Requires the shape to have
-sections or a custom layout: the plain no-section loop in `onSelectedInGUI` is left
-untouched on purpose.
+it when a property becomes inert (Bridge `Sample step`) or moved out of the panel (the
+`Validate` rows of Cone, Spline and Bridge since E5: the Shape tab has a fixed Validate button).
+The default layout skips hidden properties too (it did not before E5).
 
 ### Variable point count (Spline pattern)
 
@@ -430,15 +436,18 @@ Override `onSelectedInGUI()` and call `setX`, `setY`, `setVisibility(true)` on e
 property yourself. Layout is independent of list order — this is how `ShapeSpline` shows
 15 point properties on 5 rows while keeping their persistence order. Row height is
 `Property.rowHeight` (18 since E4; it was `AbstractWidgetHandler.defaultSize`, 20, which still
-sizes the other widgets); base is `ShapeScreen.basePropertiesX/Y` (180, 42; 70 before E3). The Y is a
-compile-time constant, so `javac` inlines it into `Property` and `Shape`: a change shows up
-in their decompiled diff too.
+sizes the other widgets); base is `ShapeScreen.basePropertiesX/Y` (2, 76 since E5; 180, 42 in E3–E4); rows then
+start at `rowsTop`. Both are compile-time constants, so `javac` inlines them into `Property`
+and `Shape`: a change shows up in their decompiled diff too.
 
 ## Screens
 
-- `ShapeScreen` draws the left column (shape selector, origin) and calls
-  `addProperty(p)` for every property of the current shape; `BaseScreen.addProperty`
-  just adds the widgets. No scrolling exists.
+- `ShapeScreen` draws the left panel (x 0..188, E5): shape dropdown at y 42, then the
+  accordion from y 64 (12-px headers `> Name  N` / `v Name  N`, clicks through
+  `onMouseClicked`). The Origin section holds "Set origin" and compact X/Y/Z rows
+  (− · field · +, Enter applies; no Set buttons). It calls `addProperty(p)` for every
+  property of the current shape; `BaseScreen.addProperty` just adds the widgets. No
+  scrolling exists. The right side (x 192..480) is empty until E6.
 - `BaseScreen.shouldUpdatePersistence = true` marks state dirty; persistence is written
   on screen close when `config.persistenceEnabled` is on (off by default — enable it in
   the Configuration screen to test save/load).

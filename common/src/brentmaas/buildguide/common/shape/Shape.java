@@ -14,7 +14,6 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import brentmaas.buildguide.common.BuildGuide;
 import brentmaas.buildguide.common.property.Property;
-import brentmaas.buildguide.common.property.PropertySection;
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
 import brentmaas.buildguide.common.screen.BaseScreen;
 import brentmaas.buildguide.common.screen.ShapeScreen;
@@ -22,9 +21,18 @@ import brentmaas.buildguide.common.screen.widget.AbstractWidgetHandler;
 
 public abstract class Shape implements IValidatable {
 	public ArrayList<Property<?>> properties = new ArrayList<Property<?>>();
-	// Optional panel sections (see declareSection). The selector is UI state: not in `properties`, never persisted
-	private PropertySection sectionSelector = null;
+	// Panel sections (see declareSection), shown as accordion headers by ShapeScreen. UI state only:
+	// never persisted. A shape that declares none has one implicit section, "Properties"
+	private List<Translatable> sectionNames = new ArrayList<Translatable>();
 	private Map<Property<?>, Integer> propertySections = new IdentityHashMap<Property<?>, Integer>();
+	// Open accordion section, -1 = all closed. Per instance and transient: survives tab switches and
+	// the preview (same instance), resets on restart
+	private int openSection = 0;
+	// Top of the open section's rows, set by ShapeScreen from the header above it
+	private int rowsTop = ShapeScreen.basePropertiesY;
+	// Row-count pass (countRows): placeRow/hideRow only count, nothing moves or changes visibility
+	private boolean counting = false;
+	private int countingSection, countedRows;
 	// Properties that only exist for the panel (row owners, buttons): shown and laid out, never persisted
 	private List<Property<?>> guiOnlyProperties = new ArrayList<Property<?>>();
 	// Persisted properties that are no longer shown (kept in `properties` so saves stay aligned)
@@ -179,13 +187,52 @@ public abstract class Shape implements IValidatable {
 	}
 	
 	/**
-	 * Declares a panel section and returns its index. Properties assigned to a section are
-	 * shown only while it is selected; properties never assigned are shown in every section.
-	 * Shapes that declare no section keep the plain single-column layout.
+	 * Declares a panel section (an accordion header) and returns its index. Properties assigned
+	 * to a section are shown only while it is open; properties never assigned belong to section
+	 * 0. Shapes that declare no section get one implicit "Properties" section.
 	 */
 	protected int declareSection(Translatable name) {
-		if(sectionSelector == null) sectionSelector = new PropertySection(new Translatable("property.buildguide.section"), () -> onSelectedInGUI());
-		return sectionSelector.addSection(name);
+		sectionNames.add(name);
+		return sectionNames.size() - 1;
+	}
+
+	public int getSectionCount() {
+		return Math.max(1, sectionNames.size());
+	}
+
+	public Translatable getSectionName(int section) {
+		return sectionNames.isEmpty() ? new Translatable("property.buildguide.section.properties") : sectionNames.get(section);
+	}
+
+	public int getOpenSection() {
+		return openSection;
+	}
+
+	// Opens one section (closing the previous one) or closes all with -1, then lays the rows out again
+	public void setOpenSection(int section) {
+		openSection = section;
+		onSelectedInGUI();
+	}
+
+	public void setRowsTop(int y) {
+		rowsTop = y;
+	}
+
+	/**
+	 * Rows the given section takes when open: a dry run of onSelectedInGUI, so it follows custom
+	 * layouts (a point row is four properties on one row) and dynamic counts (Point count).
+	 * Moves nothing and changes no visibility.
+	 */
+	public int countRows(int section) {
+		counting = true;
+		countingSection = section;
+		countedRows = 0;
+		try {
+			onSelectedInGUI();
+		}finally {
+			counting = false;
+		}
+		return countedRows;
 	}
 	
 	protected void assignSection(int section, Property<?>... props) {
@@ -229,62 +276,56 @@ public abstract class Shape implements IValidatable {
 		if(changed) update();
 	}
 	
-	// Everything the screen must add as widgets: the persisted properties plus the section selector
+	// Everything the screen must add as widgets: the persisted properties that are not hidden plus the GUI-only ones
 	public List<Property<?>> getGuiProperties() {
-		if(sectionSelector == null && guiOnlyProperties.isEmpty() && hiddenProperties.isEmpty()) return properties;
+		if(guiOnlyProperties.isEmpty() && hiddenProperties.isEmpty()) return properties;
 		List<Property<?>> all = new ArrayList<Property<?>>();
 		for(Property<?> p: properties) if(!hiddenProperties.contains(p)) all.add(p);
 		all.addAll(guiOnlyProperties);
-		if(sectionSelector != null) all.add(sectionSelector);
 		return all;
 	}
-	
-	// True if the property belongs to the selected section or to no section
+
+	// True if the property is not hidden and belongs to the open section (the counted one during countRows)
 	protected boolean isShown(Property<?> p) {
 		if(hiddenProperties.contains(p)) return false;
 		Integer section = propertySections.get(p);
-		return section == null || sectionSelector == null || section == sectionSelector.value;
+		return (section == null ? 0 : section) == (counting ? countingSection : openSection);
 	}
-	
+
 	// Places all given properties on the same row and shows them; returns the next row
 	protected int placeRow(int row, Property<?>... props) {
+		if(counting) {
+			countedRows = Math.max(countedRows, row + 1);
+			return row + 1;
+		}
 		for(Property<?> p: props) {
 			p.setX(ShapeScreen.basePropertiesX);
-			p.setY(ShapeScreen.basePropertiesY + row * Property.rowHeight);
+			p.setY(rowsTop + row * Property.rowHeight);
 			p.setVisibility(true);
 		}
 		return row + 1;
 	}
-	
-	// Row 0 is the section selector when sections exist; returns the first row for properties
-	protected int placeSectionSelector() {
-		if(sectionSelector == null) return 0;
-		return placeRow(0, sectionSelector);
+
+	// Hides properties that are not laid out (a no-op during countRows)
+	protected void hideRow(Property<?>... props) {
+		if(counting) return;
+		for(Property<?> p: props) p.setVisibility(false);
 	}
-	
+
+	// Default layout: the open section's properties in list order, one per row
 	public void onSelectedInGUI() {
-		if(sectionSelector == null) {
-			for(int i = 0;i < properties.size();++i) {
-				properties.get(i).setX(ShapeScreen.basePropertiesX);
-				properties.get(i).setY(ShapeScreen.basePropertiesY + i * Property.rowHeight);
-				properties.get(i).setVisibility(true);
-			}
-			return;
-		}
-		
-		int row = placeSectionSelector();
+		int row = 0;
 		for(Property<?> p: properties) {
 			if(isShown(p)) row = placeRow(row, p);
-			else p.setVisibility(false);
+			else hideRow(p);
 		}
 	}
-	
+
 	public void onDeselectedInGUI() {
 		for(Property<?> p: properties) {
 			p.setVisibility(false);
 		}
 		for(Property<?> p: guiOnlyProperties) p.setVisibility(false);
-		if(sectionSelector != null) sectionSelector.setVisibility(false);
 	}
 	
 	public int getNumberOfBlocks() {

@@ -73,6 +73,8 @@ public class ShapeSpline extends Shape {
 		properties.add(propertyDiameter);
 		properties.add(propertyStepsPerSegment);
 		properties.add(propertyValidate);
+		// Validate lives in the Shape tab's fixed row (GUI redesign E5): kept here only so saves stay aligned
+		hideFromGui(propertyValidate);
 
 		PropertyCompactInt[][] points = {{p1x, p1y, p1z}, {p2x, p2y, p2z}, {p3x, p3y, p3z}, {p4x, p4y, p4z}, {p5x, p5y, p5z}};
 		for(int i = 0;i < maxPoints;++i) {
@@ -84,7 +86,7 @@ public class ShapeSpline extends Shape {
 		}
 		properties.add(propertyPointCount);
 		
-		// Panel sections: curve settings vs. control points; Validate stays visible in both
+		// Panel sections (accordion headers): curve settings vs. control points
 		int sectionShape = declareSection(new Translatable("property.buildguide.section.shape"));
 		int sectionPoints = declareSection(new Translatable("property.buildguide.section.points"));
 		assignSection(sectionShape, propertyDir, propertyDiameter, propertyStepsPerSegment);
@@ -109,15 +111,15 @@ public class ShapeSpline extends Shape {
 
 	/**
 	 * Custom layout: one row per point (X Y Z Set Pos) instead of three, and only the
-	 * first `Point count` rows. Rows: section selector, then either the curve settings or
-	 * (count + points), then Validate.
+	 * first `Point count` rows. Rows of the open section: either the curve settings or
+	 * (count + points).
 	 */
 	@Override
 	public void onSelectedInGUI() {
-		int row = placeSectionSelector();
+		int row = 0;
 		for(Property<?> p: new Property<?>[] {propertyDir, propertyDiameter, propertyStepsPerSegment, propertyPointCount}) {
 			if(isShown(p)) row = placeRow(row, p);
-			else p.setVisibility(false);
+			else hideRow(p);
 		}
 		Property<?>[] pointProps = {p1x, p1y, p1z, p2x, p2y, p2z, p3x, p3y, p3z, p4x, p4y, p4z, p5x, p5y, p5z};
 		for(int i = 0;i < maxPoints;++i) {
@@ -125,10 +127,9 @@ public class ShapeSpline extends Shape {
 			if(i < propertyPointCount.value && isShown(pointRows[i])) {
 				row = placeRow(row, rowProps);
 			}else {
-				for(Property<?> p: rowProps) p.setVisibility(false);
+				hideRow(rowProps);
 			}
 		}
-		row = placeRow(row, propertyValidate);
 	}
 	
 	protected void updateShape(IShapeBuffer buffer) throws InterruptedException {

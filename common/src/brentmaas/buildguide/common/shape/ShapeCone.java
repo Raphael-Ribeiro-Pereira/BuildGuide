@@ -49,6 +49,8 @@ public class ShapeCone extends Shape {
 		properties.add(propertyTaper);
 		properties.add(propertyLayerThickness);
 		properties.add(propertyValidate);
+		// Validate lives in the Shape tab's fixed row (GUI redesign E5): kept here only so saves stay aligned
+		hideFromGui(propertyValidate);
 	}
 
 	protected void updateShape(IShapeBuffer buffer) throws InterruptedException {
