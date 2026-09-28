@@ -34,13 +34,12 @@ public abstract class BaseScreen {
 	
 	private IButton buttonClose;
 	private ICheckboxRunnableButton buttonEnabled;
-	private IButton buttonBuildGuide = BuildGuide.widgetHandler.createButton(0, 20, 80, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.shape"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Shape)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Shape);
-	private IButton buttonVisualisation = BuildGuide.widgetHandler.createButton(80, 20, 80, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.visualisation"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Visualisation)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Visualisation);
-	private IButton buttonShapeList = BuildGuide.widgetHandler.createButton(160, 20, 80, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.shapelist"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Shapelist)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Shapelist);
-	private IButton buttonConfiguration = BuildGuide.widgetHandler.createButton(240, 20, 80, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.configuration"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Settings)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Settings);
-	// Six 80-px tabs (0..480, y 20..40) fill a 480-px GUI; the upstream four 120-px ones ended at 500
-	private IButton buttonExclusions = BuildGuide.widgetHandler.createButton(320, 20, 80, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.exclusions"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Exclusions)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Exclusions);
-	private IButton buttonValidation = BuildGuide.widgetHandler.createButton(400, 20, 80, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.validation"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Validation)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Validation);
+	private IButton buttonBuildGuide = BuildGuide.widgetHandler.createButton(0, 20, 96, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.shape"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Shape)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Shape);
+	private IButton buttonVisualisation = BuildGuide.widgetHandler.createButton(96, 20, 96, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.visualisation"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Visualisation)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Visualisation);
+	private IButton buttonShapeList = BuildGuide.widgetHandler.createButton(192, 20, 96, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.shapelist"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Shapelist)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Shapelist);
+	private IButton buttonConfiguration = BuildGuide.widgetHandler.createButton(288, 20, 96, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.configuration"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Settings)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Settings);
+	// Five 96-px tabs (0..480, y 20..40) fill a 480-px GUI (six of 80 until the Validation tab went in E6)
+	private IButton buttonExclusions = BuildGuide.widgetHandler.createButton(384, 20, 96, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.exclusions"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Exclusions)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Exclusions);
 	
 	public void init() {
 		// A screen object can be shown again (back from a dropdown or the preview): its properties are
@@ -48,7 +47,8 @@ public abstract class BaseScreen {
 		properties.clear();
 		// One-line header (GUI redesign E3): checkbox and close button in the corners of y 0..20
 		buttonClose =BuildGuide.widgetHandler.createButton(wrapper.getWidth() - AbstractWidgetHandler.defaultSize, 0, new Translatable("X"), () -> BuildGuide.screenHandler.showScreen(null));
-		buttonEnabled = BuildGuide.widgetHandler.createCheckbox(0, 0, new Translatable(""), BuildGuide.stateManager.getState().isEnabled(), false, () -> {
+		// Shape header (E6): the vanilla checkbox is 17 px, at x 2..19, y 1..18
+		buttonEnabled = BuildGuide.widgetHandler.createCheckbox(hasShapeHeader() ? 2 : 0, hasShapeHeader() ? 1 : 0, new Translatable(""), BuildGuide.stateManager.getState().isEnabled(), false, () -> {
 			BuildGuide.stateManager.getState().setEnabled(buttonEnabled.isCheckboxSelected());
 			BaseScreen.shouldUpdatePersistence = true;
 		});
@@ -60,12 +60,30 @@ public abstract class BaseScreen {
 		addWidget(buttonShapeList);
 		addWidget(buttonConfiguration);
 		addWidget(buttonExclusions);
-		addWidget(buttonValidation);
 		
 		BuildGuide.stateManager.getState().initCheck();
 	}
 	
 	public void render() {
+		if(!hasShapeHeader()) renderHeader();
+		for(Property<?> p: properties) {
+			p.render(this);
+		}
+		if(hasBottomBar()) renderBottomBar();
+	}
+
+	// Drawn before the widgets (render() comes after them): panel fills that widgets sit on, such as
+	// the preview's black area under the filter and slice controls (E6 fix)
+	public void renderBackground() {
+	}
+
+	// The Shape tab draws its own header row (GUI redesign E6: set selector, type, name, Save); the
+	// other tabs keep the E3 one. Only the Enabled checkbox and the close button are shared
+	protected boolean hasShapeHeader() {
+		return false;
+	}
+
+	private void renderHeader() {
 		// One-line header (D4): "Enabled", the title in the centre, the shape's block count ending just
 		// left of the title and the total starting just right of it (the x 64 + n breakdown is gone)
 		int centre = wrapper.getWidth() / 2, halfTitle = wrapper.getTextWidth(title.toString()) / 2;
@@ -74,11 +92,6 @@ public abstract class BaseScreen {
 		int n = BuildGuide.stateManager.getState().isShapeAvailable() ? BuildGuide.stateManager.getState().getCurrentShape().getNumberOfBlocks() : 0;
 		drawShadowRight(titleNumberOfBlocksShape + ": " + n, centre - halfTitle - headerGap, headerTextY, 0xFFFFFF);
 		drawShadowLeft(titleNumberOfBlocksTotal + ": " + BuildGuide.stateManager.getState().getNumberOfBlocks(), centre + halfTitle + headerGap, headerTextY, 0xFFFFFF);
-
-		for(Property<?> p: properties) {
-			p.render(this);
-		}
-		if(hasBottomBar()) renderBottomBar();
 	}
 	
 	// Screens that use y 250..270 themselves (dropdowns, preview, visualisation until E7) return false

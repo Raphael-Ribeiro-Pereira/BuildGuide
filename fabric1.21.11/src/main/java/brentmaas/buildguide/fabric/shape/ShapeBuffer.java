@@ -50,6 +50,11 @@ public class ShapeBuffer implements IShapeBuffer {
 	
 	public void end() {
 		MeshData meshData = bufferBuilder.build();
+		// null when nothing was pushed (a preview view that matches no cube): nothing to upload, render() draws nothing
+		if(meshData == null) {
+			indexCount = 0;
+			return;
+		}
 		vertexBuffer = RenderSystem.getDevice().createBuffer(() -> "Build Guide vertices", GpuBuffer.USAGE_VERTEX, meshData.vertexBuffer());
 		indexCount = meshData.drawState().indexCount();
 		indexBuffer = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS).getBuffer(indexCount);
@@ -68,6 +73,7 @@ public class ShapeBuffer implements IShapeBuffer {
 
 	// Any target (the 3D preview draws into its picture-in-picture texture) with an explicit model-view and pipeline
 	public void render(GpuTextureView colourTexture, GpuTextureView depthTexture, Matrix4fc modelView, RenderPipeline pipeline) {
+		if(vertexBuffer == null || indexCount == 0) return;
 		GpuBufferSlice dynamicTransforms = RenderSystem.getDynamicUniforms().writeTransform(modelView, new Vector4f(1.0f), new Vector3f(), new Matrix4f());
 		try (RenderPass renderPass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "Build Guide", colourTexture, OptionalInt.empty(), depthTexture, OptionalDouble.empty())) {
 			renderPass.setPipeline(pipeline);

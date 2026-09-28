@@ -4,12 +4,12 @@ import brentmaas.buildguide.common.shape.*;
 // GUI redesign E5: row counts of every accordion section of every shape, from the same dry run the
 // headers use (Shape.countRows). Any widget access would throw here (no widget handler outside the
 // game), so passing also proves the count pass moves nothing. Point counts are set to the maximum.
-// Capacity: the accordion is 184 px (y 64..248) = headers x 12 + open section rows x 18, and the
+// Capacity: the accordion is 206 px (y 42..248 since E6; 184 from y 64 in E5) = headers x 12 + open section rows x 18, and the
 // Origin section (4 rows) must fit too.
 public class AccordionTest {
 	static int fails = 0;
 	static void check(boolean c, String m){ System.out.println((c?"OK   ":"FAIL ")+m); if(!c) ++fails; }
-	static final int ACCORDION = 184, HEADER = 12, ORIGIN_ROWS = 4;
+	static final int ACCORDION = 206, HEADER = 12, ORIGIN_ROWS = 4;
 	static final Class<?>[] SHAPES = {ShapeCatenary.class, ShapeCircle.class, ShapeCone.class, ShapeCuboid.class, ShapeEllipse.class, ShapeEllipsoid.class, ShapeGrid.class, ShapeLine.class, ShapeParabola.class, ShapeParaboloid.class, ShapePolygon.class, ShapePolygonalPyramid.class, ShapeSphere.class, ShapeTorus.class, ShapeSpline.class, ShapeBridge.class};
 
 	public static void main(String[] a) throws Exception {

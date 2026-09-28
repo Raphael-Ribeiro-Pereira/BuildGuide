@@ -41,8 +41,9 @@ public class ScreenWrapper extends Screen implements IScreenWrapper {
 	
 	@Override
 	public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
-		super.render(guiGraphics, mouseX, mouseY, partialTicks);
 		guiGraphicsInstance = guiGraphics;
+		attachedScreen.renderBackground();
+		super.render(guiGraphics, mouseX, mouseY, partialTicks);
 		attachedScreen.render();
 	}
 	

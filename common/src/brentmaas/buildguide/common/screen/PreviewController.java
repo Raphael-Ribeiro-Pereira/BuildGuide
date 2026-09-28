@@ -3,6 +3,7 @@ package brentmaas.buildguide.common.screen;
 import java.util.function.LongSupplier;
 
 import brentmaas.buildguide.common.shape.PreviewCamera;
+import brentmaas.buildguide.common.shape.PreviewFilter;
 import brentmaas.buildguide.common.shape.PreviewModel;
 import brentmaas.buildguide.common.shape.Shape;
 import brentmaas.buildguide.common.shape.ValidationState;
@@ -34,6 +35,11 @@ public class PreviewController {
 	private long lastGeometry = 0, lastColour = 0;
 	// A left click started in a preview area and the button is still down
 	private boolean dragging = false;
+	// View shared by both previews (E6): filter and slice. The viewed model is cached so it stays the
+	// same instance until the base model or the view changes (the renderer rebuilds on a new instance)
+	private PreviewFilter filter = PreviewFilter.ALL;
+	private int sliceAxis = PreviewModel.SLICE_OFF, sliceValue = 0;
+	private PreviewModel viewed = null;
 
 	public PreviewController() {
 		this(System::currentTimeMillis);
@@ -73,7 +79,42 @@ public class PreviewController {
 			model = model.withValidation(state);
 			lastColour = now;
 		}
+		return view(model);
+	}
+
+	private PreviewModel view(PreviewModel base) {
+		if(base == null || (filter == PreviewFilter.ALL && sliceAxis == PreviewModel.SLICE_OFF)) return base;
+		if(viewed == null || viewed.positions != base.positions || viewed.stateVersion != base.stateVersion || viewed.generation != base.generation || viewed.filter != filter || viewed.sliceAxis != sliceAxis || viewed.sliceValue != sliceValue) {
+			viewed = base.withView(filter, sliceAxis, sliceValue);
+		}
+		return viewed;
+	}
+
+	// Latest model before the view is applied (bounds for the slice range); null when none
+	public PreviewModel getModel() {
 		return model;
+	}
+
+	public PreviewFilter getFilter() {
+		return filter;
+	}
+
+	public void setFilter(PreviewFilter filter) {
+		this.filter = filter;
+	}
+
+	public int getSliceAxis() {
+		return sliceAxis;
+	}
+
+	public int getSliceValue() {
+		return sliceValue;
+	}
+
+	// Axis 0 x, 1 y, 2 z or PreviewModel.SLICE_OFF; the value is a local coordinate on that axis
+	public void setSlice(int axis, int value) {
+		sliceAxis = axis;
+		sliceValue = value;
 	}
 
 	// A view takes over the preview: forget any drag another view left behind

@@ -15,10 +15,10 @@ import brentmaas.buildguide.common.shape.ValidationState;
 import brentmaas.buildguide.common.shape.ValidationState.NearBlock;
 
 /**
- * Error list of a shape, read from its live ValidationState, in any rectangle of any screen:
- * the Validation tab today, the right panel of the redesigned Shape screen later (GUI redesign
- * E6). Structure errors and Ignored list world coordinates and block names; Missing
- * (non-solid or empty guideline positions) shows only its count, last. Rebuilt when the state's
+ * Error list of a shape, read from its live ValidationState, in any rectangle of any screen (the
+ * right panel of the Shape screen since GUI redesign E6, where it replaced the Validation tab).
+ * One category at a time, chosen by the screen's tabs: structure errors (with block name and
+ * distance), missing positions, or ignored blocks (with name), in world coordinates. Rebuilt when the state's
  * version or the shape changes, at most every rebuildIntervalMillis. Clicking a row highlights
  * that position (ValidationState.setHighlightedPos, drawn by the world overlay); clicking it
  * again or a header clears it.
@@ -29,6 +29,17 @@ import brentmaas.buildguide.common.shape.ValidationState.NearBlock;
 public class ValidationListComponent {
 	public static final long rebuildIntervalMillis = 100;
 	public static final int rowHeight = 12;
+	
+	// Tabs of the Shape screen's list (GUI redesign E6): one category at a time, no headers
+	public static enum Category {
+		ERRORS("screen.buildguide.tab.errors"), MISSING("screen.buildguide.tab.missing"), IGNORED("screen.buildguide.tab.ignored");
+		
+		public final String translationKey;
+		
+		private Category(String translationKey) {
+			this.translationKey = translationKey;
+		}
+	}
 
 	// Same parameters as AbstractWidgetHandler.createSelectorList (note: left, right, top, bottom)
 	public interface ListFactory {
@@ -57,7 +68,8 @@ public class ValidationListComponent {
 	private long shownVersion = -1;
 	private long lastRebuild = 0;
 	private Shape shownShape = null;
-
+	private Category category = Category.ERRORS;
+	private int ox, oy, oz;
 	public ValidationListComponent() {
 		// The lambda defers the widget handler lookup to init(), when the loader has registered it
 		this(System::currentTimeMillis, (left, right, top, bottom, slotHeight, titles, current, callback) -> BuildGuide.widgetHandler.createSelectorList(left, right, top, bottom, slotHeight, titles, current, callback));
@@ -75,7 +87,10 @@ public class ValidationListComponent {
 	 */
 	public ISelectorList init(int x1, int y1, int x2, int y2, Shape shape, int ox, int oy, int oz) {
 		this.shape = shape;
-		Entries entries = buildEntries(shape, ox, oy, oz);
+		this.ox = ox;
+		this.oy = oy;
+		this.oz = oz;
+		Entries entries = buildEntries(shape, ox, oy, oz, category);
 		rowPositions = entries.positions;
 		list = factory.create(x1, x2, y1, y2, rowHeight, entries.titles, 0, this::click);
 		return list;
@@ -84,14 +99,32 @@ public class ValidationListComponent {
 	public ISelectorList getList() {
 		return list;
 	}
+	
+	public Category getCategory() {
+		return category;
+	}
+	
+	// Switch tab: the rows are rebuilt at once
+	public void setCategory(Category category) {
+		this.category = category;
+		Entries entries = buildEntries(shape, ox, oy, oz, category);
+		rowPositions = entries.positions;
+		shownVersion = entries.version;
+		shownShape = shape;
+		lastRebuild = clock.getAsLong();
+		if(list != null) list.setEntries(entries.titles);
+	}
 
 	// Every frame: rebuild the rows when the state or the shape changed, at most every rebuildIntervalMillis
 	public void update(Shape shape, int ox, int oy, int oz) {
 		this.shape = shape;
+		this.ox = ox;
+		this.oy = oy;
+		this.oz = oz;
 		long version = shape != null ? shape.getValidationState().getVersion() : -1;
 		long now = clock.getAsLong();
 		if((version != shownVersion || shape != shownShape) && now - lastRebuild >= rebuildIntervalMillis) {
-			Entries entries = buildEntries(shape, ox, oy, oz);
+			Entries entries = buildEntries(shape, ox, oy, oz, category);
 			rowPositions = entries.positions;
 			shownVersion = entries.version;
 			shownShape = shape;
@@ -108,8 +141,22 @@ public class ValidationListComponent {
 		state.setHighlightedPos(pos == state.getHighlightedPos() ? -1 : pos);
 	}
 
-	// The rows for a shape (null = none) whose set has its origin at (ox, oy, oz). Pure: no widgets, no loader
-	public static Entries buildEntries(Shape shape, int ox, int oy, int oz) {
+	/**
+	 * Tab counts {errors, missing, ignored}, or null when there is no shape or it is not validated.
+	 * Missing excludes the ignored positions, like the combined list's header.
+	 */
+	public static int[] counts(Shape shape) {
+		if(shape == null || !shape.getValidationState().isValidated()) return null;
+		ValidationState state = shape.getValidationState();
+		return new int[] {state.getNearCount(), state.getMissing() - state.getIgnored(), state.getIgnored()};
+	}
+	
+	/**
+	 * The rows of one tab for a shape (null = none) whose set has its origin at (ox, oy, oz): its
+	 * positions in world coordinates, sorted, no header; one "None" row when empty, one message
+	 * row without a shape or before validation. Pure: no widgets, no loader
+	 */
+	public static Entries buildEntries(Shape shape, int ox, int oy, int oz, Category category) {
 		List<Translatable> titles = new ArrayList<Translatable>();
 		List<Long> positions = new ArrayList<Long>();
 		if(shape == null) {
@@ -123,28 +170,28 @@ public class ValidationListComponent {
 			positions.add(-1L);
 			return new Entries(titles, positions, state.getVersion());
 		}
-
-		// Most actionable first: structure errors, then ignored blocks, then the missing count
-		List<NearBlock> errors = state.getNearBlocks();
-		errors.sort(Comparator.comparingInt((NearBlock nb) -> LocalPos.unpackX(nb.localPos)).thenComparingInt(nb -> LocalPos.unpackY(nb.localPos)).thenComparingInt(nb -> LocalPos.unpackZ(nb.localPos)));
-		header(titles, positions, "screen.buildguide.errors.structure", errors.size());
-		for(NearBlock nb: errors) row(titles, positions, nb.localPos, ox, oy, oz, nb.blockName, String.format(Locale.ROOT, "%.1f", nb.distance));
-
-		List<Long> ignored = sortedByPosition(state.getPositions(ValidationState.IGNORED));
-		header(titles, positions, "screen.buildguide.errors.ignored", ignored.size());
-		for(long pos: ignored) row(titles, positions, pos, ox, oy, oz, state.getIgnoredBlockName(pos), null);
-
-		header(titles, positions, "screen.buildguide.errors.missing", state.getMissing() - state.getIgnored());
+		if(category == Category.ERRORS) {
+			List<NearBlock> errors = state.getNearBlocks();
+			errors.sort(Comparator.comparingInt((NearBlock nb) -> LocalPos.unpackX(nb.localPos)).thenComparingInt(nb -> LocalPos.unpackY(nb.localPos)).thenComparingInt(nb -> LocalPos.unpackZ(nb.localPos)));
+			for(NearBlock nb: errors) row(titles, positions, nb.localPos, ox, oy, oz, nb.blockName, String.format(Locale.ROOT, "%.1f", nb.distance));
+		}else if(category == Category.IGNORED) {
+			for(long pos: sortedByPosition(state.getPositions(ValidationState.IGNORED))) row(titles, positions, pos, ox, oy, oz, state.getIgnoredBlockName(pos), null);
+		}else {
+			// Missing: where a block still has to go; no block name (air or a non-solid block)
+			for(long pos: sortedByPosition(state.getPositions(ValidationState.MISSING))) {
+				titles.add(new Translatable("[" + (ox + LocalPos.unpackX(pos)) + ", " + (oy + LocalPos.unpackY(pos)) + ", " + (oz + LocalPos.unpackZ(pos)) + "]"));
+				positions.add(pos);
+			}
+		}
+		if(titles.isEmpty()) {
+			titles.add(new Translatable("screen.buildguide.errors.none"));
+			positions.add(-1L);
+		}
 		return new Entries(titles, positions, state.getVersion());
 	}
-
-	private static void header(List<Translatable> titles, List<Long> positions, String key, int count) {
-		titles.add(new Translatable(key, "" + count));
-		positions.add(-1L);
-	}
-
+	
 	private static void row(List<Translatable> titles, List<Long> positions, long pos, int ox, int oy, int oz, String blockName, String distance) {
-		String text = "  [" + (ox + LocalPos.unpackX(pos)) + ", " + (oy + LocalPos.unpackY(pos)) + ", " + (oz + LocalPos.unpackZ(pos)) + "] " + (blockName != null ? blockName : "?");
+		String text = "[" + (ox + LocalPos.unpackX(pos)) + ", " + (oy + LocalPos.unpackY(pos)) + ", " + (oz + LocalPos.unpackZ(pos)) + "] " + (blockName != null ? blockName : "?");
 		if(distance != null) text += " (d=" + distance + ")";
 		titles.add(new Translatable(text));
 		positions.add(pos);

@@ -6,6 +6,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
+import java.util.Map;
 import java.util.Random;
 import java.util.Scanner;
 
@@ -13,9 +15,9 @@ import brentmaas.buildguide.common.screen.BaseScreen;
 import brentmaas.buildguide.common.screen.ConfigurationScreen;
 import brentmaas.buildguide.common.screen.ExclusionScreen;
 import brentmaas.buildguide.common.screen.PreviewController;
-import brentmaas.buildguide.common.screen.ValidationScreen;
 import brentmaas.buildguide.common.screen.ShapeScreen;
 import brentmaas.buildguide.common.screen.ShapelistScreen;
+import brentmaas.buildguide.common.screen.ValidationListComponent;
 import brentmaas.buildguide.common.screen.VisualisationScreen;
 import brentmaas.buildguide.common.shape.Shape;
 import brentmaas.buildguide.common.shape.ShapeCircle;
@@ -45,6 +47,12 @@ public class State {
 	// Origin section of the Shape tab's accordion is open (GUI redesign E5). Transient, here because
 	// ShapeScreen is rebuilt on every tab switch; the shapes keep their own open section
 	public boolean originOpen = false;
+	// Instance names typed in the Shape tab's header (E6). In memory only: not written by
+	// savePersistence yet (E7 saves them); a set without an entry shows "Type #N"
+	public final Map<ShapeSet, String> shapeSetNames = new IdentityHashMap<ShapeSet, String>();
+	// Tab of the Shape screen's error list the user picked (transient); null = automatic: Errors when
+	// there are structure errors, Missing otherwise
+	public ValidationListComponent.Category listTab = null;
 	
 	public BaseScreen createNewScreen(ActiveScreen newActiveScreen) {
 		currentScreen = newActiveScreen;
@@ -61,8 +69,6 @@ public class State {
 			return new ConfigurationScreen();
 		case Exclusions:
 			return new ExclusionScreen();
-		case Validation:
-			return new ValidationScreen();
 		case Shape:
 		default:
 			return new ShapeScreen();
@@ -299,7 +305,6 @@ public class State {
 		Visualisation,
 		Shapelist,
 		Settings,
-		Exclusions,
-		Validation
+		Exclusions
 	}
 }

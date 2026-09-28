@@ -13,11 +13,12 @@ public class PreviewMesh {
 	public static void fill(IShapeBuffer target, PreviewModel model) {
 		FaceShadedBuffer shaded = new FaceShadedBuffer(target);
 		for(int i = 0;i < model.positions.length;++i) {
+			if(!model.shows(i)) continue; // filter and slice (E6)
 			setColour(shaded, model.colourAt(i));
 			pushCube(shaded, model.positions[i]);
 		}
 		setColour(shaded, PreviewColours.ERROR);
-		for(long pos: model.errors) pushCube(shaded, pos);
+		for(long pos: model.errors) if(model.showsError(pos)) pushCube(shaded, pos);
 	}
 
 	private static void setColour(IShapeBuffer buffer, int rgb) {

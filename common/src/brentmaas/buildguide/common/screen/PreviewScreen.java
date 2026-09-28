@@ -29,6 +29,7 @@ public class PreviewScreen extends BaseScreen {
 	private Translatable textHint = new Translatable("screen.buildguide.previewhint");
 	private Translatable textGenerating = new Translatable("screen.buildguide.previewgenerating");
 	private Translatable textEmpty = new Translatable("screen.buildguide.previewempty");
+	private Translatable textNoMatch = new Translatable("screen.buildguide.previewnomatch");
 
 	public PreviewScreen(BaseScreen parent) {
 		this.parent = parent;
@@ -60,6 +61,7 @@ public class PreviewScreen extends BaseScreen {
 		int midY = (areaY1() + areaY2()) / 2 - 4;
 		if(model == null) drawShadowCentred(textGenerating.toString(), (x1 + x2) / 2, midY, 0xAAAAAA);
 		else if(model.isEmpty()) drawShadowCentred(textEmpty.toString(), (x1 + x2) / 2, midY, 0xAAAAAA);
+		else if(model.isViewEmpty()) drawShadowCentred(textNoMatch.toString(), (x1 + x2) / 2, midY, 0xAAAAAA);
 		else wrapper.drawShapePreview(x1, areaY1(), x2, areaY2(), model, preview.camera);
 	}
 

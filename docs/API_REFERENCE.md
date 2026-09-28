@@ -158,7 +158,15 @@ it now carries a `version` counter bumped on every mutation (`getVersion()`), pe
 transitions, so `getPositions(IGNORED)` is O(k) in a deterministic, stable insertion order;
 other statuses still scan the map) and a `highlightedPos` (−1 = none).
 
-- *List*: `ValidationScreen`, sixth top-bar tab (tabs are six 80-px buttons, x 0..480 at y 20..40 since E3;
+- *List*: since GUI redesign E6 the error list is in the Shape tab's right panel (x 192..480,
+  y 193..250) under three tabs **Errors / Missing / Ignored** (`ValidationListComponent.Category`,
+  default Errors; `State.listTab` keeps the user's pick, transient). The Validation tab,
+  `ValidationScreen` and `ActiveScreen.Validation` are gone; the combined list with headers is
+  gone too. `counts(shape)` = `{nearCount, missing − ignored, ignored}` (null before validation)
+  for the tab labels; `buildEntries(shape, ox, oy, oz, category)` returns only that tab's rows,
+  a "None" row (no position) when empty; `setCategory` rebuilds at once. Clicking a row
+  without a position clears the highlight. History below (2.4–E5) for context.
+  Until E6: `ValidationScreen`, sixth top-bar tab (tabs were six 80-px buttons, x 0..480 at y 20..40 since E3;
   "Configuration" is the tightest at 67 px + 8 padding). One `ISelectorList` (the existing
   Fabric `ObjectSelectionList`, given a new `setEntries(List<Translatable>)` that keeps the
   scroll position). Since 2.5 the headers are, most actionable first: `Structure errors (n)`,
@@ -436,18 +444,36 @@ Override `onSelectedInGUI()` and call `setX`, `setY`, `setVisibility(true)` on e
 property yourself. Layout is independent of list order — this is how `ShapeSpline` shows
 15 point properties on 5 rows while keeping their persistence order. Row height is
 `Property.rowHeight` (18 since E4; it was `AbstractWidgetHandler.defaultSize`, 20, which still
-sizes the other widgets); base is `ShapeScreen.basePropertiesX/Y` (2, 76 since E5; 180, 42 in E3–E4); rows then
+sizes the other widgets); base is `ShapeScreen.basePropertiesX/Y` (2, 54 since E6; 2, 76 in E5; 180, 42 in E3–E4); rows then
 start at `rowsTop`. Both are compile-time constants, so `javac` inlines them into `Property`
 and `Shape`: a change shows up in their decompiled diff too.
 
 ## Screens
 
-- `ShapeScreen` draws the left panel (x 0..188, E5): shape dropdown at y 42, then the
-  accordion from y 64 (12-px headers `> Name  N` / `v Name  N`, clicks through
+- `ShapeScreen` draws the left panel (x 0..188, E5): the accordion from y 42 since E6 (the
+  shape dropdown moved to the header; 12-px headers `> Name  N` / `v Name  N`, clicks through
   `onMouseClicked`). The Origin section holds "Set origin" and compact X/Y/Z rows
   (− · field · +, Enter applies; no Set buttons). It calls `addProperty(p)` for every
   property of the current shape; `BaseScreen.addProperty` just adds the widgets. No
-  scrolling exists. The right side (x 192..480) is empty until E6.
+  scrolling exists.
+- **Shape header (E6).** `hasShapeHeader()` (false by default) replaces the E3 header on the
+  Shape tab only: checkbox 2..19 (17 px, y 1), set selector `<` N/Total `>` 22..78
+  (`switchShapeSet`), type dropdown 80..160, instance name 164..width − 68 (a label; the first
+  click shows a text field, the second focuses it, R11; Enter applies; names live in
+  `State.shapeSetNames`, in memory only until E7, default "Type #N"), Save at width − 64
+  (40 px, clickable placeholder that does nothing until E7), close X.
+- **Right panel (E6),** x 192..width: preview y 40..175 (filter and slice controls at y 42,
+  `+` at the top right opens the full-screen `PreviewScreen`, hint at the bottom), a 2-px
+  progress line at 175, list tabs 177..193, the list 193..250, legend at y 250..270
+  (built / errors / ignored / missing, 72 px each, colours from `PreviewColours`). Bottom row:
+  Validate 2..92 and Reset 96..186 (90 px); the Preview button and the bottom bar are gone on
+  this tab (`hasBottomBar()` false).
+- **Background hook (E6 fix).** `BaseScreen.renderBackground()` (no-op by default) is called
+  by the Fabric `ScreenWrapper` **before** the widgets; `render()` runs after them. Fills that
+  widgets sit on go there (the preview's frame and black area), or they paint over the widgets.
+- **Absolute layout (R13).** Every position is in the 480 × 270 design space; only a few
+  right edges follow `wrapper.getWidth()`. At GUI scale 3 (640 × 360) the window has an empty
+  band at the bottom; E7 anchors to the height.
 - `BaseScreen.shouldUpdatePersistence = true` marks state dirty; persistence is written
   on screen close when `config.persistenceEnabled` is on (off by default — enable it in
   the Configuration screen to test save/load).
@@ -467,11 +493,9 @@ and `Shape`: a change shows up in their decompiled diff too.
 - **Layout bands** (GUI redesign E3, design size 480 × 270): header y 0..20 (Enabled
   checkbox at 0,0; "Enabled", `Blocks: N`, title, `Total: N` on one line at
   `BaseScreen.headerTextY` 6, counters `headerGap` 10 px from the title; close X at
-  width − 20), tabs 20..40, content 40..250 (section titles at y 42), bottom bar 250..270.
-- `ShapeScreen` fixed row at y 250: `Validate` 5..83, `Reset` 87..165, `Preview` 169..247
-  (three 78-px buttons, left of the bottom bar at 251; `Button.Plain` draws only inside its
-  rectangle, so they never cover the bar). Preview is inactive only
-  when there is no shape set (`State.isShapeAvailable()`), not while a shape generates.
+  width − 20), tabs 20..40 (five 96-px tabs since E6: Shape, Visualisation, Shape list,
+  Configuration, Exclusions), content 40..250 (section titles at y 42), bottom bar 250..270
+  on the tabs that keep it (not Shape since E6).
 
 ### 3D preview (Step 0)
 
@@ -534,8 +558,24 @@ A panel over the GUI showing the shape selected when it opened, coloured by vali
   screen at a time, and `attach()` (called in the screen's `init`) drops a drag another view
   left. Injectable clock (`PreviewController(LongSupplier)`) for tests. Measured, sphere r=50
   (30,978 blocks): snapshot 4.8 ms, colour snapshot 1.5 ms, mesh fill 4.7 ms CPU.
+- **View: filter and slice (E6).** `PreviewFilter` ALL / ERRORS / MISSING / BUILT /
+  UNVALIDATED (`showsStatus`, `showsErrors`, `next`). `PreviewModel.withView(filter,
+  sliceAxis, sliceValue)` is a new instance sharing positions and bounds (framing does not
+  move); `SLICE_OFF` = −1, axes 0 x / 1 y / 2 z; `shows(i)`, `showsError(pos)`,
+  `min/max(axis)` for the slider range. `PreviewMesh.fill` skips what the view hides.
+  `PreviewController.setFilter/setSlice`; `update()` returns the view, cached as one instance
+  until the base model, filter or slice changes (the renderer rebuilds the mesh on identity,
+  so never per frame); `getModel()` is the unfiltered one. The slice slider is the plain
+  `ISlider`, read every frame (R12).
+- **Empty view (E6 fix).** A view can match no cube (ERRORS without errors, a slice on an
+  empty layer) while the model has positions. `PreviewModel.isViewEmpty()` (computed once per
+  instance): both preview screens then show "Nothing matches the filter" and never submit the
+  3D view. `BufferBuilder.build()` returns **null** when no vertex was pushed; `ShapeBuffer.end()`
+  now keeps `indexCount` 0 and `render()` draws nothing in that case (it crashed with an NPE
+  before). The world paths never build an empty buffer (the origin cube; the overlay only when
+  `hasContent`).
 - Harness: `PreviewTest`, `PreviewColourTest`, `PreviewCameraTest`, `GenerationTest`,
-  `PreviewControllerTest`.
+  `PreviewControllerTest`, `PreviewViewTest`.
 
 ## Translation
 
@@ -553,4 +593,8 @@ Etapa 2.3 added `config.buildguide.ignoredBlocks(+Comment)`, `screen.buildguide.
 `exclusionbox`, `exclusionshint`; Etapa 2.4 added `screen.buildguide.errors.{missing,wrong,ignored,near}`,
 `highlighterrors`, `notvalidated`, `novalidation`; Etapa 2.5 added `screen.buildguide.errors.structure`
 and removed `errors.wrong` and `errors.near`; Step 0 (preview) added `screen.buildguide.preview`,
-`previewhint`, `previewgenerating`, `previewempty`.
+`previewhint`, `previewgenerating`, `previewempty`; GUI redesign E6 added `screen.buildguide.save`,
+`previewhintinline`, `previewnomatch`, `filter.{all,errors,missing,built,unvalidated}`, `slice`,
+`slice.off`, `tab.{errors,missing,ignored}`, `errors.none`, `legend.{built,errors,ignored,missing}`
+and removed `screen.buildguide.validation`, `errors.structure`, `errors.ignored`, `errors.missing`
+(E5 had removed `property.buildguide.section`).
