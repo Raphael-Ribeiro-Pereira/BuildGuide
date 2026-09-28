@@ -30,8 +30,9 @@ java  -cp "$CLASSES;$OUT" PreviewCameraTest # preview camera: drag, clamps, zoom
 java  -cp "$CLASSES;$OUT" GenerationTest    # Shape.generation only on success, snapshot refuses errors (10 asserts)
 java  -cp "$CLASSES;$OUT" PreviewControllerTest # refresh throttles, shape switch, shared camera, input (25 asserts)
 java  -cp "$CLASSES;$OUT" ValidationListTest # error list tabs (Errors/Missing/Ignored), counts, debounce, tab switch, click/highlight (28 asserts)
-java  -cp "$CLASSES;$OUT" AccordionTest     # accordion rows per section, every shape, vs capacity (33 asserts)
+java  -cp "$CLASSES;$OUT" AccordionTest     # accordion rows per section, every shape, vs capacity at 270 and 360 px (50 asserts)
 java  -cp "$CLASSES;$OUT" PreviewViewTest   # preview filter and slice through PreviewMesh, view cache, empty view (25 asserts)
+java  -cp "$CLASSES;$OUT" ShapeLayoutTest   # E7 Shape-tab bands from the height (= E6 at 270), D1 minimum check (17 asserts)
 ```
 
 `CentreTest`, `Step4Test`, `BaseSetTest` are the Step 3/4 and 2.2c checks;

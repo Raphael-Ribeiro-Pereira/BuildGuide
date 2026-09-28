@@ -22,8 +22,9 @@ public abstract class BaseScreen {
 	// Layout bands (GUI redesign E3, design size 480 x 270): header y 0..20, tabs 20..40,
 	// content 40..250, bottom bar 250..270 on the tabs that have one
 	public static final int headerTextY = 6, headerGap = 10;
-	// Bottom bar: validation progress right of the Shape tab's buttons (they end at x 247)
-	public static final int barX1 = 251, barX2 = 400, barY1 = 252, barY2 = 258, barTextY = 260;
+	// Bottom bar: validation progress at x 251..400 on the tabs that keep it. Its rows follow the bottom
+	// edge (E7): bar h - 18..h - 12, text at h - 10 (252, 258, 260 at the minimum height 270)
+	public static final int barX1 = 251, barX2 = 400;
 	
 	protected Translatable title = new Translatable("screen.buildguide.title");
 	protected Translatable titleNumberOfBlocksShape = new Translatable("screen.buildguide.numberofblocksshape");
@@ -72,6 +73,44 @@ public abstract class BaseScreen {
 		if(hasBottomBar()) renderBottomBar();
 	}
 
+	// Below the design minimum (GUI redesign E7, D1 option a): no cut layout, only a message and the
+	// close button. The loader calls initChecked / renderBackgroundChecked / renderChecked and skips the
+	// input hooks while isTooSmall(), so Escape and X always close. Re-checked on every init, which
+	// also runs on a resize or a GUI scale change
+	private boolean tooSmall = false;
+	private Translatable textTooSmallHint = new Translatable("screen.buildguide.toosmall.hint");
+
+	public static boolean fitsMinimum(int width, int height) {
+		return width >= ShapeLayout.minWidth && height >= ShapeLayout.minHeight;
+	}
+
+	public boolean isTooSmall() {
+		return tooSmall;
+	}
+
+	public void initChecked() {
+		tooSmall = !fitsMinimum(wrapper.getWidth(), wrapper.getHeight());
+		if(!tooSmall) {
+			init();
+			return;
+		}
+		properties.clear();
+		addWidget(BuildGuide.widgetHandler.createButton(wrapper.getWidth() - AbstractWidgetHandler.defaultSize, 0, new Translatable("X"), () -> BuildGuide.screenHandler.showScreen(null)));
+	}
+
+	public void renderBackgroundChecked() {
+		if(!tooSmall) renderBackground();
+	}
+
+	public void renderChecked() {
+		if(!tooSmall) {
+			render();
+			return;
+		}
+		int x = wrapper.getWidth() / 2, y = wrapper.getHeight() / 2 - 10;
+		drawShadowCentred(new Translatable("screen.buildguide.toosmall", "" + ShapeLayout.minWidth, "" + ShapeLayout.minHeight, "" + wrapper.getWidth(), "" + wrapper.getHeight()).toString(), x, y, 0xFFFFFF);
+		drawShadowCentred(textTooSmallHint.toString(), x, y + 12, 0xAAAAAA);
+	}
 	// Drawn before the widgets (render() comes after them): panel fills that widgets sit on, such as
 	// the preview's black area under the filter and slice controls (E6 fix)
 	public void renderBackground() {
@@ -94,7 +133,7 @@ public abstract class BaseScreen {
 		drawShadowLeft(titleNumberOfBlocksTotal + ": " + BuildGuide.stateManager.getState().getNumberOfBlocks(), centre + halfTitle + headerGap, headerTextY, 0xFFFFFF);
 	}
 	
-	// Screens that use y 250..270 themselves (dropdowns, preview, visualisation until E7) return false
+	// Screens that use the bottom band themselves (Shape tab, dropdowns, preview) return false
 	protected boolean hasBottomBar() {
 		return true;
 	}
@@ -102,6 +141,7 @@ public abstract class BaseScreen {
 	// Validation progress of the current shape (moved from ShapeScreen, GUI redesign E3): bar and
 	// "ok / total (p%)" text. Never scanned shows "- / total" (the total is known from the expected blocks)
 	private void renderBottomBar() {
+		int h = wrapper.getHeight(), barY1 = h - 18, barY2 = h - 12, barTextY = h - 10;
 		if(!BuildGuide.stateManager.getState().isShapeAvailable()) {
 			drawShadowLeft("-", barX1, barTextY, 0x888888);
 			return;

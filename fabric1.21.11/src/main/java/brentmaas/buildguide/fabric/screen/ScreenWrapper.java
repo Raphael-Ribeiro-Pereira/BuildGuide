@@ -36,15 +36,15 @@ public class ScreenWrapper extends Screen implements IScreenWrapper {
 	@Override
 	public void init() {
 		super.init();
-		attachedScreen.init();
+		attachedScreen.initChecked();
 	}
 	
 	@Override
 	public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
 		guiGraphicsInstance = guiGraphics;
-		attachedScreen.renderBackground();
+		attachedScreen.renderBackgroundChecked();
 		super.render(guiGraphics, mouseX, mouseY, partialTicks);
-		attachedScreen.render();
+		attachedScreen.renderChecked();
 	}
 	
 	@Override
@@ -59,19 +59,21 @@ public class ScreenWrapper extends Screen implements IScreenWrapper {
 	
 	@Override
 	public boolean keyPressed(KeyEvent event) {
-		if(event.isEscape() && attachedScreen.onEscape()) return true;
+		if(event.isEscape() && !attachedScreen.isTooSmall() && attachedScreen.onEscape()) return true;
 		return super.keyPressed(event);
 	}
 	
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
 		if(super.mouseClicked(event, doubleClick)) return true;
+		if(attachedScreen.isTooSmall()) return false; // only the message and X (D1)
 		return attachedScreen.onMouseClicked(event.x(), event.y(), event.button(), doubleClick);
 	}
 	
 	@Override
 	public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
 		if(super.mouseDragged(event, dragX, dragY)) return true;
+		if(attachedScreen.isTooSmall()) return false;
 		return attachedScreen.onMouseDragged(dragX, dragY);
 	}
 	
@@ -85,6 +87,7 @@ public class ScreenWrapper extends Screen implements IScreenWrapper {
 	@Override
 	public boolean mouseScrolled(double x, double y, double scrollX, double scrollY) {
 		if(super.mouseScrolled(x, y, scrollX, scrollY)) return true;
+		if(attachedScreen.isTooSmall()) return false;
 		return attachedScreen.onMouseScrolled(x, y, scrollY);
 	}
 	

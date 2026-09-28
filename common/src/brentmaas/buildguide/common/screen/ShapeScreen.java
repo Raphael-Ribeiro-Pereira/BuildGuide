@@ -51,16 +51,16 @@ public class ShapeScreen extends BaseScreen{
 	// properties shown right now, i.e. the open accordion section; nothing while Origin or no section
 	// is open; control points are protected by the shapes themselves): the bottom row of the left
 	// panel, two 90-px buttons at x 2..92 and 96..186 (the Preview button went with the inline preview, E6)
-	private IButton buttonValidate = BuildGuide.widgetHandler.createButton(2, 250, 90, AbstractWidgetHandler.defaultSize, new Translatable("property.buildguide.validate"), () -> {
+	private IButton buttonValidate = BuildGuide.widgetHandler.createButton(2, ShapeLayout.minHeight - 20, 90, AbstractWidgetHandler.defaultSize, new Translatable("property.buildguide.validate"), () -> {
 		if(BuildGuide.stateManager.getState().isShapeAvailable()) BuildGuide.stateManager.getState().getCurrentShape().triggerValidation();
 	});
-	private IButton buttonReset = BuildGuide.widgetHandler.createButton(96, 250, 90, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.reset"), () -> {
+	private IButton buttonReset = BuildGuide.widgetHandler.createButton(96, ShapeLayout.minHeight - 20, 90, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.reset"), () -> {
 		if(BuildGuide.stateManager.getState().isShapeAvailable()) BuildGuide.stateManager.getState().getCurrentShape().resetShownToDefaults();
 	});
 	// Right panel (E6), x 192..480: inline preview in y 40..175. Top row (y 42..60) for the filter and
 	// slice controls, then the 3D area, then a hint line. The "+" in the corner opens the full-size
 	// PreviewScreen; both views share the State's PreviewController (model, camera, input, D5)
-	public static final int rightX = 192, previewTop = 40, previewBottom = 175, previewControlsHeight = 20, previewHintHeight = 12, expandSize = 12;
+	public static final int rightX = 192, previewTop = 40, previewControlsHeight = 20, previewHintHeight = 12, expandSize = 12;
 	private final PreviewController preview = BuildGuide.stateManager.getState().preview;
 	private IButton buttonPreviewExpand;
 	// Preview controls (top row): filter (cycles on click), slice axis (Off, X, Y, Z) and, when an axis
@@ -70,16 +70,23 @@ public class ShapeScreen extends BaseScreen{
 	private IButton buttonFilter, buttonSliceAxis;
 	private ISlider sliderSlice = null;
 	private static final String[] axisNames = {"X", "Y", "Z"};
-	// Under the preview: a 2-px validation progress line (y 175..177), three tabs (177..193) and the
-	// error list of the selected tab (193..250). Replaces the bottom bar's progress on this screen
-	public static final int progressTop = 175, tabsTop = 177, tabsBottom = 193, listBottom = 250;
+	// Under the preview: a 2-px validation progress line, three tabs and the error list of the selected
+	// tab (at the minimum height 175..177, 177..193, 193..250). Replaces the bottom bar's progress on this
+	// screen. Vertical bands from the GUI height (E7): computed in init, 270 until then
+	private ShapeLayout bands = new ShapeLayout(ShapeLayout.minHeight);
 	private final ValidationListComponent errorList = new ValidationListComponent();
 	private Translatable textPreviewHint = new Translatable("screen.buildguide.previewhintinline");
 	private Translatable textGenerating = new Translatable("screen.buildguide.previewgenerating");
 	private Translatable textEmpty = new Translatable("screen.buildguide.previewempty");
 	private Translatable textNoMatch = new Translatable("screen.buildguide.previewnomatch");
-		public void init() {
+
+	public void init() {
 		super.init();
+		// Init runs again on a resize or a GUI scale change (Screen.resize -> rebuildWidgets): widgets
+		// kept as fields are the same objects, so the ones placed from the height move here
+		bands = new ShapeLayout(wrapper.getHeight());
+		buttonValidate.setYPosition(bands.bottomRowY);
+		buttonReset.setYPosition(bands.bottomRowY);
 		// Save is a placeholder until E7 (it will write the set, its name included): clickable, does nothing
 		buttonSave = BuildGuide.widgetHandler.createButton(wrapper.getWidth() - 64, 0, saveWidth, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.save"), () -> {});
 		// Instance name: a label; clicking it shows this field, Enter stores the name and hides it again
@@ -133,7 +140,7 @@ public class ShapeScreen extends BaseScreen{
 		addWidget(buttonPreviewExpand);
 		initPreviewControls();
 		errorList.setCategory(initialTab());
-		errorList.init(rightX, tabsBottom, wrapper.getWidth(), listBottom, currentShapeOrNull(), originX(), originY(), originZ());
+		errorList.init(rightX, bands.tabsBottom, wrapper.getWidth(), bands.listBottom, currentShapeOrNull(), originX(), originY(), originZ());
 		addWidget(errorList.getList());
 		preview.attach();
 		
@@ -175,13 +182,13 @@ public class ShapeScreen extends BaseScreen{
 	// Preview frame and black area: under the widgets, or they would be painted over (E6 fix)
 	@Override
 	public void renderBackground() {
-		fillRect(rightX, previewTop, wrapper.getWidth(), previewBottom, 0xFF808080);
-		fillRect(rightX + 1, previewTop + 1, wrapper.getWidth() - 1, previewBottom - 1, 0xFF000000);
+		fillRect(rightX, previewTop, wrapper.getWidth(), bands.previewBottom, 0xFF808080);
+		fillRect(rightX + 1, previewTop + 1, wrapper.getWidth() - 1, bands.previewBottom - 1, 0xFF000000);
 	}
 
 	private void renderPreview() {
 		int x1 = rightX, x2 = wrapper.getWidth(), y1 = previewAreaTop(), y2 = previewAreaBottom();
-		drawShadowCentred(textPreviewHint.toString(), (x1 + x2) / 2, previewBottom - previewHintHeight + 2, 0x888888);
+		drawShadowCentred(textPreviewHint.toString(), (x1 + x2) / 2, bands.previewBottom - previewHintHeight + 2, 0x888888);
 		if(!BuildGuide.stateManager.getState().isShapeAvailable()) return;
 		updateSlice();
 		PreviewModel model = preview.update(BuildGuide.stateManager.getState().getCurrentShape());
@@ -246,20 +253,20 @@ public class ShapeScreen extends BaseScreen{
 	private void renderListPanel() {
 		int x1 = rightX, x2 = wrapper.getWidth();
 		Shape shape = currentShapeOrNull();
-		fillRect(x1, progressTop, x2, tabsTop, 0xFF303030);
+		fillRect(x1, bands.progressTop, x2, bands.tabsTop, 0xFF303030);
 		if(shape != null && shape.getValidationState().isValidated()) {
 			ValidationState state = shape.getValidationState();
 			int fill = x1 + (int) Math.round((x2 - x1) * state.getProgress());
-			if(fill > x1) fillRect(x1, progressTop, fill, tabsTop, state.getOk() == state.getTotal() ? 0xFF40C040 : 0xFF40A0FF);
+			if(fill > x1) fillRect(x1, bands.progressTop, fill, bands.tabsTop, state.getOk() == state.getTotal() ? 0xFF40C040 : 0xFF40A0FF);
 		}
 		int[] counts = ValidationListComponent.counts(shape);
 		ValidationListComponent.Category[] tabs = ValidationListComponent.Category.values();
 		for(int i = 0;i < tabs.length;++i) {
 			int tx1 = tabX(i), tx2 = tabX(i + 1);
 			boolean selected = tabs[i] == errorList.getCategory();
-			fillRect(tx1, tabsTop, tx2 - 1, tabsBottom, selected ? 0xC0505050 : 0xC0202020);
+			fillRect(tx1, bands.tabsTop, tx2 - 1, bands.tabsBottom, selected ? 0xC0505050 : 0xC0202020);
 			String label = new Translatable(tabs[i].translationKey, counts == null ? "-" : "" + counts[i]).toString();
-			drawShadowCentred(label, (tx1 + tx2) / 2, tabsTop + 4, selected ? 0xFFFFFF : 0xAAAAAA);
+			drawShadowCentred(label, (tx1 + tx2) / 2, bands.tabsTop + 4, selected ? 0xFFFFFF : 0xAAAAAA);
 		}
 		errorList.update(shape, originX(), originY(), originZ());
 	}
@@ -272,8 +279,8 @@ public class ShapeScreen extends BaseScreen{
 		int step = (wrapper.getWidth() - rightX) / legendKeys.length;
 		for(int i = 0;i < legendKeys.length;++i) {
 			int x = rightX + i * step;
-			fillRect(x + 4, 256, x + 12, 264, 0xFF000000 | legendColours[i]);
-			drawShadowLeft(new Translatable(legendKeys[i]).toString(), x + 16, 256, 0xAAAAAA);
+			fillRect(x + 4, bands.legendY, x + 12, bands.legendY + 8, 0xFF000000 | legendColours[i]);
+			drawShadowLeft(new Translatable(legendKeys[i]).toString(), x + 16, bands.legendY, 0xAAAAAA);
 		}
 	}
 	
@@ -307,7 +314,7 @@ public class ShapeScreen extends BaseScreen{
 	}
 	
 	private int previewAreaBottom() {
-		return previewBottom - previewHintHeight;
+		return bands.previewBottom - previewHintHeight;
 	}
 	
 	private boolean inPreviewArea(double x, double y) {
@@ -436,7 +443,7 @@ public class ShapeScreen extends BaseScreen{
 			editingName = true;
 			return true;
 		}
-		if(button == MOUSE_LEFT && x >= rightX && y >= tabsTop && y < tabsBottom) {
+		if(button == MOUSE_LEFT && x >= rightX && y >= bands.tabsTop && y < bands.tabsBottom) {
 			ValidationListComponent.Category[] tabs = ValidationListComponent.Category.values();
 			for(int i = 0;i < tabs.length;++i) {
 				if(x >= tabX(i) && x < tabX(i + 1)) {
@@ -446,7 +453,7 @@ public class ShapeScreen extends BaseScreen{
 				}
 			}
 		}
-		if(x >= rightX && y >= previewTop && y < previewBottom) {
+		if(x >= rightX && y >= previewTop && y < bands.previewBottom) {
 			return preview.mouseClicked(inPreviewArea(x, y), button, doubleClick);
 		}
 		if(button != MOUSE_LEFT || x < 0 || x >= panelWidth || !BuildGuide.stateManager.getState().isShapeAvailable()) return false;

@@ -245,9 +245,10 @@ lives in `common` so the GUI can read it.
 
 **Progress bar.** Drawn by `BaseScreen.renderBottomBar()` (moved from
 `ShapeScreen.renderValidation()` in GUI redesign E3) in the **bottom bar** of every tab whose
-`hasBottomBar()` is true (default; `DropdownOverlayScreen`, `PreviewScreen` and
-`VisualisationScreen` return false): no title, a 149×6 bar at x 251..400, y 252..258
-(constants `barX1/barX2/barY1/barY2`, text left-aligned at `barTextY` 260) (`BaseScreen.fillRect` →
+`hasBottomBar()` is true (default; `DropdownOverlayScreen`, `PreviewScreen` and `ShapeScreen`
+return false; `VisualisationScreen` has it again since E7): no title, a 149×6 bar at x 251..400
+(constants `barX1/barX2`), y `height − 18..height − 12` (252..258 at 270 px; E7), text
+left-aligned at `height − 10` (`BaseScreen.fillRect` →
 `IScreenWrapper.fillRect` → `GuiGraphics.fill`, the one Fabric addition) and the text
 `ok / total (pct%)`, plus `errors N` in red when there are structure errors (2.5; it was
 `wrong N`). Shapes that are
@@ -464,16 +465,34 @@ and `Shape`: a change shows up in their decompiled diff too.
   (40 px, clickable placeholder that does nothing until E7), close X.
 - **Right panel (E6),** x 192..width: preview y 40..175 (filter and slice controls at y 42,
   `+` at the top right opens the full-screen `PreviewScreen`, hint at the bottom), a 2-px
-  progress line at 175, list tabs 177..193, the list 193..250, legend at y 250..270
+  progress line at 175, list tabs 177..193, the list 193..250, legend at y 250..270 (at 270 px
+  high; E7 stretches these bands, see below)
   (built / errors / ignored / missing, 72 px each, colours from `PreviewColours`). Bottom row:
   Validate 2..92 and Reset 96..186 (90 px); the Preview button and the bottom bar are gone on
   this tab (`hasBottomBar()` false).
 - **Background hook (E6 fix).** `BaseScreen.renderBackground()` (no-op by default) is called
   by the Fabric `ScreenWrapper` **before** the widgets; `render()` runs after them. Fills that
   widgets sit on go there (the preview's frame and black area), or they paint over the widgets.
-- **Absolute layout (R13).** Every position is in the 480 × 270 design space; only a few
-  right edges follow `wrapper.getWidth()`. At GUI scale 3 (640 × 360) the window has an empty
-  band at the bottom; E7 anchors to the height.
+- **Proportional layout (E7, R13).** Positions are designed at the 480 × 270 minimum
+  (`ShapeLayout.minWidth/minHeight`); right edges follow `wrapper.getWidth()` and, since E7,
+  bottoms follow `wrapper.getHeight()`. `ShapeLayout(height)` (common, no Minecraft) holds the
+  Shape tab's vertical bands: bottom row at `height − 20` (legend + 6), accordion
+  42..`bottomRowY − 2`, and the extra height above 270 goes 60 % to the preview
+  (`previewBottom = 175 + extra·0.6`), 40 % to the list; progress line (2 px) and tabs (16 px)
+  sit under the preview. At 270 every band is exactly the E6 value above. `ShapeScreen.init()`
+  builds `bands` from the height and calls `setYPosition` on Validate/Reset (they are fields,
+  created once; `init()` reruns on every resize or GUI-scale change). `accordionTop` (42) and
+  `basePropertiesY` (54) stay compile-time constants. Other tabs: `renderBottomBar` draws at
+  `height − 18..−12` (text `height − 10`, x 251..400 unchanged); `ShapelistScreen`'s list ends at
+  `height − 20`; `VisualisationScreen` (R10) has a third column at x 275 (cube-size sliders y 60/80,
+  Set 100, Default 120; rendering checkboxes 165/185) and the bottom bar again.
+- **Too-small message (E7, D1).** Below 480 × 270 GUI pixels (`BaseScreen.fitsMinimum(w, h)`)
+  the Fabric `ScreenWrapper` calls `initChecked()`/`renderBackgroundChecked()`/`renderChecked()`
+  instead of the plain hooks: the screen gets only the X button and draws
+  `screen.buildguide.toosmall` (minimum and current size) and `toosmall.hint`. While
+  `isTooSmall()`, ESC closes (`onEscape()` is skipped) and mouse click/drag/scroll go only to
+  the widgets. Growing the window reruns `init()` and restores the GUI. Minecraft's Auto scale
+  can land below the minimum on 1366 × 768 or 1280 × 720 (R14).
 - `BaseScreen.shouldUpdatePersistence = true` marks state dirty; persistence is written
   on screen close when `config.persistenceEnabled` is on (off by default — enable it in
   the Configuration screen to test save/load).
@@ -596,5 +615,5 @@ and removed `errors.wrong` and `errors.near`; Step 0 (preview) added `screen.bui
 `previewhint`, `previewgenerating`, `previewempty`; GUI redesign E6 added `screen.buildguide.save`,
 `previewhintinline`, `previewnomatch`, `filter.{all,errors,missing,built,unvalidated}`, `slice`,
 `slice.off`, `tab.{errors,missing,ignored}`, `errors.none`, `legend.{built,errors,ignored,missing}`
-and removed `screen.buildguide.validation`, `errors.structure`, `errors.ignored`, `errors.missing`
+(E7 added `screen.buildguide.toosmall`, `toosmall.hint`) and removed `screen.buildguide.validation`, `errors.structure`, `errors.ignored`, `errors.missing`
 (E5 had removed `property.buildguide.section`).

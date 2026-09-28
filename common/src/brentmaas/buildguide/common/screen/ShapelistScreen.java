@@ -109,7 +109,7 @@ public class ShapelistScreen extends BaseScreen {
 		addWidget(buttonSetZ);
 		addWidget(buttonOriginZIncrease);
 		
-		shapeList = BuildGuide.widgetHandler.createShapelist(180, 325, 52, 250, () -> {
+		shapeList = BuildGuide.widgetHandler.createShapelist(180, 325, 52, wrapper.getHeight() - 20, () -> { // down to the bottom bar (E7)
 			if(BuildGuide.stateManager.getState().isShapeAvailable()) {
 				textFieldX.setTextValue("" + BuildGuide.stateManager.getState().getCurrentShapeSet().getOriginX());
 				textFieldY.setTextValue("" + BuildGuide.stateManager.getState().getCurrentShapeSet().getOriginY());

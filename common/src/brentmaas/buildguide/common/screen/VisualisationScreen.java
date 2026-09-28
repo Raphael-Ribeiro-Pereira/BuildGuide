@@ -26,8 +26,8 @@ public class VisualisationScreen extends BaseScreen {
 	private ISlider sliderOriginG = BuildGuide.widgetHandler.createSlider(140, 80, new Translatable("G"), 0.0, 1.0, BuildGuide.stateManager.getState().isShapeAvailable() ? BuildGuide.stateManager.getState().getCurrentShapeSet().getOriginColourG() : ShapeSet.defaultColourOriginG);
 	private ISlider sliderOriginB = BuildGuide.widgetHandler.createSlider(140, 100, new Translatable("B"), 0.0, 1.0, BuildGuide.stateManager.getState().isShapeAvailable() ? BuildGuide.stateManager.getState().getCurrentShapeSet().getOriginColourB() : ShapeSet.defaultColourOriginB);
 	private ISlider sliderOriginA = BuildGuide.widgetHandler.createSlider(140, 120, new Translatable("A"), 0.0, 1.0, BuildGuide.stateManager.getState().isShapeAvailable() ? BuildGuide.stateManager.getState().getCurrentShapeSet().getOriginColourA() : ShapeSet.defaultColourOriginA);
-	private ISlider sliderShapeCubeSize = BuildGuide.widgetHandler.createSlider(140, 225, new Translatable("screen.buildguide.shape"), 0.0, 1.0, BuildGuide.stateManager.getState().isShapeAvailable() ? BuildGuide.stateManager.getState().getCurrentShapeSet().getShapeCubeSize() : ShapeSet.defaultShapeCubeSize);
-	private ISlider sliderOriginCubeSize = BuildGuide.widgetHandler.createSlider(140, 245, new Translatable("screen.buildguide.origin"), 0.0, 1.0, BuildGuide.stateManager.getState().isShapeAvailable() ? BuildGuide.stateManager.getState().getCurrentShapeSet().getOriginCubeSize() : ShapeSet.defaultOriginCubeSize);
+	private ISlider sliderShapeCubeSize = BuildGuide.widgetHandler.createSlider(275, 60, new Translatable("screen.buildguide.shape"), 0.0, 1.0, BuildGuide.stateManager.getState().isShapeAvailable() ? BuildGuide.stateManager.getState().getCurrentShapeSet().getShapeCubeSize() : ShapeSet.defaultShapeCubeSize);
+	private ISlider sliderOriginCubeSize = BuildGuide.widgetHandler.createSlider(275, 80, new Translatable("screen.buildguide.origin"), 0.0, 1.0, BuildGuide.stateManager.getState().isShapeAvailable() ? BuildGuide.stateManager.getState().getCurrentShapeSet().getOriginCubeSize() : ShapeSet.defaultOriginCubeSize);
 	
 	private IButton buttonSetShape = BuildGuide.widgetHandler.createButton(5, 140, 120, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.set"), () -> {
 		if(BuildGuide.stateManager.getState().isShapeAvailable()) {
@@ -91,12 +91,12 @@ public class VisualisationScreen extends BaseScreen {
 	});
 	private ICheckboxRunnableButton buttonHighlightErrors;
 	private ICheckboxRunnableButton buttonDepthTest;
-	private IButton buttonSetCubeSize = BuildGuide.widgetHandler.createButton(140, 265, 120, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.set"), () -> {
+	private IButton buttonSetCubeSize = BuildGuide.widgetHandler.createButton(275, 100, 120, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.set"), () -> {
 		if(BuildGuide.stateManager.getState().isShapeAvailable()) {
 			BuildGuide.stateManager.getState().getCurrentShapeSet().setCubeSize(sliderShapeCubeSize.getSliderValue(), sliderOriginCubeSize.getSliderValue());
 		}
 	});
-	private IButton buttonDefaultCubeSize = BuildGuide.widgetHandler.createButton(140, 285, 120, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.default"), () -> {
+	private IButton buttonDefaultCubeSize = BuildGuide.widgetHandler.createButton(275, 120, 120, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.default"), () -> {
 		sliderShapeCubeSize.setSliderValue(0.6);
 		sliderOriginCubeSize.setSliderValue(0.2);
 		sliderShapeCubeSize.updateText();
@@ -126,12 +126,12 @@ public class VisualisationScreen extends BaseScreen {
 			buttonDefaultOrigin.setActive(false);
 		}
 		
-		buttonDepthTest = BuildGuide.widgetHandler.createCheckbox(5, 225, new Translatable(""), BuildGuide.stateManager.getState().isDepthTest(), false, () -> {
+		buttonDepthTest = BuildGuide.widgetHandler.createCheckbox(275, 165, new Translatable(""), BuildGuide.stateManager.getState().isDepthTest(), false, () -> {
 			BuildGuide.stateManager.getState().setDepthTest(buttonDepthTest.isCheckboxSelected());
 			BaseScreen.shouldUpdatePersistence = true;
 		});
 		// Validation overlay toggle (red/yellow/orange cubes on wrong/ignored/near blocks)
-		buttonHighlightErrors = BuildGuide.widgetHandler.createCheckbox(5, 245, new Translatable(""), BuildGuide.stateManager.getState().isHighlightErrors(), false, () -> {
+		buttonHighlightErrors = BuildGuide.widgetHandler.createCheckbox(275, 185, new Translatable(""), BuildGuide.stateManager.getState().isHighlightErrors(), false, () -> {
 			BuildGuide.stateManager.getState().setHighlightErrors(buttonHighlightErrors.isCheckboxSelected());
 		});
 		
@@ -157,19 +157,17 @@ public class VisualisationScreen extends BaseScreen {
 		addWidget(buttonDefaultCubeSize);
 	}
 	
-	@Override
-	protected boolean hasBottomBar() {
-		return false; // content still reaches y 305 (debt R10, E7)
-	}
-	
+	// Three columns within y 40..250 since E7 (R10: the cube size and rendering blocks reached y 305):
+	// shape colour x 5, origin colour x 140, cube size then rendering x 275. Fixed-size controls, so the
+	// extra height of a larger window is left empty; the bottom bar is back on this tab
 	public void render() {
 		super.render();
 		
 		drawShadowCentred(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + titleShapeColour, 65, 45, 0xFFFFFF);
 		drawShadowCentred(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + titleOriginColour, 200, 45, 0xFFFFFF);
-		drawShadowCentred(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + titleRendering, 65, 210, 0xFFFFFF);
-		drawShadowLeft(textDepthTest.toString(), 30, 230, 0xFFFFFF);
-		drawShadowLeft(textHighlightErrors.toString(), 30, 250, 0xFFFFFF);
-		drawShadowCentred(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + titleCubeSize, 200, 210, 0xFFFFFF);
+		drawShadowCentred(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + titleRendering, 335, 150, 0xFFFFFF);
+		drawShadowLeft(textDepthTest.toString(), 300, 170, 0xFFFFFF);
+		drawShadowLeft(textHighlightErrors.toString(), 300, 190, 0xFFFFFF);
+		drawShadowCentred(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + titleCubeSize, 335, 45, 0xFFFFFF);
 	}
 }

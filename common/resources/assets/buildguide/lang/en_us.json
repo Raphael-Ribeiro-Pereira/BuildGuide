@@ -136,6 +136,8 @@
 	"screen.buildguide.tab.missing": "Missing (%s)",
 	"screen.buildguide.title": "Build Guide",
 	"screen.buildguide.toggle": "Toggle",
+	"screen.buildguide.toosmall": "Build Guide needs at least %s x %s GUI pixels (now %s x %s).",
+	"screen.buildguide.toosmall.hint": "Lower the GUI scale in Options > Video Settings.",
 	"screen.buildguide.visible": "Visible",
 	"screen.buildguide.visualisation": "Visualization",
 	
