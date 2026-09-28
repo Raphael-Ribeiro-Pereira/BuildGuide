@@ -163,7 +163,8 @@ Only the latest one matters; diff the next change against it.
 | `850dcd0` | GUI redesign E3 — one-line header, six tabs at y 20, bottom bar in `BaseScreen` | `E3` |
 | `97ab2ae` | GUI redesign E4 — compact 18 × 184 property rows, Enter replaces Set, compact point row | `E4` |
 | `17fc563` | GUI redesign E5 — accordion in the left panel, Origin as a section, Bridge Rails/Placement, Validate rows hidden | `E5` |
-| `f08d981` | GUI redesign E6 — Shape header, right panel (preview with filter/slice, list tabs, legend), Validation tab removed; fixes: background under widgets, empty-view crash. Committed under the message "docs: record E6 commit and baseline" (a failed commit command; the code, tests and docs of E6 are all in it) | `E6fix2` (current) |
+| `f08d981` | GUI redesign E6 — Shape header, right panel (preview with filter/slice, list tabs, legend), Validation tab removed; fixes: background under widgets, empty-view crash. Committed under the message "docs: record E6 commit and baseline" (a failed commit command; the code, tests and docs of E6 are all in it) | `E6fix2` |
+| `30f14aa` | GUI redesign E7 — proportional layout (`ShapeLayout`, bottoms follow the height), too-small message below 480 x 270 (D1), Visualisation third column (R10) | `E7` (current) |
 
 GUI redesign plan and decisions: `docs/GUI_REDESIGN.md` (stages E1–E7).
 
