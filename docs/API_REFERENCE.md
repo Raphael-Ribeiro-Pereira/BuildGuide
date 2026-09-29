@@ -65,7 +65,7 @@ held by every `Shape` in a `transient` field (never persisted):
   **byte 3 is reserved**, it was `WRONG` until 2.5 and is never reused), the IGNORED index, a
   `version` counter, ignored block names in a second map, and the structure errors
   `NearBlock{localPos, blockName, distance}` keyed by position.
-- Scan protocol: `beginScan(expected)` (all `UNKNOWN`, not validated) → `setStatus(pos,
+- Scan protocol: `beginScan(expected, ox, oy, oz)` (P4: records the scan origin; all `UNKNOWN`, not validated) → `setStatus(pos,
   status, name)` per position → `setNearBlocks(list)` → `endScan()` (validated = true).
 - `setStatus` adjusts `ok/missing/ignored` **by the transition** (O(1)); positions not in the
   map are ignored. This is what incremental validation (2.2) will call per block event.
@@ -113,6 +113,28 @@ Known gap: chunks that reload after flying away do not trigger a rescan (nothing
 state while they are unloaded, so counts only drift if the world changed meanwhile);
 the cheap future hook is Fabric API `ClientChunkEvents.CHUNK_LOAD` → `requestScan()` for
 shapes whose bounding box intersects the chunk.
+
+**Scan origin (P4).** Every local position in a `ValidationState` (status, near blocks,
+highlight, bounding box) is relative to the origin **of its last scan**, not to the current
+origin: `beginScan(expected, ox, oy, oz)` records it (`getScanOriginX/Y/Z()`; the
+one-argument `beginScan` uses 0 and is kept for the harness; `invalidate()` keeps it).
+Moving the origin therefore leaves the red/yellow/white cubes and the list rows where the scan
+saw them in the world until the rescan. Readers: the overlay is drawn inside the current
+origin's translation plus `getScanOffset(ox, oy, oz)` = scan − current (push/translate/pop
+**only when non-zero**: with matching origins the draw path is the one from before P4), and
+its nearest-to-player cap uses the scan origin; `IncrementalValidator` converts block events
+with the scan origin; `ValidationListComponent.buildEntries` reads it from the state. The
+preview and the progress show the old scan until the rescan (one frame of reference, not
+mixed). Every origin change goes through `ShapeSet.setOrigin*` / `shiftOrigin` /
+`resetOrigin` (Origin fields and Enter, Set origin, key binds, the Shape list's global origin
+via `State.shiftOrigins`); when the value really changes, `onOriginChanged()` calls
+`requestScan()` on every instantiated shape of the set. Debounce: `requestScan()` stamps
+`lastScanRequestAt` (`requestScan(now)` for tests) and the automatic scan waits for
+`isScanDue(now, autoScanIdleMillis)` (300 ms without a new request) as well as the idle time
+after generation: one clock for regeneration and origin moves, so holding `+` gives one scan.
+The chunk gate checks the new place; manual Validate stays immediate. Known and accepted: an
+exclusion corner captured from the player during the 300 ms window is converted with the new
+origin and applied to the old state; the rescan it requests fixes it.
 
 **Validate button (Etapa 2.2c).** The fixed row under the validation block holds two 78 px
 buttons: `Validate` at `(5, 238)` (manual rescan of the current shape via
@@ -163,7 +185,8 @@ other statuses still scan the map) and a `highlightedPos` (−1 = none).
   default Errors; `State.listTab` keeps the user's pick, transient). The Validation tab,
   `ValidationScreen` and `ActiveScreen.Validation` are gone; the combined list with headers is
   gone too. `counts(shape)` = `{nearCount, missing − ignored, ignored}` (null before validation)
-  for the tab labels; `buildEntries(shape, ox, oy, oz, category)` returns only that tab's rows,
+  for the tab labels; `buildEntries(shape, category)` (P4: world coordinates from the state's scan
+  origin; before, the caller passed the current origin) returns only that tab's rows,
   a "None" row (no position) when empty; `setCategory` rebuilds at once. Clicking a row
   without a position clears the highlight. History below (2.4–E5) for context.
   Until E6: `ValidationScreen`, sixth top-bar tab (tabs were six 80-px buttons, x 0..480 at y 20..40 since E3;

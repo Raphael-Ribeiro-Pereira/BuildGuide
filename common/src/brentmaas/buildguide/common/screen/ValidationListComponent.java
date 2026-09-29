@@ -69,7 +69,6 @@ public class ValidationListComponent {
 	private long lastRebuild = 0;
 	private Shape shownShape = null;
 	private Category category = Category.ERRORS;
-	private int ox, oy, oz;
 	public ValidationListComponent() {
 		// The lambda defers the widget handler lookup to init(), when the loader has registered it
 		this(System::currentTimeMillis, (left, right, top, bottom, slotHeight, titles, current, callback) -> BuildGuide.widgetHandler.createSelectorList(left, right, top, bottom, slotHeight, titles, current, callback));
@@ -82,15 +81,12 @@ public class ValidationListComponent {
 
 	/**
 	 * Creates the list in the rectangle (x1, y1)..(x2, y2) for this shape (null = none) with the
-	 * shape set's origin (ox, oy, oz); the caller adds getList() to its screen. The first update()
-	 * rebuilds right away.
+	 * world coordinates from the origin of its scan (P4); the caller adds getList() to its screen.
+	 * The first update() rebuilds right away.
 	 */
-	public ISelectorList init(int x1, int y1, int x2, int y2, Shape shape, int ox, int oy, int oz) {
+	public ISelectorList init(int x1, int y1, int x2, int y2, Shape shape) {
 		this.shape = shape;
-		this.ox = ox;
-		this.oy = oy;
-		this.oz = oz;
-		Entries entries = buildEntries(shape, ox, oy, oz, category);
+		Entries entries = buildEntries(shape, category);
 		rowPositions = entries.positions;
 		list = factory.create(x1, x2, y1, y2, rowHeight, entries.titles, 0, this::click);
 		return list;
@@ -107,7 +103,7 @@ public class ValidationListComponent {
 	// Switch tab: the rows are rebuilt at once
 	public void setCategory(Category category) {
 		this.category = category;
-		Entries entries = buildEntries(shape, ox, oy, oz, category);
+		Entries entries = buildEntries(shape, category);
 		rowPositions = entries.positions;
 		shownVersion = entries.version;
 		shownShape = shape;
@@ -116,15 +112,12 @@ public class ValidationListComponent {
 	}
 
 	// Every frame: rebuild the rows when the state or the shape changed, at most every rebuildIntervalMillis
-	public void update(Shape shape, int ox, int oy, int oz) {
+	public void update(Shape shape) {
 		this.shape = shape;
-		this.ox = ox;
-		this.oy = oy;
-		this.oz = oz;
 		long version = shape != null ? shape.getValidationState().getVersion() : -1;
 		long now = clock.getAsLong();
 		if((version != shownVersion || shape != shownShape) && now - lastRebuild >= rebuildIntervalMillis) {
-			Entries entries = buildEntries(shape, ox, oy, oz, category);
+			Entries entries = buildEntries(shape, category);
 			rowPositions = entries.positions;
 			shownVersion = entries.version;
 			shownShape = shape;
@@ -152,11 +145,11 @@ public class ValidationListComponent {
 	}
 	
 	/**
-	 * The rows of one tab for a shape (null = none) whose set has its origin at (ox, oy, oz): its
+	 * The rows of one tab for a shape (null = none) at the origin of its last scan (P4): its
 	 * positions in world coordinates, sorted, no header; one "None" row when empty, one message
 	 * row without a shape or before validation. Pure: no widgets, no loader
 	 */
-	public static Entries buildEntries(Shape shape, int ox, int oy, int oz, Category category) {
+	public static Entries buildEntries(Shape shape, Category category) {
 		List<Translatable> titles = new ArrayList<Translatable>();
 		List<Long> positions = new ArrayList<Long>();
 		if(shape == null) {
@@ -170,6 +163,8 @@ public class ValidationListComponent {
 			positions.add(-1L);
 			return new Entries(titles, positions, state.getVersion());
 		}
+		// Rows stay where the scan saw them in the world, even after the origin moved (P4)
+		int ox = state.getScanOriginX(), oy = state.getScanOriginY(), oz = state.getScanOriginZ();
 		if(category == Category.ERRORS) {
 			List<NearBlock> errors = state.getNearBlocks();
 			errors.sort(Comparator.comparingInt((NearBlock nb) -> LocalPos.unpackX(nb.localPos)).thenComparingInt(nb -> LocalPos.unpackY(nb.localPos)).thenComparingInt(nb -> LocalPos.unpackZ(nb.localPos)));

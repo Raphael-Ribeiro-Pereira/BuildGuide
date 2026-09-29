@@ -28,7 +28,8 @@ public class IncrementalValidator {
 		for(ShapeSet set: state.shapeSets) {
 			if(!set.isShapeAvailable(set.getIndex())) continue; // never instantiate a shape from a block event
 			ValidationState vs = set.getShape().getValidationState(); // every Shape is IValidatable
-			int lx = pos.getX() - set.getOriginX(), ly = pos.getY() - set.getOriginY(), lz = pos.getZ() - set.getOriginZ();
+			// Local to the origin of the last scan, like the rest of the state (P4), not to the current origin
+			int lx = pos.getX() - vs.getScanOriginX(), ly = pos.getY() - vs.getScanOriginY(), lz = pos.getZ() - vs.getScanOriginZ();
 			if(!vs.isInRange(lx, ly, lz)) continue;
 			// Every non-air block needs its name: near blocks are listed too (resolved once, only when in range)
 			if(name == null && !air) name = blockState.getBlock().getName().getString();

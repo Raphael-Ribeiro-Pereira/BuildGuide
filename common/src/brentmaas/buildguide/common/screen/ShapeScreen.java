@@ -140,7 +140,7 @@ public class ShapeScreen extends BaseScreen{
 		addWidget(buttonPreviewExpand);
 		initPreviewControls();
 		errorList.setCategory(initialTab());
-		errorList.init(rightX, bands.tabsBottom, wrapper.getWidth(), bands.listBottom, currentShapeOrNull(), originX(), originY(), originZ());
+		errorList.init(rightX, bands.tabsBottom, wrapper.getWidth(), bands.listBottom, currentShapeOrNull());
 		addWidget(errorList.getList());
 		preview.attach();
 		
@@ -268,7 +268,7 @@ public class ShapeScreen extends BaseScreen{
 			String label = new Translatable(tabs[i].translationKey, counts == null ? "-" : "" + counts[i]).toString();
 			drawShadowCentred(label, (tx1 + tx2) / 2, bands.tabsTop + 4, selected ? 0xFFFFFF : 0xAAAAAA);
 		}
-		errorList.update(shape, originX(), originY(), originZ());
+		errorList.update(shape);
 	}
 	
 	// Colour legend of the preview (E6), right of the bottom row: four 72-px entries, a swatch and a label
@@ -290,18 +290,6 @@ public class ShapeScreen extends BaseScreen{
 	
 	private Shape currentShapeOrNull() {
 		return BuildGuide.stateManager.getState().isShapeAvailable() ? BuildGuide.stateManager.getState().getCurrentShape() : null;
-	}
-	
-	private int originX() {
-		return BuildGuide.stateManager.getState().isShapeAvailable() ? BuildGuide.stateManager.getState().getCurrentShapeSet().getOriginX() : 0;
-	}
-	
-	private int originY() {
-		return BuildGuide.stateManager.getState().isShapeAvailable() ? BuildGuide.stateManager.getState().getCurrentShapeSet().getOriginY() : 0;
-	}
-	
-	private int originZ() {
-		return BuildGuide.stateManager.getState().isShapeAvailable() ? BuildGuide.stateManager.getState().getCurrentShapeSet().getOriginZ() : 0;
 	}
 	
 	@Override

@@ -65,6 +65,13 @@ public class ValidationState {
 	// A full scan was requested by the shape itself (after regeneration); the render handler
 	// runs it once the shape has been idle for a moment and its chunks are loaded
 	private boolean scanRequested = false;
+	// When the last scan request came (regeneration or origin change); automatic scans wait until the
+	// requests stop for a moment, so holding + on the origin gives one scan, not one per click (P4)
+	private long lastScanRequestAt = 0;
+	// World origin of the set when the last scan began. Every local position here (status, near
+	// blocks, highlight, bounding box) is relative to it, not to the current origin: moving the origin
+	// leaves the results where they were in the world until the rescan (P4)
+	private int scanOriginX = 0, scanOriginY = 0, scanOriginZ = 0;
 
 	// The shape regenerated: everything known so far is stale
 	public synchronized void invalidate() {
@@ -80,9 +87,17 @@ public class ValidationState {
 		maxX = maxY = maxZ = Integer.MIN_VALUE;
 	}
 
-	// Start a full scan over these expected positions (all UNKNOWN until set)
+	// Start a full scan over these expected positions (all UNKNOWN until set), origin (0, 0, 0)
 	public synchronized void beginScan(Collection<Long> expected) {
+		beginScan(expected, 0, 0, 0);
+	}
+
+	// Start a full scan with the set's origin at (ox, oy, oz) in the world
+	public synchronized void beginScan(Collection<Long> expected, int ox, int oy, int oz) {
 		invalidate();
+		scanOriginX = ox;
+		scanOriginY = oy;
+		scanOriginZ = oz;
 		for(long pos: expected) {
 			int x = LocalPos.unpackX(pos), y = LocalPos.unpackY(pos), z = LocalPos.unpackZ(pos);
 			if(isExcluded(x, y, z)) continue;
@@ -102,9 +117,37 @@ public class ValidationState {
 	}
 	
 	public synchronized void requestScan() {
-		scanRequested = true;
+		requestScan(System.currentTimeMillis());
 	}
-	
+
+	public synchronized void requestScan(long nowMillis) {
+		scanRequested = true;
+		lastScanRequestAt = nowMillis;
+	}
+
+	// A request is pending and no new one came in the last idleMillis
+	public synchronized boolean isScanDue(long nowMillis, long idleMillis) {
+		return scanRequested && nowMillis - lastScanRequestAt >= idleMillis;
+	}
+
+	public synchronized int getScanOriginX() {
+		return scanOriginX;
+	}
+
+	public synchronized int getScanOriginY() {
+		return scanOriginY;
+	}
+
+	public synchronized int getScanOriginZ() {
+		return scanOriginZ;
+	}
+
+	// Scan origin minus the current origin (ox, oy, oz): the extra translation of the overlay, drawn
+	// inside the current origin's translation. Exactly {0, 0, 0} once the rescan caught up
+	public synchronized int[] getScanOffset(int ox, int oy, int oz) {
+		return new int[] {scanOriginX - ox, scanOriginY - oy, scanOriginZ - oz};
+	}
+
 	public synchronized boolean isScanRequested() {
 		return scanRequested;
 	}

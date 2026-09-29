@@ -71,8 +71,19 @@ public class ShapeSet {
 	}
 	
 	public void resetOrigin() {
+		Origin old = origin;
 		origin = BuildGuide.shapeHandler.getPlayerPosition();
 		BaseScreen.shouldUpdatePersistence = true;
+		if(old == null || old.x != origin.x || old.y != origin.y || old.z != origin.z) onOriginChanged();
+	}
+
+	// Every way of moving the origin ends here (Origin fields and Enter, Set origin, key binds, the global
+	// origin of the Shape list): the validation results stay at the old place until a rescan, which is
+	// requested for every instantiated shape of the set and debounced by ValidationState (P4)
+	private void onOriginChanged() {
+		for(Shape s: shapes) {
+			if(s != null) s.getValidationState().requestScan();
+		}
 	}
 	
 	public void updateShape() {
@@ -90,32 +101,28 @@ public class ShapeSet {
 	}
 	
 	public void setOriginX(int x) {
-		origin.x = x;
-		BaseScreen.shouldUpdatePersistence = true;
+		setOrigin(x, origin.y, origin.z);
 	}
-	
+
 	public void setOriginY(int y) {
-		origin.y = y;
-		BaseScreen.shouldUpdatePersistence = true;
+		setOrigin(origin.x, y, origin.z);
 	}
-	
+
 	public void setOriginZ(int z) {
-		origin.z = z;
-		BaseScreen.shouldUpdatePersistence = true;
+		setOrigin(origin.x, origin.y, z);
 	}
-	
+
 	public void setOrigin(int x, int y, int z) {
+		boolean changed = origin.x != x || origin.y != y || origin.z != z;
 		origin.x = x;
 		origin.y = y;
 		origin.z = z;
 		BaseScreen.shouldUpdatePersistence = true;
+		if(changed) onOriginChanged();
 	}
-	
+
 	public void shiftOrigin(int dx, int dy, int dz) {
-		origin.x += dx;
-		origin.y += dy;
-		origin.z += dz;
-		BaseScreen.shouldUpdatePersistence = true;
+		setOrigin(origin.x + dx, origin.y + dy, origin.z + dz);
 	}
 	
 	public float getShapeColourR() {

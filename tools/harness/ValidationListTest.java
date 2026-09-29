@@ -19,20 +19,20 @@ public class ValidationListTest {
 	public static void main(String[] a){
 		System.out.println("-- messages");
 		for(Category c: Category.values()){
-			ValidationListComponent.Entries none=ValidationListComponent.buildEntries(null,0,0,0,c);
+			ValidationListComponent.Entries none=ValidationListComponent.buildEntries(null,c);
 			check(none.titles.size()==1 && k(none.titles.get(0)).equals("screen.buildguide.novalidation") && none.positions.get(0)==-1 && none.version==-1, c+": no shape -> only 'No shape'");
 		}
 		ShapeBridge s=new ShapeBridge(); ValidationState st=s.getValidationState();
-		check(keys(ValidationListComponent.buildEntries(s,0,0,0,Category.MISSING)).equals(Arrays.asList("screen.buildguide.notvalidated")), "not validated -> only 'Not validated yet'");
+		check(keys(ValidationListComponent.buildEntries(s,Category.MISSING)).equals(Arrays.asList("screen.buildguide.notvalidated")), "not validated -> only 'Not validated yet'");
 		check(ValidationListComponent.counts(null)==null && ValidationListComponent.counts(s)==null, "no counts without a shape or before validation");
 
 		System.out.println("-- validated, clean");
 		List<Long> exp=new ArrayList<>(); for(int x=0;x<6;x++) exp.add(LocalPos.pack(x,0,0));
-		st.beginScan(exp); for(long p: exp) st.setStatus(p,ValidationState.OK,null); st.endScan();
+		st.beginScan(exp,100,64,-200); for(long p: exp) st.setStatus(p,ValidationState.OK,null); st.endScan();
 		int[] n0=ValidationListComponent.counts(s);
 		check(n0[0]==0 && n0[1]==0 && n0[2]==0, "counts {0, 0, 0}");
 		for(Category c: Category.values()){
-			ValidationListComponent.Entries e=ValidationListComponent.buildEntries(s,100,64,-200,c);
+			ValidationListComponent.Entries e=ValidationListComponent.buildEntries(s,c);
 			check(keys(e).equals(Arrays.asList("screen.buildguide.errors.none")) && e.positions.get(0)==-1, c+": one 'None' row, no position");
 		}
 
@@ -44,28 +44,28 @@ public class ValidationListTest {
 		st.updateBlock(LocalPos.pack(0,1,0),false,true,false,null);
 		int[] n=ValidationListComponent.counts(s);
 		check(n[0]==2 && n[1]==2 && n[2]==1, "counts {errors 2, missing 2, ignored 1}: missing without the ignored one");
-		ValidationListComponent.Entries te=ValidationListComponent.buildEntries(s,100,64,-200,Category.ERRORS);
+		ValidationListComponent.Entries te=ValidationListComponent.buildEntries(s,Category.ERRORS);
 		check(keys(te).equals(Arrays.asList("[100, 65, -200] ? (d=1.0)","[105, 65, -200] Stone (d=1.0)")), "Errors: world coords (local + origin), sorted by x, '?' without a name, distance; no header "+keys(te));
 		check(te.positions.equals(Arrays.asList(LocalPos.pack(0,1,0),LocalPos.pack(5,1,0))), "Errors: positions parallel to the rows");
-		ValidationListComponent.Entries tm=ValidationListComponent.buildEntries(s,100,64,-200,Category.MISSING);
+		ValidationListComponent.Entries tm=ValidationListComponent.buildEntries(s,Category.MISSING);
 		check(keys(tm).equals(Arrays.asList("[101, 64, -200]","[102, 64, -200]")) && tm.positions.get(1)==LocalPos.pack(2,0,0), "Missing: one row per missing position, sorted, no name "+keys(tm));
-		ValidationListComponent.Entries ti=ValidationListComponent.buildEntries(s,100,64,-200,Category.IGNORED);
+		ValidationListComponent.Entries ti=ValidationListComponent.buildEntries(s,Category.IGNORED);
 		check(keys(ti).equals(Arrays.asList("[104, 64, -200] Scaffolding")), "Ignored: world coords and block name, no distance");
 
 		System.out.println("-- glue");
 		FakeList fl=new FakeList();
 		ValidationListComponent c=new ValidationListComponent(()->now,(l,r,t,b,h,ts,cur,cb)->{ fl.l=l; fl.r=r; fl.t=t; fl.b=b; fl.h=h; fl.titles=ts; fl.cb=cb; return fl; });
 		check(c.getCategory()==Category.ERRORS, "default tab: Errors");
-		c.init(192,193,480,250,s,100,64,-200);
+		c.init(192,193,480,250,s);
 		check(fl.l==192 && fl.r==480 && fl.t==193 && fl.b==250 && fl.h==12 && fl.titles.size()==2, "init: rectangle (192,193)-(480,250) passed as left, right, top, bottom; rows 12 px; Errors rows");
-		c.update(s,100,64,-200); check(fl.sets==1, "first update after init rebuilds right away");
-		c.update(s,100,64,-200); check(fl.sets==1, "nothing changed: no rebuild");
+		c.update(s); check(fl.sets==1, "first update after init rebuilds right away");
+		c.update(s); check(fl.sets==1, "nothing changed: no rebuild");
 		now+=50; st.updateBlock(LocalPos.pack(5,1,0),true,false,false,null);
-		c.update(s,100,64,-200); check(fl.sets==1, "state changed 50 ms after the last rebuild: waits");
-		now+=60; c.update(s,100,64,-200); check(fl.sets==2 && fl.titles.size()==1, "after 100 ms: rebuilt, 1 error left");
-		ShapeBridge s2=new ShapeBridge(); now+=200; c.update(s2,0,0,0);
+		c.update(s); check(fl.sets==1, "state changed 50 ms after the last rebuild: waits");
+		now+=60; c.update(s); check(fl.sets==2 && fl.titles.size()==1, "after 100 ms: rebuilt, 1 error left");
+		ShapeBridge s2=new ShapeBridge(); now+=200; c.update(s2);
 		check(fl.sets==3 && k(fl.titles.get(0)).equals("screen.buildguide.notvalidated"), "shape switch: rebuilt for the other shape");
-		c.update(s,100,64,-200); now+=200; c.update(s,100,64,-200);
+		c.update(s); now+=200; c.update(s);
 		fl.cb.run(0); check(st.getHighlightedPos()==LocalPos.pack(0,1,0), "click on an error row highlights its position");
 		fl.cb.run(0); check(st.getHighlightedPos()==-1, "click on the highlighted row again clears it");
 		int before=fl.sets; c.setCategory(Category.MISSING);

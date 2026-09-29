@@ -123,13 +123,22 @@ public class RenderHandler extends AbstractRenderHandler {
 			if(shape.overlayBuffer != null) shape.overlayBuffer.close();
 			ShapeBuffer buffer = new ShapeBuffer();
 			ShapeSet.Origin player = BuildGuide.shapeHandler.getPlayerPosition();
-			ValidationOverlay.build(buffer, state, new ShapeSet.Origin(player.x - shapeSet.getOriginX(), player.y - shapeSet.getOriginY(), player.z - shapeSet.getOriginZ()));
+			ValidationOverlay.build(buffer, state, new ShapeSet.Origin(player.x - state.getScanOriginX(), player.y - state.getScanOriginY(), player.z - state.getScanOriginZ()));
 			buffer.end();
 			shape.overlayBuffer = buffer;
 			shape.overlayVersion = version;
 			shape.overlayBuiltAt = now;
 		}
+		// The state is local to the origin of its scan (P4): after the origin moved, the cubes stay where
+		// the scan saw them until the rescan. No extra transform at all when the origins match
+		int[] offset = state.getScanOffset(shapeSet.getOriginX(), shapeSet.getOriginY(), shapeSet.getOriginZ());
+		boolean shifted = offset[0] != 0 || offset[1] != 0 || offset[2] != 0;
+		if(shifted) {
+			RenderSystem.getModelViewStack().pushMatrix();
+			RenderSystem.getModelViewStack().translate(offset[0], offset[1], offset[2]);
+		}
 		((ShapeBuffer) shape.overlayBuffer).render();
+		if(shifted) RenderSystem.getModelViewStack().popMatrix();
 	}
 	
 	protected void validateShape(ShapeSet shapeSet) {
@@ -138,10 +147,11 @@ public class RenderHandler extends AbstractRenderHandler {
 		// Manual (button) scans run now. Automatic ones, requested by the shape after it regenerated,
 		// wait until the shape has been idle for a moment (holding +/- regenerates many times per
 		// second) and until the chunks under the shape are loaded (a scan of unloaded chunks would
-		// read everything as air)
+		// read everything as air). Origin changes request a scan too (P4): the same idle wait makes
+		// holding + on the origin give one scan
 		boolean manual = validatable.consumeValidateRequest();
 		if(!manual) {
-			if(!state.isScanRequested()) return;
+			if(!state.isScanDue(System.currentTimeMillis(), autoScanIdleMillis)) return;
 			if(shapeSet.getShape().getHowLongAgoCompletedMillis() < autoScanIdleMillis) return;
 		}
 
@@ -178,7 +188,7 @@ public class RenderHandler extends AbstractRenderHandler {
 		}
 		if(!manual && !world.hasChunksAt(new BlockPos(minX, minY, minZ), new BlockPos(maxX, maxY, maxZ))) return; // stays pending
 		state.consumeScanRequest();
-		state.beginScan(validatable.getExpectedBlocks());
+		state.beginScan(validatable.getExpectedBlocks(), ox, oy, oz);
 
 		// Classify expected positions into the state: ignored type -> ignored (counts as missing), solid ->
 		// ok, anything else (air, torch, flower, water) -> missing
