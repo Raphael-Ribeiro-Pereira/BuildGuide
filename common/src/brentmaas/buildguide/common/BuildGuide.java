@@ -34,6 +34,8 @@ public class BuildGuide {
 	public static AbstractRenderHandler renderHandler;
 	public static ILogHandler logHandler;
 	public static Config config;
+	// Shape presets (E8): global slots in their own file next to buildguide.cfg
+	public static PresetStore presets;
 	
 	public static void registerClient(AbstractScreenHandler screenHandler, AbstractWidgetHandler widgetHandler, AbstractStateManager stateManager, IShapeHandler shapeHandler, AbstractRenderHandler renderHandler, ILogHandler logHandler, File configFolder) {
 		BuildGuide.screenHandler = screenHandler;
@@ -43,6 +45,7 @@ public class BuildGuide {
 		BuildGuide.renderHandler = renderHandler;
 		BuildGuide.logHandler = logHandler;
 		BuildGuide.config = new Config(configFolder);
+		BuildGuide.presets = new PresetStore(configFolder);
 		
 		ShapeRegistry.registerShape(ShapeCatenary.class, "shape.buildguide.catenary");
 		ShapeRegistry.registerShape(ShapeCircle.class, "shape.buildguide.circle");

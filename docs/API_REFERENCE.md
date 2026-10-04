@@ -424,6 +424,64 @@ Keep rows ≤ 480 so they fit at GUI scale 4 on 1080p.
 - non-value properties (`PropertyRunnable`, `PropertyPointRow`) return a constant and
   accept anything in `setValueFromString`.
 
+### Presets and the instance name (GUI redesign E8)
+
+**Store.** `common/PresetStore` (`BuildGuide.presets`, created next to `Config`): three global
+slots, the same in every world, in `buildguide_presets.txt` beside `buildguide.cfg` (a file of
+their own on purpose: `Config` rewrites its file with its own keys only and would drop them).
+One line per occupied slot, `slot1=…`..`slot3=…`, empty slots have no line. Written on every
+`set`/`clear` whatever `persistenceEnabled` says (saving a preset is an explicit action), to
+`buildguide_presets.txt.tmp` and then `Files.move(REPLACE_EXISTING, ATOMIC_MOVE)` (falling back
+to `REPLACE_EXISTING` alone): `File.renameTo` fails on Windows when the target exists. Reading
+skips a missing file, malformed, out-of-range and empty lines. `set` refuses empty or
+multi-line data. Only `java.*`. `PresetStore.encode/decode` (URL encoding, UTF-8) wrap free
+text (name, world); `entries(data)` splits `key=value;` data; `describe(data)` returns
+`{shape class or null, name or null, world}` for the slot label.
+
+**Slot data** is `ShapeSet`'s own `key=value;` format, a subset of the world save:
+`index`, `origin` (`x,y,z`), `exclusions` (same 28 numbers as the save), `<shape class>=<values>`
+(`Shape.toPersistence`), `name` (only when typed) and `world` (`getWorldLabel()` when saved).
+Colours, visibility and cube sizes are the set's look and are not in a preset. Unknown keys
+are skipped, so presets cross jar versions the way saves do. `ShapeSet.toPresetString(world)`
+writes it.
+
+**Loading.** `ShapeSet.applyPresetValues(data)` first parses and checks everything (shape
+class known to the registry, `origin` has three integers, exclusion numbers parse) and returns a
+translation key (`preset.unknowntype`, `preset.invalid`) **without changing anything** when
+something is wrong. Then: the set's instance of that type is reused (created through
+`initialiseShape`, with defaults, when the set never opened that type; instances of other types
+stay in the set and in the type dropdown); `Shape.loadPresetValues` cancels a running generation
+(`cancelFuture`), takes `lock`, sets **every** property to its captured default, protected ones
+(control points, `Point count`) included, and applies the preset's values over them, so a
+preset with fewer values (older jar) leaves nothing of the previous shape; `index`,
+exclusion boxes (replaced, also when the preset has none enabled) and name are set;
+`setOrigin` goes through the P4 hook (rescan requested when the origin moved);
+`onExclusionsChanged()`; `shouldUpdatePersistence = true`. `applyPreset` adds the single
+`update()`. Spline note: a preset without the `Point count` field gets `maxPoints`, the
+Spline's own rule for pre-count data; every preset written by this jar has the field.
+
+**Instance name.** `ShapeSet.name` (null = default "Type #N"; `getName/setName`, trimmed, blank
+= null) replaces the in-memory `State.shapeSetNames`. World save: `name=<encoded>;` is the
+**last** entry of the set's persistence and only written when a name exists, so a set without a
+name serialises exactly as before E8; a jar without E8 reads `name` as an unknown key (its
+`getShapeId` is −1, skipped); a save without it loads with the default. Like all world state it
+is only written with `persistenceEnabled` on (Configuration, off by default).
+
+**Menu.** The Shape header's Save opens `screen/PresetScreen(parent)` (the `PreviewScreen`
+pattern: the Shape screen is replaced and shown again on Back or Escape). Three rows with the
+label `N. Type - name - world` (cut with `..` by `BaseScreen.fit`, moved from `ShapeScreen`;
+unknown type shows `?`, empty slot "Empty") and Save / Load / Clear. `PresetConfirm` (pure,
+injectable `LongSupplier` clock) arms a destructive press (Save over an occupied slot, Load,
+Clear): the button reads "Overwrite?" / "Replace?" / "Clear?" and the second press of the same
+button runs it; another button or `timeoutMillis` = 3000 disarms. Titles change through
+`IButton.setTitle(Translatable)`, a **`default` no-op** (37 implementations across the loader
+modules; only the Fabric 1.21.11 `ButtonImpl` overrides it). Load closes with a fresh Shape
+screen (`createNewScreen(ActiveScreen.Shape)`) because its type dropdown and accordion belong to
+the shape it opened with. `AbstractStateManager.getWorldLabel()` = singleplayer world name, else
+server address, else "unknown" (no dimension).
+
+Keys: `screen.buildguide.preset.{title,empty,save,overwrite,load,replace,clear,clearconfirm,back,unknowntype,invalid}`.
+
 ### Panel sections
 
 **Accordion (GUI redesign E5).** Sections are accordion headers drawn by `ShapeScreen`
@@ -484,8 +542,8 @@ and `Shape`: a change shows up in their decompiled diff too.
   Shape tab only: checkbox 2..19 (17 px, y 1), set selector `<` N/Total `>` 22..78
   (`switchShapeSet`), type dropdown 80..160, instance name 164..width − 68 (a label; the first
   click shows a text field, the second focuses it, R11; Enter applies; names live in
-  `State.shapeSetNames`, in memory only until E7, default "Type #N"), Save at width − 64
-  (40 px, clickable placeholder that does nothing until E7), close X.
+  `ShapeSet.name` since E8, saved with the world, default "Type #N"), Save at width − 64
+  (40 px; E8: opens the preset menu, see Presets), close X.
 - **Right panel (E6),** x 192..width: preview y 40..175 (filter and slice controls at y 42,
   `+` at the top right opens the full-screen `PreviewScreen`, hint at the bottom), a 2-px
   progress line at 175, list tabs 177..193, the list 193..250, legend at y 250..270 (at 270 px
@@ -638,5 +696,5 @@ and removed `errors.wrong` and `errors.near`; Step 0 (preview) added `screen.bui
 `previewhint`, `previewgenerating`, `previewempty`; GUI redesign E6 added `screen.buildguide.save`,
 `previewhintinline`, `previewnomatch`, `filter.{all,errors,missing,built,unvalidated}`, `slice`,
 `slice.off`, `tab.{errors,missing,ignored}`, `errors.none`, `legend.{built,errors,ignored,missing}`
-(E7 added `screen.buildguide.toosmall`, `toosmall.hint`) and removed `screen.buildguide.validation`, `errors.structure`, `errors.ignored`, `errors.missing`
+(E7 added `screen.buildguide.toosmall`, `toosmall.hint`; E8 added `screen.buildguide.preset.*`, see Presets) and removed `screen.buildguide.validation`, `errors.structure`, `errors.ignored`, `errors.missing`
 (E5 had removed `property.buildguide.section`).

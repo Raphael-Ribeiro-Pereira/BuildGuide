@@ -34,6 +34,7 @@ java  -cp "$CLASSES;$OUT" AccordionTest     # accordion rows per section, every 
 java  -cp "$CLASSES;$OUT" PreviewViewTest   # preview filter and slice through PreviewMesh, view cache, empty view (25 asserts)
 java  -cp "$CLASSES;$OUT" ShapeLayoutTest   # E7 Shape-tab bands from the height (= E6 at 270), D1 minimum check (17 asserts)
 java  -cp "$CLASSES;$OUT" OriginScanTest    # P4 scan origin: results stay in the world, overlay offset exactly 0 when origins match, list rows, debounce, every ShapeSet origin path and the global origin (36 asserts)
+java  -cp "$CLASSES;$OUT" PresetTest        # E8 presets: slot file (Windows-safe replace, bad lines), encoding, name= in the world save, two-click confirmation with an injected clock, preset data, load (reused/new instance, refusals leave the set untouched, full reset incl. Spline points) (63 asserts)
 ```
 
 `CentreTest`, `Step4Test`, `BaseSetTest` are the Step 3/4 and 2.2c checks;

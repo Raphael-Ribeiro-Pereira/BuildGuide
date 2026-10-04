@@ -2,8 +2,10 @@ package brentmaas.buildguide.common.shape;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import brentmaas.buildguide.common.BuildGuide;
+import brentmaas.buildguide.common.PresetStore;
 import brentmaas.buildguide.common.screen.BaseScreen;
 
 public class ShapeSet {
@@ -15,6 +17,9 @@ public class ShapeSet {
 	private static final String PERSISTENCE_SHAPECUBESIZE = "shapeCubeSize";
 	private static final String PERSISTENCE_ORIGINCUBESIZE = "originCubeSize";
 	private static final String PERSISTENCE_EXCLUSIONS = "exclusions";
+	// Instance name typed in the Shape tab (E8; E6 kept it in memory only). Written last, URL-encoded: a jar
+	// without it skips the unknown key, a save without it gives the default "Type #N"
+	private static final String PERSISTENCE_NAME = "name";
 	
 	public Shape[] shapes;
 	private int index;
@@ -22,6 +27,8 @@ public class ShapeSet {
 	private Origin origin;
 	
 	private boolean visible = true;
+	// null = default name ("Type #N")
+	private String name = null;
 
 	public static final float defaultColourShapeR = 1.0f;
 	public static final float defaultColourShapeG = 1.0f;
@@ -223,6 +230,16 @@ public class ShapeSet {
 		BaseScreen.shouldUpdatePersistence = true;
 	}
 	
+	// Typed instance name, null for the default
+	public String getName() {
+		return name;
+	}
+	
+	public void setName(String name) {
+		this.name = name == null || name.trim().isEmpty() ? null : name.trim();
+		BaseScreen.shouldUpdatePersistence = true;
+	}
+	
 	public boolean isVisible() {
 		return visible;
 	}
@@ -252,15 +269,36 @@ public class ShapeSet {
 		persistenceData += PERSISTENCE_ORIGINCOLOUR + "=" + colourOriginR + "," + colourOriginG + "," + colourOriginB + "," + colourOriginA + ";";
 		persistenceData += PERSISTENCE_SHAPECUBESIZE + "=" + shapeCubeSize + ";";
 		persistenceData += PERSISTENCE_ORIGINCUBESIZE + "=" + originCubeSize + ";";
-		String exclusions = "";
-		for(ExclusionBox b: exclusionBoxes) exclusions += (exclusions.isEmpty() ? "" : ",") + (b.enabled ? 1 : 0) + "," + b.minX + "," + b.minY + "," + b.minZ + "," + b.maxX + "," + b.maxY + "," + b.maxZ;
-		persistenceData += PERSISTENCE_EXCLUSIONS + "=" + exclusions + ";";
+		persistenceData += PERSISTENCE_EXCLUSIONS + "=" + exclusionsPersistence() + ";";
 		for(Shape s: shapes) {
 			if(s != null) {
 				persistenceData += s.getClass().getName() + "=" + s.toPersistence() + ";";
 			}
 		}
+		if(name != null) persistenceData += PERSISTENCE_NAME + "=" + PresetStore.encode(name) + ";";
 		return persistenceData;
+	}
+
+	private String exclusionsPersistence() {
+		String exclusions = "";
+		for(ExclusionBox b: exclusionBoxes) exclusions += (exclusions.isEmpty() ? "" : ",") + (b.enabled ? 1 : 0) + "," + b.minX + "," + b.minY + "," + b.minZ + "," + b.maxX + "," + b.maxY + "," + b.maxZ;
+		return exclusions;
+	}
+
+	/**
+	 * Preset of the current shape (E8), in the same "key=value;" format as the world save: type,
+	 * origin, exclusion boxes, the shape's values, the name when typed, and the world it came from
+	 * (for the slot label). Colours and cube sizes are the set's look, not the shape: left out
+	 */
+	public String toPresetString(String world) {
+		Shape s = getShape();
+		String data = PERSISTENCE_INDEX + "=" + index + ";";
+		data += PERSISTENCE_ORIGIN + "=" + origin.x + "," + origin.y + "," + origin.z + ";";
+		data += PERSISTENCE_EXCLUSIONS + "=" + exclusionsPersistence() + ";";
+		data += s.getClass().getName() + "=" + s.toPersistence() + ";";
+		if(name != null) data += PERSISTENCE_NAME + "=" + PresetStore.encode(name) + ";";
+		data += PresetStore.KEY_WORLD + "=" + PresetStore.encode(world == null ? "" : world) + ";";
+		return data;
 	}
 	
 	public void restorePersistence(String persistenceData) {
@@ -301,6 +339,9 @@ public class ShapeSet {
 					shapeCubeSize = Double.parseDouble(value);
 				}else if(key.equals(PERSISTENCE_ORIGINCUBESIZE)){
 					originCubeSize = Double.parseDouble(value);
+				}else if(key.equals(PERSISTENCE_NAME)) {
+					name = PresetStore.decode(value).trim();
+					if(name.isEmpty()) name = null;
 				}else if(key.equals(PERSISTENCE_EXCLUSIONS)) {
 					String[] v = value.split(",");
 					for(int i = 0;i < numExclusionBoxes && i * 7 + 6 < v.length;++i) {
@@ -324,7 +365,66 @@ public class ShapeSet {
 		}
 		index = Math.max(0, Math.min(shapes.length - 1, index));
 	}
-	
+
+	/**
+	 * Load a preset (E8) into this set, replacing the current shape: type, the shape's values, origin,
+	 * exclusion boxes and name. Everything is parsed and checked first; on a problem nothing changes
+	 * and a translation key is returned (unknown shape type: a preset from a jar with a shape this one
+	 * lacks). The instance of that type is reused when the set already has one (other types' instances
+	 * stay, reachable from the type dropdown), created with its defaults otherwise. Does not
+	 * regenerate: applyPreset does, this split lets the harness run without the loader
+	 */
+	public String applyPresetValues(String data) {
+		Map<String, String> e = PresetStore.entries(data);
+		String shapeClass = PresetStore.describe(data)[0];
+		int id = shapeClass == null ? -1 : ShapeRegistry.getShapeId(shapeClass);
+		if(id < 0) return "screen.buildguide.preset.unknowntype";
+		int[] o = new int[3];
+		int[][] boxes = new int[numExclusionBoxes][7];
+		try {
+			String[] v = e.containsKey(PERSISTENCE_ORIGIN) ? e.get(PERSISTENCE_ORIGIN).split(",") : new String[0];
+			if(v.length != 3) return "screen.buildguide.preset.invalid";
+			for(int i = 0;i < 3;++i) o[i] = Integer.parseInt(v[i]);
+			String[] x = e.containsKey(PERSISTENCE_EXCLUSIONS) ? e.get(PERSISTENCE_EXCLUSIONS).split(",") : new String[0];
+			for(int i = 0;i < numExclusionBoxes && i * 7 + 6 < x.length;++i) {
+				boxes[i][0] = "1".equals(x[i * 7]) ? 1 : 0;
+				for(int k = 1;k < 7;++k) boxes[i][k] = Integer.parseInt(x[i * 7 + k]);
+			}
+		}catch(NumberFormatException ex) {
+			return "screen.buildguide.preset.invalid";
+		}
+
+		Shape s = shapes[id];
+		if(s == null) {
+			s = initialiseShape(shapeClass);
+			shapes[id] = s;
+		}
+		s.loadPresetValues(e.get(shapeClass));
+		index = id;
+		for(int i = 0;i < numExclusionBoxes;++i) {
+			ExclusionBox b = exclusionBoxes[i];
+			b.enabled = boxes[i][0] == 1;
+			b.minX = boxes[i][1];
+			b.minY = boxes[i][2];
+			b.minZ = boxes[i][3];
+			b.maxX = boxes[i][4];
+			b.maxY = boxes[i][5];
+			b.maxZ = boxes[i][6];
+		}
+		setName(e.containsKey(PERSISTENCE_NAME) ? PresetStore.decode(e.get(PERSISTENCE_NAME)) : null);
+		setOrigin(o[0], o[1], o[2]); // a changed origin requests a scan (P4)
+		onExclusionsChanged();
+		BaseScreen.shouldUpdatePersistence = true; // the world save must write the loaded shape
+		return null;
+	}
+
+	// applyPresetValues, then one regeneration of the loaded shape (it requests its own scan)
+	public String applyPreset(String data) {
+		String problem = applyPresetValues(data);
+		if(problem == null) getShape().update();
+		return problem;
+	}
+
 	public ExclusionBox getExclusionBox(int i) {
 		return exclusionBoxes[i];
 	}

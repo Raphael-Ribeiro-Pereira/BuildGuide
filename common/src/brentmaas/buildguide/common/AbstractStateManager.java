@@ -67,6 +67,14 @@ public abstract class AbstractStateManager {
 		return new File(persistenceFolder, safeKey + PERSISTENCE_EXTENSION);
 	}
 	
+	// Readable name of the current world for labels (E8 presets): the singleplayer world name, else the
+	// server address, else "unknown". No dimension
+	public String getWorldLabel() {
+		String host = getWorldName();
+		if(host == null) host = getServerAddress();
+		return host == null ? "unknown" : host;
+	}
+	
 	public void savePersistence() throws IOException {
 		String key = getKey();
 		stateStore.get(key).savePersistence(getPersistenceFile(key));

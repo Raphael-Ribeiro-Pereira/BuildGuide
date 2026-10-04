@@ -14,6 +14,11 @@ public class ButtonImpl extends Button.Plain implements IButton {
 		this.active = active;
 	}
 	
+	@Override
+	public void setTitle(Translatable title) {
+		setMessage(Component.translatable(title.getTranslationKey(), title.getValues()));
+	}
+	
 	public ButtonImpl(int x, int y, int width, int height, Translatable text, IButton.IPressable onPress) {
 		super(x, y, width, height, Component.translatable(text.getTranslationKey(), text.getValues()), button -> onPress.onPress(), DEFAULT_NARRATION);
 	}

@@ -276,6 +276,30 @@ public abstract class Shape implements IValidatable {
 		if(changed) update();
 	}
 	
+	/**
+	 * Preset load (E8): every property back to its default, the protected ones too (a preset from an
+	 * older jar with fewer values must not keep this instance's control points), then the preset's
+	 * values on top. A running generation is cancelled first and the values change under the lock,
+	 * so the executor never reads them half-set. No update(): the caller regenerates once. Returns
+	 * false if a value could not be parsed (restorePersistence sets error).
+	 */
+	@SuppressWarnings("unchecked")
+	public boolean loadPresetValues(String persistenceData) {
+		cancelFuture();
+		lock.lock();
+		try {
+			for(Property<?> p: properties) {
+				Object def = defaults.get(p);
+				if(def == null || def instanceof Runnable) continue;
+				((Property<Object>) p).setValue(def);
+			}
+			restorePersistence(persistenceData);
+		}finally {
+			lock.unlock();
+		}
+		return !error;
+	}
+
 	// Everything the screen must add as widgets: the persisted properties that are not hidden plus the GUI-only ones
 	public List<Property<?>> getGuiProperties() {
 		if(guiOnlyProperties.isEmpty() && hiddenProperties.isEmpty()) return properties;

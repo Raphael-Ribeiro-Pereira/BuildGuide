@@ -87,8 +87,8 @@ public class ShapeScreen extends BaseScreen{
 		bands = new ShapeLayout(wrapper.getHeight());
 		buttonValidate.setYPosition(bands.bottomRowY);
 		buttonReset.setYPosition(bands.bottomRowY);
-		// Save is a placeholder until E7 (it will write the set, its name included): clickable, does nothing
-		buttonSave = BuildGuide.widgetHandler.createButton(wrapper.getWidth() - 64, 0, saveWidth, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.save"), () -> {});
+		// Save opens the preset menu (E8): 3 global slots, saved, loaded and cleared there
+		buttonSave = BuildGuide.widgetHandler.createButton(wrapper.getWidth() - 64, 0, saveWidth, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.save"), () -> BuildGuide.screenHandler.showScreen(new PresetScreen(this)));
 		// Instance name: a label; clicking it shows this field, Enter stores the name and hides it again
 		textFieldName = BuildGuide.widgetHandler.createTextField(nameX, 0, nameEnd() - nameX, AbstractWidgetHandler.defaultSize, "");
 		textFieldName.setVisibility(false);
@@ -345,7 +345,7 @@ public class ShapeScreen extends BaseScreen{
 	
 	// Name typed for the current set, or "Type #N" (N = its position in the list)
 	private String instanceName() {
-		String name = BuildGuide.stateManager.getState().shapeSetNames.get(BuildGuide.stateManager.getState().getCurrentShapeSet());
+		String name = BuildGuide.stateManager.getState().getCurrentShapeSet().getName();
 		if(name != null) return name;
 		return new Translatable(BuildGuide.stateManager.getState().getCurrentShape().getTranslationKey()).toString() + " #" + (BuildGuide.stateManager.getState().getShapeSetIndex() + 1);
 	}
@@ -353,18 +353,9 @@ public class ShapeScreen extends BaseScreen{
 	private boolean editingName = false;
 	
 	private void applyName() {
-		String name = textFieldName.getTextValue().trim();
-		if(name.isEmpty()) BuildGuide.stateManager.getState().shapeSetNames.remove(BuildGuide.stateManager.getState().getCurrentShapeSet());
-		else BuildGuide.stateManager.getState().shapeSetNames.put(BuildGuide.stateManager.getState().getCurrentShapeSet(), name);
+		BuildGuide.stateManager.getState().getCurrentShapeSet().setName(textFieldName.getTextValue()); // empty = default name; saved with the world since E8
 		editingName = false;
 		textFieldName.setVisibility(false);
-	}
-	
-	// Cuts a string to the given pixel width, ending in ".."
-	private String fit(String text, int width) {
-		if(wrapper == null || wrapper.getTextWidth(text) <= width) return text;
-		while(text.length() > 1 && wrapper.getTextWidth(text + "..") > width) text = text.substring(0, text.length() - 1);
-		return text + "..";
 	}
 	
 	// Previous / next shape set (wraps); the screen is rebuilt for the new set's properties

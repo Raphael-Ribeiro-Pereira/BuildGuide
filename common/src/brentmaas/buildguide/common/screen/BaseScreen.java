@@ -197,6 +197,13 @@ public abstract class BaseScreen {
 		if(wrapper != null) wrapper.drawShadow(text, x - wrapper.getTextWidth(text), y, colour);
 	}
 	
+	// Cuts a string to the given pixel width, ending in ".." (moved from ShapeScreen in E8, the preset menu uses it too)
+	protected String fit(String text, int width) {
+		if(wrapper == null || wrapper.getTextWidth(text) <= width) return text;
+		while(text.length() > 1 && wrapper.getTextWidth(text + "..") > width) text = text.substring(0, text.length() - 1);
+		return text + "..";
+	}
+	
 	public void fillRect(int x1, int y1, int x2, int y2, int colour) {
 		if(wrapper != null) wrapper.fillRect(x1, y1, x2, y2, colour);
 	}

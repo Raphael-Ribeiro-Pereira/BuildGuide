@@ -6,8 +6,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.util.ArrayList;
-import java.util.IdentityHashMap;
-import java.util.Map;
 import java.util.Random;
 import java.util.Scanner;
 
@@ -47,9 +45,6 @@ public class State {
 	// Origin section of the Shape tab's accordion is open (GUI redesign E5). Transient, here because
 	// ShapeScreen is rebuilt on every tab switch; the shapes keep their own open section
 	public boolean originOpen = false;
-	// Instance names typed in the Shape tab's header (E6). In memory only: not written by
-	// savePersistence yet (E7 saves them); a set without an entry shows "Type #N"
-	public final Map<ShapeSet, String> shapeSetNames = new IdentityHashMap<ShapeSet, String>();
 	// Tab of the Shape screen's error list the user picked (transient); null = automatic: Errors when
 	// there are structure errors, Missing otherwise
 	public ValidationListComponent.Category listTab = null;
