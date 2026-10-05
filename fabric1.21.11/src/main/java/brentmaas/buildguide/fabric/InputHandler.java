@@ -35,5 +35,10 @@ public class InputHandler extends AbstractInputHandler {
 		public boolean isDown() {
 			return bind.isDown();
 		}
+		
+		@Override
+		public boolean consumePress() {
+			return bind.consumeClick();
+		}
 	}
 }

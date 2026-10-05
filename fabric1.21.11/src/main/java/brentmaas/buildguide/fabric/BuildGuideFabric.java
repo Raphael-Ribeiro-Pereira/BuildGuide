@@ -4,6 +4,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import brentmaas.buildguide.common.BuildGuide;
+import brentmaas.buildguide.fabric.place.PlacementHud;
 import brentmaas.buildguide.fabric.preview.PreviewRenderer;
 import brentmaas.buildguide.fabric.screen.ScreenHandler;
 import brentmaas.buildguide.fabric.screen.widget.WidgetHandler;
@@ -20,5 +21,7 @@ public class BuildGuideFabric implements ClientModInitializer {
 		BuildGuide.registerInputHandler(new InputHandler());
 		// 3D preview: a picture-in-picture GUI renderer. Must be registered before the GuiRenderer is built
 		SpecialGuiElementRegistry.register(context -> new PreviewRenderer(context.vertexConsumers()));
+		// Area 3: placing into the guideline (the label under the crosshair; the click hooks itself through MixinMinecraft)
+		PlacementHud.register();
 	}
 }

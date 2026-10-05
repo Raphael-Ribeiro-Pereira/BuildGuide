@@ -18,6 +18,7 @@
 	"key.buildguide.setorigin": "Set origin",
 	"key.buildguide.setglobalorigin": "Set global origin",
 	"key.buildguide.toggleenable": "Toggle enabled",
+	"key.buildguide.toggleplace": "Toggle placing into the guideline",
 	
 	"_comment": "Shape properties",
 	"property.buildguide.addlength": "Extra length",
@@ -138,6 +139,7 @@
 	"screen.buildguide.toggle": "Toggle",
 	"screen.buildguide.toosmall": "Build Guide needs at least %s x %s GUI pixels (now %s x %s).",
 	"screen.buildguide.toosmall.hint": "Lower the GUI scale in Options > Video Settings.",
+	"hud.buildguide.place": "Guideline placement",
 	"screen.buildguide.preset.title": "Presets (all worlds)",
 	"screen.buildguide.preset.empty": "Empty",
 	"screen.buildguide.preset.save": "Save",

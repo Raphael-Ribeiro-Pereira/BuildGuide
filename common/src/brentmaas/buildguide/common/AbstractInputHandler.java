@@ -7,6 +7,7 @@ public abstract class AbstractInputHandler {
 	private IKeyBind toggleEnable;
 	private IKeyBind setOrigin;
 	private IKeyBind setGlobalOrigin;
+	private IKeyBind togglePlace;
 	
 	public abstract IKeyBind registerKeyBind(String name, int keyCode);
 	public abstract void registerOnKeyInput();
@@ -16,9 +17,18 @@ public abstract class AbstractInputHandler {
 		toggleEnable = registerKeyBind("key.buildguide.toggleenable", KeyCode.GLFW_KEY_UNKNOWN);
 		setOrigin = registerKeyBind("key.buildguide.setorigin", KeyCode.GLFW_KEY_UNKNOWN);
 		setGlobalOrigin = registerKeyBind("key.buildguide.setglobalorigin", KeyCode.GLFW_KEY_UNKNOWN);
+		togglePlace = registerKeyBind("key.buildguide.toggleplace", KeyCode.GLFW_KEY_G);
 	}
 	
 	public void onKeyInput() {
+		// Area 3: placing into the guideline, on and off. One toggle per press (consumePress), not per tick held.
+		// An if, not a while: the default consumePress is isDown, which would never end the loop
+		if(togglePlace.consumePress()) {
+			State state = BuildGuide.stateManager.getState();
+			state.placeMode = !state.placeMode;
+			if(!state.placeMode) state.placeTarget = null;
+		}
+		
 		if(openBuildGuide.isDown()) {
 			BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen());
 		}
@@ -45,6 +55,11 @@ public abstract class AbstractInputHandler {
 		public static final String category = "key.category.buildguide.buildguide";
 		
 		public boolean isDown();
+		
+		// True once per press (the loader's click counter). Default: isDown, for loaders that do not implement it
+		public default boolean consumePress() {
+			return isDown();
+		}
 	}
 	
 	public static class KeyCode {
