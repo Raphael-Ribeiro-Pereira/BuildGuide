@@ -23,6 +23,9 @@ import brentmaas.buildguide.common.shape.ValidationState.NearBlock;
  */
 public class ValidationOverlay {
 	public static final int maxCubes = 4000;
+	// The position picked in the error list: white, the strongest alpha of the overlay (also the faces of the
+	// area 3 target outline, TargetOutline)
+	public static final int highlightR = 255, highlightG = 255, highlightB = 255, highlightA = 200;
 	// Slightly larger than the shape cubes so the colour reads through the guide
 	private static final double cubeSize = 0.7;
 	// Shell around a solid block: this far outside each face. Raise it if the faces z-fight at a distance
@@ -53,7 +56,7 @@ public class ValidationOverlay {
 			}
 		}
 		if(highlighted != -1) {
-			buffer.setColour(255, 255, 255, 200);
+			buffer.setColour(highlightR, highlightG, highlightB, highlightA);
 			// Untracked position = structure error (solid): shell. Tracked ones are the shape's own positions
 			if(state.getStatus(highlighted) == ValidationState.UNKNOWN) pushShell(buffer, highlighted);
 			else pushCube(buffer, highlighted);

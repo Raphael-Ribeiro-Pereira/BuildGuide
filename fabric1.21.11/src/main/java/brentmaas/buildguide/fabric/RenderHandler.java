@@ -16,12 +16,12 @@ import com.mojang.blaze3d.systems.RenderSystem;
 
 import brentmaas.buildguide.common.AbstractRenderHandler;
 import brentmaas.buildguide.common.BuildGuide;
-import brentmaas.buildguide.common.shape.CubeMesh;
 import brentmaas.buildguide.common.shape.GuidelinePicker;
 import brentmaas.buildguide.common.shape.Shape;
 import brentmaas.buildguide.common.shape.LocalPos;
 import brentmaas.buildguide.common.shape.ShapeSet;
 import brentmaas.buildguide.common.shape.StateReconciler;
+import brentmaas.buildguide.common.shape.TargetOutline;
 import brentmaas.buildguide.common.shape.ValidationOverlay;
 import brentmaas.buildguide.common.shape.ValidationState;
 import brentmaas.buildguide.common.shape.ValidationState.NearBlock;
@@ -264,8 +264,10 @@ public class RenderHandler extends AbstractRenderHandler {
 	private double[] playerBox;
 	private WorldProbe placeProbe;
 	private GuidelinePicker.Target placeBest;
-	// A unit cube slightly larger than a block, translucent cyan (no status uses cyan); built once, moved per frame
+	// TargetOutline (white faces, black edges) for the target's cube size; rebuilt only when the size
+	// changes, moved per frame
 	private ShapeBuffer placeOutline;
+	private double placeOutlineSize = Double.NaN;
 
 	@Override
 	protected void beginPlacementFrame() {
@@ -301,7 +303,8 @@ public class RenderHandler extends AbstractRenderHandler {
 		Shape shape = shapeSet.getShape();
 		GuidelinePicker.Cells cells = GuidelinePicker.shapeCells(shape.getExpectedBlocks(), shapeSet.getOriginX(), shapeSet.getOriginY(), shapeSet.getOriginZ(), shapeSet.getActiveExclusionBoxes());
 		GuidelinePicker.Target target = GuidelinePicker.pick(eyeX, eyeY, eyeZ, lookX, lookY, lookZ, placeReach, realHit, playerBox, cells, placeProbe);
-		if(target != null && (placeBest == null || target.distance < placeBest.distance)) placeBest = target;
+		// The set's cube size travels with the target, for the outline only: the choice is unchanged
+		if(target != null && (placeBest == null || target.distance < placeBest.distance)) placeBest = new GuidelinePicker.Target(target.x, target.y, target.z, target.distance, shapeSet.getShapeCubeSize());
 	}
 
 	@Override
@@ -311,11 +314,12 @@ public class RenderHandler extends AbstractRenderHandler {
 		BuildGuide.stateManager.getState().placeTarget = placeBest;
 		PlacementClick.noteTarget(placeBest);
 		if(placeBest == null) return;
-		if(placeOutline == null) {
+		if(placeOutline == null || placeOutlineSize != placeBest.cubeSize) {
+			if(placeOutline != null) placeOutline.close();
 			placeOutline = new ShapeBuffer();
-			placeOutline.setColour(60, 200, 255, 110);
-			CubeMesh.push(placeOutline, -0.03, -0.03, -0.03, 1.06);
+			TargetOutline.build(placeOutline, placeBest.cubeSize);
 			placeOutline.end();
+			placeOutlineSize = placeBest.cubeSize;
 		}
 		Vec3 camera = mc.gameRenderer.getMainCamera().position();
 		RenderSystem.getModelViewStack().pushMatrix();

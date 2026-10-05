@@ -25,12 +25,19 @@ public final class GuidelinePicker {
 		public final int x, y, z;
 		// Distance from the eye to where the ray enters the cell
 		public final double distance;
+		// shapeCubeSize of the set the cell belongs to (for the outline; 1.0 when unknown)
+		public final double cubeSize;
 
 		public Target(int x, int y, int z, double distance) {
+			this(x, y, z, distance, 1.0);
+		}
+
+		public Target(int x, int y, int z, double distance, double cubeSize) {
 			this.x = x;
 			this.y = y;
 			this.z = z;
 			this.distance = distance;
+			this.cubeSize = cubeSize;
 		}
 	}
 
