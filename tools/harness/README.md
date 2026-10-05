@@ -35,6 +35,8 @@ java  -cp "$CLASSES;$OUT" PreviewViewTest   # preview filter and slice through P
 java  -cp "$CLASSES;$OUT" ShapeLayoutTest   # E7 Shape-tab bands from the height (= E6 at 270), D1 minimum check (17 asserts)
 java  -cp "$CLASSES;$OUT" OriginScanTest    # P4 scan origin: results stay in the world, overlay offset exactly 0 when origins match, list rows, debounce, every ShapeSet origin path and the global origin (36 asserts)
 java  -cp "$CLASSES;$OUT" PresetTest        # E8 presets: slot file (Windows-safe replace, bad lines), encoding, name= in the world save, two-click confirmation with an injected clock, preset data, load (reused/new instance, refusals leave the set untouched, full reset incl. Spline points) (63 asserts)
+java  -cp "$CLASSES;$OUT" ReconcileTest     # ghost fix: safety net (stuck error before, gone after; chunk gate; scan/unvalidated gates; round robin with 50k positions; log limit), update idempotence, client model with and without the second hook, cost per pass (35 asserts)
+java  -cp "$CLASSES;$OUT" GhostTest         # not an assert test: prints how a ghost error can arise in a model of the 1.21.11 client block-change code (ReconcileTest also drives it)
 ```
 
 `CentreTest`, `Step4Test`, `BaseSetTest` are the Step 3/4 and 2.2c checks;

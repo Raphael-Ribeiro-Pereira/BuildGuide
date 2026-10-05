@@ -19,6 +19,9 @@ public abstract class AbstractRenderHandler {
 	// Hook for loader-specific world validation; called once per rendered shape set
 	protected void validateShape(ShapeSet shapeSet) {}
 	
+	// Hook for the validation safety net (StateReconciler); called right after validateShape, under the shape's lock
+	protected void reconcileShape(ShapeSet shapeSet) {}
+	
 	// Hook for the validation overlay (coloured error cubes); called inside the shape set's translation, after its buffer
 	protected void renderValidationOverlay(ShapeSet shapeSet) {}
 	
@@ -46,6 +49,7 @@ public abstract class AbstractRenderHandler {
 					if(BuildGuide.stateManager.getState().isHighlightErrors()) renderValidationOverlay(shapeSet);
 					endRenderingShapeSet();
 					validateShape(shapeSet);
+					reconcileShape(shapeSet);
 				}
 			}finally {
 				shapeSet.getShape().lock.unlock();

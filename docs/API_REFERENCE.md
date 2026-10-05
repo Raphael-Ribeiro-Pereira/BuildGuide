@@ -81,8 +81,10 @@ held by every `Shape` in a `transient` field (never persisted):
 
 **Incremental validation (Etapa 2.2).** `fabric/mixin/MixinClientLevel` injects at the
 return of `ClientLevel.setBlock(BlockPos, BlockState, int, int)` — the single point where
-server block updates, section updates, local placement prediction and block destruction
-converge (chunk loads do not: that is what the Validate scan is for). It calls
+local placement prediction, block destruction and the server's correction at the
+acknowledgement (`syncBlockState`) converge. Server `BlockUpdate` / section updates do **not**
+all reach it, and neither do chunk loads (that is what the Validate scan is for): see "Ghost
+fix" below for the second hook and the safety net. It calls
 `fabric/validation/IncrementalValidator.onBlockChanged`, which for every shape set with an
 instantiated `IValidatable` shape does, cheapest first: `isInRange(local)` (validated **and**
 inside the expected bounding box expanded by `nearRadius` = 2, ~0.01 µs), then
@@ -113,6 +115,47 @@ Known gap: chunks that reload after flying away do not trigger a rescan (nothing
 state while they are unloaded, so counts only drift if the world changed meanwhile);
 the cheap future hook is Fabric API `ClientChunkEvents.CHUNK_LOAD` → `requestScan()` for
 shapes whose bounding box intersects the chunk.
+
+**Ghost fix: second hook and safety net.** Symptom (found building a ~2000-block cone): a
+wrong block placed and broken at once could leave its structure error in the list and the
+overlay although the world was fine; Validate, or placing and breaking another block on the
+same position, cleared it. Cause found in the decompiled 1.21.11 client:
+`ClientLevel.setServerVerifiedBlockState` stores the server's state for a pending prediction,
+and **without** one calls `Level.setBlock` through `invokespecial`, which skips the
+`ClientLevel.setBlock` override the first hook sits on. So a server change to a position with
+no prediction pending (a block that falls, another player, fire, an update arriving after its
+prediction was settled by the ack) never reached the validation. The ack's `syncBlockState`
+does go through the override. Which exact sequence left Raphael's ghost was not proven; the
+model of the client code (harness `GhostTest`) leaves no ghost with the server's normal order
+(update before its ack), and leaves one whenever a removal arrives with no prediction pending.
+Two fixes, independent of each other:
+- *Second hook,* `MixinClientLevel.buildguide$onServerVerified`, injected at the return of
+  `setServerVerifiedBlockState`: reads `getBlockState(pos)` (the block that is in the world, not
+  the one requested) and calls the same `IncrementalValidator.onBlockChanged`. Idempotent with the
+  first hook: `ValidationState.updateBlock` told the same thing twice changes no count and does
+  not bump `version` (a near block already known with the same name and distance is left alone).
+- *Safety net,* `common/shape/StateReconciler` (events are an optimisation, the world is the
+  truth). `AbstractRenderHandler.reconcileShape` (no-op by default, called after `validateShape`
+  under the shape's lock) lets the Fabric `RenderHandler` run a pass per validated shape every
+  `StateReconciler.intervalMillis` = 250 ms (`ValidationState.isReconcileDue/markReconciled`).
+  A pass reads the world through `IBlockProbe` (`isLoaded`, `flags` = air / solid / ignored,
+  `name`; Fabric: `validation/WorldProbe`, `hasChunkAt` + `getBlockState`): **every** tracked
+  structure error is re-read and removed (`ValidationState.removeNearBlock`) when it is no longer
+  a solid, non-ignored block; and up to `checksPerPass` = 4000 tracked positions, round robin
+  from `getReconcileCursor` over `getTrackedPositions()` (list built once per scan; positions
+  excluded since are skipped by `isTracked`), have OK / MISSING / IGNORED corrected with the
+  scan's rule. Gates: nothing on an unvalidated state or with a scan pending; only positions
+  whose chunk is loaded are judged (an unloaded chunk reads as air). All positions are local to
+  the scan origin (P4). Every correction logs one line to the game log
+  (`BuildGuide.logHandler.debugOrHigher`, no chat):
+  `[Build Guide] safety net corrected [x, y, z]: was <status>, world says <status>` with world
+  coordinates, at most `ValidationState.maxLoggedCorrections` = 200 per shape, then a notice;
+  `getReconcileCorrections()` keeps counting. Cost in the harness (fake world, one HashMap read
+  per position): 0.36 ms per pass at 2,000 positions, 0.82 ms at 50,000 (the whole shape is
+  re-read every 3.3 s); the real `getBlockState` cost was not measured in game. Limitation: the
+  net only removes errors and corrects expected positions; it does not add a structure error
+  that appeared without an event (that would mean sweeping the neighbourhood of every expected
+  position).
 
 **Scan origin (P4).** Every local position in a `ValidationState` (status, near blocks,
 highlight, bounding box) is relative to the origin **of its last scan**, not to the current

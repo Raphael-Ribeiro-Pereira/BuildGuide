@@ -19,10 +19,12 @@ import brentmaas.buildguide.common.BuildGuide;
 import brentmaas.buildguide.common.shape.Shape;
 import brentmaas.buildguide.common.shape.LocalPos;
 import brentmaas.buildguide.common.shape.ShapeSet;
+import brentmaas.buildguide.common.shape.StateReconciler;
 import brentmaas.buildguide.common.shape.ValidationOverlay;
 import brentmaas.buildguide.common.shape.ValidationState;
 import brentmaas.buildguide.common.shape.ValidationState.NearBlock;
 import brentmaas.buildguide.fabric.shape.ShapeBuffer;
+import brentmaas.buildguide.fabric.validation.WorldProbe;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -234,6 +236,19 @@ public class RenderHandler extends AbstractRenderHandler {
 		state.setNearBlocks(near);
 		state.endScan();
 		logValidation(state);
+	}
+
+	// Safety net (StateReconciler): block events miss some server-side changes, so a few tracked
+	// positions are re-read from the world every 250 ms. Runs under the shape's lock, right after validateShape
+	@Override
+	protected void reconcileShape(ShapeSet shapeSet) {
+		ValidationState state = shapeSet.getShape().getValidationState();
+		long now = System.currentTimeMillis();
+		if(!state.isReconcileDue(now, StateReconciler.intervalMillis)) return;
+		ClientLevel world = Minecraft.getInstance().level;
+		if(world == null) return;
+		state.markReconciled(now);
+		StateReconciler.run(state, new WorldProbe(world), StateReconciler.checksPerPass, line -> BuildGuide.logHandler.debugOrHigher(line));
 	}
 
 	// Block ids the user chose to ignore (Configuration screen), resolved through the registry here so common stays Minecraft-free

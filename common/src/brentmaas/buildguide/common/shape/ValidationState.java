@@ -72,6 +72,16 @@ public class ValidationState {
 	// blocks, highlight, bounding box) is relative to it, not to the current origin: moving the origin
 	// leaves the results where they were in the world until the rescan (P4)
 	private int scanOriginX = 0, scanOriginY = 0, scanOriginZ = 0;
+	// Safety net (StateReconciler): block events are an optimisation, the world is the truth. The
+	// reconciler re-reads a few positions per pass, round robin over the tracked positions
+	private int scanCount = 0;
+	private long[] trackedCache = null;
+	private int trackedCacheScan = -1;
+	private int reconcileCursor = 0;
+	private long lastReconcileAt = 0;
+	private long reconcileCorrections = 0;
+	private int reconcileLogged = 0;
+	public static final int maxLoggedCorrections = 200;
 
 	// The shape regenerated: everything known so far is stale
 	public synchronized void invalidate() {
@@ -98,6 +108,8 @@ public class ValidationState {
 		scanOriginX = ox;
 		scanOriginY = oy;
 		scanOriginZ = oz;
+		++scanCount;
+		reconcileCursor = 0;
 		for(long pos: expected) {
 			int x = LocalPos.unpackX(pos), y = LocalPos.unpackY(pos), z = LocalPos.unpackZ(pos);
 			if(isExcluded(x, y, z)) continue;
@@ -140,6 +152,63 @@ public class ValidationState {
 
 	public synchronized int getScanOriginZ() {
 		return scanOriginZ;
+	}
+
+	// ---- safety net support (StateReconciler)
+
+	public synchronized boolean isTracked(long pos) {
+		return status.containsKey(pos);
+	}
+
+	// The tracked positions as of the last scan, in a stable order for the round robin (rebuilt once
+	// per scan; positions excluded since are filtered by isTracked)
+	public synchronized long[] getTrackedPositions() {
+		if(trackedCache == null || trackedCacheScan != scanCount) {
+			trackedCache = new long[status.size()];
+			int i = 0;
+			for(long pos: status.keySet()) trackedCache[i++] = pos;
+			trackedCacheScan = scanCount;
+		}
+		return trackedCache;
+	}
+
+	public synchronized int getReconcileCursor() {
+		return reconcileCursor;
+	}
+
+	public synchronized void setReconcileCursor(int cursor) {
+		reconcileCursor = cursor;
+	}
+
+	// True when intervalMillis passed since the last pass
+	public synchronized boolean isReconcileDue(long nowMillis, long intervalMillis) {
+		return nowMillis - lastReconcileAt >= intervalMillis;
+	}
+
+	public synchronized void markReconciled(long nowMillis) {
+		lastReconcileAt = nowMillis;
+	}
+
+	public synchronized void addReconcileCorrections(int n) {
+		reconcileCorrections += n;
+	}
+
+	public synchronized long getReconcileCorrections() {
+		return reconcileCorrections;
+	}
+
+	// 0 = do not log (limit reached), 1 = log, 2 = log, and this was the last line allowed
+	public synchronized int takeLogSlot() {
+		if(reconcileLogged >= maxLoggedCorrections) return 0;
+		++reconcileLogged;
+		return reconcileLogged == maxLoggedCorrections ? 2 : 1;
+	}
+
+	// Remove one structure error that the world no longer shows; true if it was there
+	public synchronized boolean removeNearBlock(long local) {
+		if(nearBlocks.remove(local) == null) return false;
+		++version;
+		return true;
 	}
 
 	// Scan origin minus the current origin (ox, oy, oz): the extra translation of the overlay, drawn
@@ -268,6 +337,10 @@ public class ValidationState {
 			}
 		}
 		if(best <= nearRadius) {
+			// Idempotent: the same block seen twice (setBlock hook and server-update hook, or the safety
+			// net) changes nothing, so the list and the overlay are not rebuilt for it
+			NearBlock existing = nearBlocks.get(local);
+			if(existing != null && existing.distance == (float) best && java.util.Objects.equals(existing.blockName, blockName)) return;
 			nearBlocks.put(local, new NearBlock(local, blockName, (float) best));
 			++version;
 		}else if(nearBlocks.remove(local) != null) ++version;
