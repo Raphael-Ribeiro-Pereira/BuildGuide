@@ -166,7 +166,8 @@ Only the latest one matters; diff the next change against it.
 | `f08d981` | GUI redesign E6 — Shape header, right panel (preview with filter/slice, list tabs, legend), Validation tab removed; fixes: background under widgets, empty-view crash. Committed under the message "docs: record E6 commit and baseline" (a failed commit command; the code, tests and docs of E6 are all in it) | `E6fix2` |
 | `30f14aa` | GUI redesign E7 — proportional layout (`ShapeLayout`, bottoms follow the height), too-small message below 480 x 270 (D1), Visualisation third column (R10) | `E7` |
 | `98f6e4b` | P4 — validation state bound to the scan origin (overlay, list, incremental); origin changes request a debounced rescan | `P4` |
-| `acf4904` | GUI redesign E8 — presets: Save menu with 3 global slots (`buildguide_presets.txt`), load replacing the shape, instance name saved with the world | `E8` (current) |
+| `acf4904` | GUI redesign E8 — presets: Save menu with 3 global slots (`buildguide_presets.txt`), load replacing the shape, instance name saved with the world | `E8` |
+| `9c3fbde` | Ghost fix — second block-change hook (`setServerVerifiedBlockState`) and the `StateReconciler` safety net for validation errors that outlive their block | `GHOSTFIX` (current) |
 
 GUI redesign plan and decisions: `docs/GUI_REDESIGN.md` (stages E1–E8). Project status, final
 jars, rules going forward and backlog: `docs/STATUS.md`.

@@ -56,10 +56,13 @@ follow-up that writes the hash into `CLAUDE.md`) is not listed.
 | E7 | `30f14aa` | proportional layout (`ShapeLayout`), too-small message below 480 × 270 (D1), Visualisation third column (R10) |
 | P4 | `98f6e4b` | validation state bound to the scan origin; origin changes request a debounced rescan |
 | E8 | `acf4904` | presets: Save menu with 3 global slots, load replacing the shape, instance name saved with the world |
+| Ghost fix | `9c3fbde` | validation error that outlived its block (found building a real cone): second hook on `setServerVerifiedBlockState`, which the first hook could not see, plus the `StateReconciler` safety net (every 250 ms re-reads the tracked errors and a round-robin slice of the shape) |
 
-Offline harness at the close: 371 asserts, 0 failures; Bridge reference sizes 466 / 159 / 360.
+Offline harness at the close: 406 asserts, 0 failures; Bridge reference sizes 466 / 159 / 360.
 E6 (after two fixes), E7, P4 and E8 passed their in-game checklists before being committed
-(E7 7 of 7, P4 9 of 9, E8 9 of 9).
+(E7 7 of 7, P4 9 of 9, E8 9 of 9). The ghost fix was committed on Raphael's go-ahead after the
+`ghost-fix-wip` test; the result of that test was not reported to the session that wrote this
+file, so it is not claimed here (see the backlog).
 
 ## 2. Final jars
 
@@ -67,14 +70,15 @@ Build output: `fabric1.21.11/build/libs/BuildGuide-Fabric-0.4.8.jar` (mod versio
 
 | Item | Value |
 |---|---|
-| Active jar in the mods folder | `BuildGuide-Fabric-0.4.8-e8-wip.jar` (1,707 KB) |
-| SHA-256 | `0B70AA5EB1DB4F419FCAF606F3771C89E53E1E8C96E0AAF5A12330ED091FFD4C` |
-| Source | commit `acf4904`: the jar was built at 2026-09-28 23:20 from the same working tree, and no source file is newer than it; the build output and the mods copy have the same SHA-256 |
-| Tested | the in-game E8 checklist, 9 of 9 |
+| Active jar in the mods folder | `BuildGuide-Fabric-0.4.8-ghost-fix-wip.jar` |
+| SHA-256 | `1E2F5E96A659D474EF14D9CDDBF5930E6B695DF66F31C782A7C1E5654E55BDB6` |
+| Source | commit `9c3fbde`: built 2026-10-04 21:37 from the same working tree, no source file newer than the jar; the build output and the mods copy have the same SHA-256; `StateReconciler`, `IBlockProbe` and `WorldProbe` are inside |
+| Tested | the offline harness (406 asserts); the in-game ghost test result was not reported |
+| Previous jar | `BuildGuide-Fabric-0.4.8-e8-wip.jar` (SHA-256 `0B70AA5EB1DB4F419FCAF606F3771C89E53E1E8C96E0AAF5A12330ED091FFD4C`, commit `acf4904`, E8 checklist 9 of 9), kept as `.bak` |
 
 - The file name still says `wip`: it was never renamed after the test. Renaming is a choice
   for Raphael (nothing depends on the name); a rebuild of `acf4904` gives the same classes.
-- The mods folder also keeps 24 older jars as `.bak` (one per stage, `e1-wip` .. `p4-wip`,
+- The mods folder also keeps 25 older jars as `.bak` (one per stage, `e1-wip` .. `e8-wip`,
   plus the original feature jars). They are history, not needed: each is reproducible from
   the branch (one commit per jar), as `CLAUDE.md` says.
 - Mods folder: `C:\Users\Rapha\AppData\Roaming\ModrinthApp\profiles\Fabulously Optimized (1)\mods`.
@@ -104,7 +108,7 @@ Process
    user has confirmed the stage in-game; the user runs the in-game tests.
 9. Before every in-game test: build green, harness green. Declare the expected decompile diff
    *before* running it, then diff the new jar against the previous baseline
-   (`BuildGuide-tools\decompiled\<NAME>`, Vineflower, CRLF normalised). The baseline is now `E8`.
+   (`BuildGuide-tools\decompiled\<NAME>`, Vineflower, CRLF normalised). The baseline is now `GHOSTFIX`.
 10. Deploy only with the game and the Modrinth App closed; check java / Modrinth processes
     first and abort if any runs; rename the old jar to `.bak`; prove the deploy with the
     SHA-256 of the mods copy against the build. (E6 once tested the old jar for this reason.)
@@ -162,4 +166,12 @@ From the last stages (no earlier doc lists them)
 - **"To check in game" from 2.5, never recorded as checked:** the validation bar text with
   five-digit totals, and the error shells z-fighting with the block faces
   (`shellInset` 0.01, raise to 0.05 if it flickers).
+- **Ghost fix, open points:** (1) the exact server/client sequence behind Raphael's ghost error
+  was not proven, only a confirmed hole (`setServerVerifiedBlockState` skips the first hook) and a
+  net that corrects whatever escapes; the first `safety net corrected` line in `latest.log`
+  (`...\ModrinthApp\profiles\Fabulously Optimized (1)\logs\latest.log`) names the next culprit if
+  there is one. (2) The net only removes errors and corrects expected positions: a structure
+  error that appears without an event is not added until the next scan. (3) The two mixin
+  targets were checked against the game jar and remapped by the build, but only the game proves
+  they apply. (4) The real `getBlockState` cost per pass was estimated, not measured in game.
 - **The `wip` file name** of the final jar (section 2).
