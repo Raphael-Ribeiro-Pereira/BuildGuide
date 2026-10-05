@@ -4,7 +4,8 @@
     "mixins": [],
     "client": [
         "MixinLevelRenderer",
-        "MixinClientLevel"
+        "MixinClientLevel",
+        "MixinMinecraft"
     ],
     "server": [],
     "refmap": "mixins.buildguide.fabric.refmap.json",

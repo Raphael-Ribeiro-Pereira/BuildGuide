@@ -4,6 +4,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import brentmaas.buildguide.common.BuildGuide;
+import brentmaas.buildguide.fabric.place.PlacementClick;
 import brentmaas.buildguide.fabric.place.PlacementHud;
 import brentmaas.buildguide.fabric.preview.PreviewRenderer;
 import brentmaas.buildguide.fabric.screen.ScreenHandler;
@@ -23,5 +24,6 @@ public class BuildGuideFabric implements ClientModInitializer {
 		SpecialGuiElementRegistry.register(context -> new PreviewRenderer(context.vertexConsumers()));
 		// Area 3: placing into the guideline (the label under the crosshair; the click hooks itself through MixinMinecraft)
 		PlacementHud.register();
+		PlacementClick.register();
 	}
 }
