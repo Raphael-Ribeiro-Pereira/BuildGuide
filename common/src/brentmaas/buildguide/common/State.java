@@ -19,6 +19,7 @@ import brentmaas.buildguide.common.screen.ValidationListComponent;
 import brentmaas.buildguide.common.screen.VisualisationScreen;
 import brentmaas.buildguide.common.shape.Shape;
 import brentmaas.buildguide.common.shape.ShapeCircle;
+import brentmaas.buildguide.common.shape.GuidelinePicker;
 import brentmaas.buildguide.common.shape.ShapeRegistry;
 import brentmaas.buildguide.common.shape.ShapeSet;
 
@@ -48,6 +49,12 @@ public class State {
 	// Tab of the Shape screen's error list the user picked (transient); null = automatic: Errors when
 	// there are structure errors, Missing otherwise
 	public ValidationListComponent.Category listTab = null;
+	// Area 3: a right click fills the guideline cell aimed at (toggled by a key, default G). In memory only:
+	// not written by savePersistence
+	public boolean placeMode = false;
+	// The cell picked in the last rendered frame (world coordinates), null = none. Written by the render
+	// handler under the shape locks, read by the click
+	public volatile GuidelinePicker.Target placeTarget = null;
 	
 	public BaseScreen createNewScreen(ActiveScreen newActiveScreen) {
 		currentScreen = newActiveScreen;

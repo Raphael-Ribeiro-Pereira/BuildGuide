@@ -25,12 +25,22 @@ public abstract class AbstractRenderHandler {
 	// Hook for the validation overlay (coloured error cubes); called inside the shape set's translation, after its buffer
 	protected void renderValidationOverlay(ShapeSet shapeSet) {}
 	
+	// Area 3 (placing into the guideline): once per frame around the shape sets, and pickPlacementTarget for each
+	// rendered set under its lock, so the guideline is read safely; the click only reads the last result
+	protected void beginPlacementFrame() {}
+	
+	protected void pickPlacementTarget(ShapeSet shapeSet) {}
+	
+	protected void endPlacementFrame() {}
+	
 	public void render() {
 		pushProfiler(BuildGuide.modid);
 		
+		beginPlacementFrame();
 		if(BuildGuide.stateManager.getState().isEnabled() && BuildGuide.stateManager.getState().isShapeAvailable() && BuildGuide.stateManager.getState().getCurrentShapeSet().hasOrigin()) {
 			for(ShapeSet s: BuildGuide.stateManager.getState().shapeSets) renderShapeSet(s); 
 		}
+		endPlacementFrame();
 		
 		popProfiler();
 	}
@@ -50,6 +60,7 @@ public abstract class AbstractRenderHandler {
 					endRenderingShapeSet();
 					validateShape(shapeSet);
 					reconcileShape(shapeSet);
+					pickPlacementTarget(shapeSet);
 				}
 			}finally {
 				shapeSet.getShape().lock.unlock();

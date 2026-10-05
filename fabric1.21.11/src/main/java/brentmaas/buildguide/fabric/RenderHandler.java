@@ -16,6 +16,8 @@ import com.mojang.blaze3d.systems.RenderSystem;
 
 import brentmaas.buildguide.common.AbstractRenderHandler;
 import brentmaas.buildguide.common.BuildGuide;
+import brentmaas.buildguide.common.shape.CubeMesh;
+import brentmaas.buildguide.common.shape.GuidelinePicker;
 import brentmaas.buildguide.common.shape.Shape;
 import brentmaas.buildguide.common.shape.LocalPos;
 import brentmaas.buildguide.common.shape.ShapeSet;
@@ -23,16 +25,20 @@ import brentmaas.buildguide.common.shape.StateReconciler;
 import brentmaas.buildguide.common.shape.ValidationOverlay;
 import brentmaas.buildguide.common.shape.ValidationState;
 import brentmaas.buildguide.common.shape.ValidationState.NearBlock;
+import brentmaas.buildguide.fabric.place.PlacementClick;
 import brentmaas.buildguide.fabric.shape.ShapeBuffer;
 import brentmaas.buildguide.fabric.validation.WorldProbe;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.profiling.Profiler;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
 public class RenderHandler extends AbstractRenderHandler {
@@ -249,6 +255,73 @@ public class RenderHandler extends AbstractRenderHandler {
 		if(world == null) return;
 		state.markReconciled(now);
 		StateReconciler.run(state, new WorldProbe(world), StateReconciler.checksPerPass, line -> BuildGuide.logHandler.debugOrHigher(line));
+	}
+
+	// Area 3 (placing into the guideline): the view ray of this frame, filled by beginPlacementFrame when
+	// the mode is on; every rendered set contributes its nearest cell, the nearest of all is published
+	private boolean placeFrame = false;
+	private double eyeX, eyeY, eyeZ, lookX, lookY, lookZ, placeReach, realHit;
+	private double[] playerBox;
+	private WorldProbe placeProbe;
+	private GuidelinePicker.Target placeBest;
+	// A unit cube slightly larger than a block, translucent cyan (no status uses cyan); built once, moved per frame
+	private ShapeBuffer placeOutline;
+
+	@Override
+	protected void beginPlacementFrame() {
+		placeFrame = false;
+		placeBest = null;
+		Minecraft mc = Minecraft.getInstance();
+		LocalPlayer player = mc.player;
+		if(player == null || mc.level == null || !BuildGuide.stateManager.getState().placeMode) return;
+		// No target for a spectator or when the camera is not the player (free camera, spectating a mob)
+		if(player.isSpectator() || mc.getCameraEntity() != player) return;
+		float partialTick = mc.getDeltaTracker().getGameTimeDeltaPartialTick(true);
+		Vec3 eye = player.getEyePosition(partialTick), look = player.getViewVector(partialTick);
+		eyeX = eye.x;
+		eyeY = eye.y;
+		eyeZ = eye.z;
+		lookX = look.x;
+		lookY = look.y;
+		lookZ = look.z;
+		// The real hit of this frame (GameRenderer.pick ran before the world render): a block or an entity
+		HitResult hit = mc.hitResult;
+		realHit = hit == null || hit.getType() == HitResult.Type.MISS ? Double.POSITIVE_INFINITY : hit.getLocation().distanceTo(eye);
+		AABB box = player.getBoundingBox();
+		playerBox = new double[] {box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ};
+		placeReach = player.blockInteractionRange();
+		placeProbe = new WorldProbe(mc.level);
+		placeFrame = true;
+	}
+
+	// Under the shape's lock (AbstractRenderHandler.renderShapeSet): the expected set is not being regenerated
+	@Override
+	protected void pickPlacementTarget(ShapeSet shapeSet) {
+		if(!placeFrame) return;
+		Shape shape = shapeSet.getShape();
+		GuidelinePicker.Cells cells = GuidelinePicker.shapeCells(shape.getExpectedBlocks(), shapeSet.getOriginX(), shapeSet.getOriginY(), shapeSet.getOriginZ(), shapeSet.getActiveExclusionBoxes());
+		GuidelinePicker.Target target = GuidelinePicker.pick(eyeX, eyeY, eyeZ, lookX, lookY, lookZ, placeReach, realHit, playerBox, cells, placeProbe);
+		if(target != null && (placeBest == null || target.distance < placeBest.distance)) placeBest = target;
+	}
+
+	@Override
+	protected void endPlacementFrame() {
+		Minecraft mc = Minecraft.getInstance();
+		if(mc.level == null) return;
+		BuildGuide.stateManager.getState().placeTarget = placeBest;
+		PlacementClick.noteTarget(placeBest);
+		if(placeBest == null) return;
+		if(placeOutline == null) {
+			placeOutline = new ShapeBuffer();
+			placeOutline.setColour(60, 200, 255, 110);
+			CubeMesh.push(placeOutline, -0.03, -0.03, -0.03, 1.06);
+			placeOutline.end();
+		}
+		Vec3 camera = mc.gameRenderer.getMainCamera().position();
+		RenderSystem.getModelViewStack().pushMatrix();
+		RenderSystem.getModelViewStack().translate((float) (placeBest.x - camera.x), (float) (placeBest.y - camera.y), (float) (placeBest.z - camera.z));
+		placeOutline.render();
+		RenderSystem.getModelViewStack().popMatrix();
 	}
 
 	// Block ids the user chose to ignore (Configuration screen), resolved through the registry here so common stays Minecraft-free
