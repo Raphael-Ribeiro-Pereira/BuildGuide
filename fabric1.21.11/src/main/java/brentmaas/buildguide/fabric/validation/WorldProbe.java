@@ -28,6 +28,7 @@ public class WorldProbe implements IBlockProbe {
 		int flags = 0;
 		if(state.blocksMotion()) flags |= FLAG_SOLID;
 		if(RenderHandler.isIgnored(state)) flags |= FLAG_IGNORED;
+		if(state.canBeReplaced()) flags |= FLAG_REPLACEABLE; // water, tall grass: a placed block takes their place (area 3)
 		return flags;
 	}
 	

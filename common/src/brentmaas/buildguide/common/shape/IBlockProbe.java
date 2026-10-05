@@ -10,6 +10,8 @@ public interface IBlockProbe {
 	public static final int FLAG_SOLID = 2;
 	// Not air and an ignored block type (Configuration screen)
 	public static final int FLAG_IGNORED = 4;
+	// The block can be replaced by placing another one into it (air, water, tall grass): Block.canBeReplaced()
+	public static final int FLAG_REPLACEABLE = 8;
 
 	// The chunk holding this position is loaded. An unloaded chunk reads as air, which is not evidence
 	public boolean isLoaded(int x, int y, int z);
