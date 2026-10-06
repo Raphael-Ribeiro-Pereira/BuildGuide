@@ -78,6 +78,25 @@ placed the vanilla way, at the block looked at, not into the guideline.
 
 Offline harness after Area 3: 466 asserts, 0 failures; Bridge 466 / 159 / 360.
 
+### Island, block A (plan, body, organic edge; no colours)
+
+Built on `wip/island` and fast-forwarded into `feat/cone-expanded` on 2026-10-06 after the
+`island-wip` in-game test passed. Decisions and the test feedback: `docs/ROADMAP_MODES.md`.
+
+| Stage | Commit | What |
+|---|---|---|
+| Roadmap | `5398f84` | flat top included, block A decisions, stage 4 split into 4C and 4D |
+| Core | `3fe71f7` | `IslandNoise` (pure seeded gradient noise) and `IslandGeometry`: star-shaped plan (Circle, Square with Roundness, Polygon 3-12, Organic), body Bowl / Cone / Terraced, flat cap, hollow shell = solid cells within Manhattan distance Wall (1-3) of a non-solid cell, closed in 6-connectivity |
+| Shape | `643d540`  | `ShapeIsland` registered last, sections Base / Body / Seed, 15 persisted properties, New seed |
+| Float step | `f7937be` | `PropertyFloat` gains an optional -/+ step (default 1.0, the old path unchanged; a fractional step uses decimal arithmetic, so 0.05 x 3 reads 0.15); Island's Roundness, Edge noise, Sharpness and Roughness step 0.05 and the shape holds them in [0, 1] (no float property type has a maximum) |
+
+Limits: width 3 to 121 (radius 60), depth 0 to 80, Wall 1 to 3. Measured worst case (Square,
+radius 60, depth 80, Wall 2): 83 657 blocks, 19 ms of geometry, about 54 MB of vertex buffer,
+5.0 MB of expected-block set. Diagonal (26-connected) leaks: Wall 1 and 2 have some, Wall 3
+none; the 6-connected shell is always closed.
+
+Offline harness after Island block A: 571 asserts, 0 failures; Bridge 466 / 159 / 360.
+
 Offline harness at the close: 406 asserts, 0 failures; Bridge reference sizes 466 / 159 / 360.
 E6 (after two fixes), E7, P4 and E8 passed their in-game checklists before being committed
 (E7 7 of 7, P4 9 of 9, E8 9 of 9). The ghost fix was committed on Raphael's go-ahead after the
@@ -90,11 +109,11 @@ Build output: `fabric1.21.11/build/libs/BuildGuide-Fabric-0.4.8.jar` (mod versio
 
 | Item | Value |
 |---|---|
-| Active jar in the mods folder | `BuildGuide-Fabric-0.4.8-area3-wip2.jar` |
-| SHA-256 | `B5AC963F068EFF59954521F29F24D994BBFE61CF9F55C2C1DE9256E055392A32` |
-| Source | the Area 3 code of commit `584674b` (`99fa942` only adds docs): the build output and the mods copy have the same SHA-256; `TargetOutline` and `RenderHandler` are inside |
-| Tested | the offline harness (466 asserts); the outline passed in game |
-| Previous jars | `BuildGuide-Fabric-0.4.8-area3-wip.jar` (first Area 3 test) and `BuildGuide-Fabric-0.4.8-ghost-fix-wip.jar` (SHA-256 `1E2F5E96A659D474EF14D9CDDBF5930E6B695DF66F31C782A7C1E5654E55BDB6`, commit `9c3fbde`), kept as `.bak` |
+| Active jar in the mods folder | `BuildGuide-Fabric-0.4.8-island-wip.jar` |
+| SHA-256 | `556D80E49975B12802361D5CB8971EE632415A7E841C0EC71D8AF06826C92DE9` |
+| Source | commit `f7937be`: the build output and the mods copy have the same SHA-256; `ShapeIsland`, `IslandGeometry`, `IslandNoise` and the stepped `PropertyFloat` are inside |
+| Tested | the offline harness (571 asserts); the island passed in game |
+| Previous jars | `BuildGuide-Fabric-0.4.8-area3-wip2.jar` (SHA-256 `B5AC963F068EFF59954521F29F24D994BBFE61CF9F55C2C1DE9256E055392A32`, commit `584674b`), `BuildGuide-Fabric-0.4.8-area3-wip.jar` (first Area 3 test) and `BuildGuide-Fabric-0.4.8-ghost-fix-wip.jar` (SHA-256 `1E2F5E96A659D474EF14D9CDDBF5930E6B695DF66F31C782A7C1E5654E55BDB6`, commit `9c3fbde`), kept as `.bak` |
 
 - The file name still says `wip`: it was never renamed after the test. Renaming is a choice
   for Raphael (nothing depends on the name); a rebuild of `acf4904` gives the same classes.
