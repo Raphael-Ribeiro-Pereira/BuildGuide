@@ -1,5 +1,6 @@
 package brentmaas.buildguide.common.property;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 
 import brentmaas.buildguide.common.BuildGuide;
@@ -11,15 +12,30 @@ import brentmaas.buildguide.common.screen.widget.IWidget;
 public class PropertyFloat extends Property<Float> {
 	private ITextField valueTextField;
 	private Runnable onPress;
+	// Amount the -/+ buttons move the value; 1 keeps the original behaviour exactly
+	private float step = 1.0f;
 	
 	public PropertyFloat(float value, Translatable name, Runnable onPress) {
 		super(value, name);
 		this.onPress = onPress;
 	}
 	
+	public PropertyFloat(float value, Translatable name, Runnable onPress, float step) {
+		this(value, name, onPress);
+		this.step = step;
+	}
+	
+	// value + sign * step; a fractional step goes through decimal arithmetic so 0.05 + 0.05 + 0.05 reads 0.15
+	private float stepped(int sign) {
+		if(step == 1.0f) return sign > 0 ? value + 1 : value - 1;
+		BigDecimal delta = new BigDecimal(Float.toString(step));
+		BigDecimal current = new BigDecimal(Float.toString(value));
+		return (sign > 0 ? current.add(delta) : current.subtract(delta)).floatValue();
+	}
+	
 	protected void initWidgets(ArrayList<IWidget> widgetList) {
 		widgetList.add(BuildGuide.widgetHandler.createButton(x + controlX, y, stepWidth, rowHeight, new Translatable("-"), () -> {
-			--this.value;
+			this.value = stepped(-1);
 			valueTextField.setTextValue("" + this.value);
 			valueTextField.setTextColour(0xFFFFFF);
 			if(onPress != null) onPress.run();
@@ -40,7 +56,7 @@ public class PropertyFloat extends Property<Float> {
 			}
 		});
 		widgetList.add(BuildGuide.widgetHandler.createButton(x + increaseX, y, stepWidth, rowHeight, new Translatable("+"), () -> {
-			++this.value;
+			this.value = stepped(1);
 			valueTextField.setTextValue("" + this.value);
 			valueTextField.setTextColour(0xFFFFFF);
 			if(onPress != null) onPress.run();
