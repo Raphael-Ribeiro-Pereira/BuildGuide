@@ -52,6 +52,21 @@ Order is the order of work. Rules that apply to all of it are in `docs/STATUS.md
 
 Satellites (loose rocks) only if Raphael asks for them.
 
+## Island: pending from the block A test (2026-10-06)
+
+Block A (`3fe71f7`..`f7937be`) passed in game with `island-wip`. Raphael's feedback, not yet
+implemented:
+
+1. **Only the controls that apply.** Sides serves only Polygon: show only the controls that apply
+   to the chosen Outline.
+2. **Neutral defaults, clearer labels.** Defaults become a smooth circle with no noise and no
+   Roughness; labels get clearer. A `Naturalize` action creates the natural island.
+3. **More than one cone underneath** is block B (spikes, item 3 of the plan).
+4. **Wall is unclear:** rename it to `Thickness` and explain its effect.
+5. **Seed becomes Randomize,** with a percentage for Base and one for Body, plus Naturalize.
+6. **Apply values without Enter and without freezing:** debounce on the fields; 3 modes for
+   updating the world; measure before optimising. "Reveal in sequence" goes to the backlog.
+
 ## Area 3 decisions (already taken)
 
 - A right click aimed at an empty position of the guideline places the block in hand there. One
