@@ -38,6 +38,20 @@ public class AccordionTest {
 				if(h == ShapeLayout.minHeight) check(s.getOpenSection() == 0, c.getSimpleName() + ": first section open by default");
 			}
 		}
+		// Island shows only the plan controls of its Outline: every Outline must fit too
+		for(int h: HEIGHTS) {
+			int accordion = ShapeLayout.accordionHeight(h);
+			for(IslandGeometry.Outline o: IslandGeometry.Outline.values()) {
+				Shape s = new ShapeIsland();
+				Field f = ShapeIsland.class.getDeclaredField("propertyOutline");
+				f.setAccessible(true);
+				((Property<Object>) f.get(s)).value = o;
+				int capacity = (accordion - (1 + s.getSectionCount()) * HEADER) / Property.rowHeight;
+				int worst = ORIGIN_ROWS;
+				for(int i = 0;i < s.getSectionCount();++i) worst = Math.max(worst, s.countRows(i));
+				check(worst <= capacity, "height " + h + ", Island " + o + ": capacity " + capacity + " rows, base=" + s.countRows(0) + " body=" + s.countRows(1) + " random=" + s.countRows(2));
+			}
+		}
 		System.out.println(fails == 0 ? "ALL OK" : fails + " FAILED");
 	}
 
