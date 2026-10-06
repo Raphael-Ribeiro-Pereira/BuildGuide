@@ -11,6 +11,8 @@ import brentmaas.buildguide.common.screen.widget.IWidget;
 // PropertyInt clamped to [minValue, maxValue]; the -/+ buttons are disabled at the bounds
 public class PropertyRangeInt extends PropertyInt {
 	private int minValue, maxValue;
+	// Amount the -/+ buttons move the value (default 1)
+	private int step = 1;
 	private IButton buttonDecrease, buttonIncrease;
 	
 	public PropertyRangeInt(int value, Translatable name, Runnable onPress, int minValue, int maxValue) {
@@ -19,10 +21,15 @@ public class PropertyRangeInt extends PropertyInt {
 		this.maxValue = maxValue;
 	}
 	
+	public PropertyRangeInt(int value, Translatable name, Runnable onPress, int minValue, int maxValue, int step) {
+		this(value, name, onPress, minValue, maxValue);
+		this.step = Math.max(1, step);
+	}
+	
 	protected void initWidgets(ArrayList<IWidget> widgetList) {
 		buttonDecrease = BuildGuide.widgetHandler.createButton(x + controlX, y, stepWidth, rowHeight, new Translatable("-"), () -> {
 			if(this.value > minValue) {
-				--this.value;
+				this.value = Math.max(minValue, this.value - step);
 				refresh();
 				if(onPress != null) onPress.run();
 			}
@@ -49,7 +56,7 @@ public class PropertyRangeInt extends PropertyInt {
 		});
 		buttonIncrease = BuildGuide.widgetHandler.createButton(x + increaseX, y, stepWidth, rowHeight, new Translatable("+"), () -> {
 			if(this.value < maxValue) {
-				++this.value;
+				this.value = Math.min(maxValue, this.value + step);
 				refresh();
 				if(onPress != null) onPress.run();
 			}
