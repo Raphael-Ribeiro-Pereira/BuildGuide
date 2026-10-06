@@ -13,6 +13,7 @@ import brentmaas.buildguide.common.shape.ShapeCuboid;
 import brentmaas.buildguide.common.shape.ShapeEllipse;
 import brentmaas.buildguide.common.shape.ShapeEllipsoid;
 import brentmaas.buildguide.common.shape.ShapeGrid;
+import brentmaas.buildguide.common.shape.ShapeIsland;
 import brentmaas.buildguide.common.shape.ShapeLine;
 import brentmaas.buildguide.common.shape.ShapeParabola;
 import brentmaas.buildguide.common.shape.ShapeParaboloid;
@@ -64,6 +65,7 @@ public class BuildGuide {
 		// New shapes always go at the end: the registry index is what saved shapes reference
 		ShapeRegistry.registerShape(ShapeSpline.class, "shape.buildguide.spline");
 		ShapeRegistry.registerShape(ShapeBridge.class, "shape.buildguide.bridge");
+		ShapeRegistry.registerShape(ShapeIsland.class, "shape.buildguide.island");
 		
 		renderHandler.register();
 	}
