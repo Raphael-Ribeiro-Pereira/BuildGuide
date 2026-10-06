@@ -17,10 +17,23 @@ Order is the order of work. Rules that apply to all of it are in `docs/STATUS.md
    - *Body* (the depth profile): Bowl, Cone, Spike, Terraced.
    - Always a hollow shell, with the thickness as a parameter.
    - One column per position: no caves and no overhangs.
+   - Flat top included (2026-10-05): a flat cap, the disc of the outline at depth 0, with no
+     relief. Relief belongs to Terrain (item 5).
+   - Block A (2026-10-05): shape `Island` registered at the end, sections Base, Body, Seed;
+     Wall 1 to 3 (default 2); shapes Circle, Square, Polygon (3 to 12 sides), Organic;
+     Roundness 0 (square) to 1 (circle); separate X and Z widths; rotation; edge noise amplitude
+     and scale; Depth, Profile (Bowl, Cone, Terraced), Sharpness, Roughness; numeric seed saved
+     with a `New seed` button.
 
 3. **Island, spikes: focal points.**
 
-4. **Palette per layer (its own stage, the riskiest).**
+4. **Palette per layer (its own stage, the riskiest), split in two (2026-10-05).**
+   - **4C, visual only:** layers and their colours, in the world and in the preview. No
+     validation change.
+   - **4D, validation per block:** each layer's block is typed as an ID in the form
+     `minecraft:stone` (no autocomplete); the field turns red if the ID is invalid; the text is
+     persisted encoded (it must not break the comma-separated persistence).
+   The rules below are the target of 4C and 4D together.
    - 4 layers by depth, with adjustable cuts; 1 block per colour; the layer colours are
      distinct from the status colours.
    - Rule: a block of the layer = green; a block from another layer's palette = orange; a solid
