@@ -8,6 +8,7 @@ Order is the order of work. Rules that apply to all of it are in `docs/STATUS.md
 ## The plan
 
 1. **Area 3: place a block straight into the guideline.** See "Area 3 decisions" below.
+   **Done** (2026-10-05, `229c3fe`..`99fa942`; see `docs/STATUS.md`).
 
 2. **Island, phases 0-2: seeded noise, outline and body, organic edge (no colours).**
    - Noise with a seed that is saved.

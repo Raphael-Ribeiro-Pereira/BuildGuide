@@ -167,7 +167,8 @@ Only the latest one matters; diff the next change against it.
 | `30f14aa` | GUI redesign E7 — proportional layout (`ShapeLayout`, bottoms follow the height), too-small message below 480 x 270 (D1), Visualisation third column (R10) | `E7` |
 | `98f6e4b` | P4 — validation state bound to the scan origin (overlay, list, incremental); origin changes request a debounced rescan | `P4` |
 | `acf4904` | GUI redesign E8 — presets: Save menu with 3 global slots (`buildguide_presets.txt`), load replacing the shape, instance name saved with the world | `E8` |
-| `9c3fbde` | Ghost fix — second block-change hook (`setServerVerifiedBlockState`) and the `StateReconciler` safety net for validation errors that outlive their block | `GHOSTFIX` (current) |
+| `9c3fbde` | Ghost fix — second block-change hook (`setServerVerifiedBlockState`) and the `StateReconciler` safety net for validation errors that outlive their block | `GHOSTFIX` |
+| `584674b` | Area 3 — place a block into the guideline: `GuidelinePicker`, toggle key G and HUD, `MixinMinecraft` click swap, `TargetOutline` (phases `229c3fe`..`584674b`) | `AREA3B` (current) |
 
 GUI redesign plan and decisions: `docs/GUI_REDESIGN.md` (stages E1–E8). Project status, final
 jars, rules going forward and backlog: `docs/STATUS.md`.

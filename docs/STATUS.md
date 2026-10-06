@@ -58,6 +58,26 @@ follow-up that writes the hash into `CLAUDE.md`) is not listed.
 | E8 | `acf4904` | presets: Save menu with 3 global slots, load replacing the shape, instance name saved with the world |
 | Ghost fix | `9c3fbde` | validation error that outlived its block (found building a real cone): second hook on `setServerVerifiedBlockState`, which the first hook could not see, plus the `StateReconciler` safety net (every 250 ms re-reads the tracked errors and a round-robin slice of the shape) |
 
+### Placement into the guideline (Area 3)
+
+Built on `wip/area3` and fast-forwarded into `feat/cone-expanded` on 2026-10-05 after the
+`area3-wip2` in-game test passed.
+
+| Stage | Commit | What |
+|---|---|---|
+| Phase 2 | `229c3fe` | `GuidelinePicker` (voxel walk along the look ray) and `IBlockProbe.FLAG_REPLACEABLE` |
+| Phase 3 | `2ad86f2` | target picked once per frame under the shape lock, and its outline |
+| Phase 4 | `183c15e` | toggle key G, in-memory `State.placeMode`, HUD label below the crosshair |
+| Phase 5 | `f7f4a42` | right click fills the targeted cell (`MixinMinecraft` swaps `hitResult` in `startUseItem`; one click, one block) |
+| Outline | `584674b` | target outline in the error-list highlight white, `shapeCubeSize + 0.15` (at most 1.0), 12 black edge boxes, same buffer and pipeline |
+| Rule | `99fa942` | deploy process guard (rule 10) |
+
+Known limit, off hand: placement into the guideline only acts when the **main hand** holds a
+block item. A block held only in the off hand (main hand empty or holding a non-block) is
+placed the vanilla way, at the block looked at, not into the guideline.
+
+Offline harness after Area 3: 466 asserts, 0 failures; Bridge 466 / 159 / 360.
+
 Offline harness at the close: 406 asserts, 0 failures; Bridge reference sizes 466 / 159 / 360.
 E6 (after two fixes), E7, P4 and E8 passed their in-game checklists before being committed
 (E7 7 of 7, P4 9 of 9, E8 9 of 9). The ghost fix was committed on Raphael's go-ahead after the
@@ -70,11 +90,11 @@ Build output: `fabric1.21.11/build/libs/BuildGuide-Fabric-0.4.8.jar` (mod versio
 
 | Item | Value |
 |---|---|
-| Active jar in the mods folder | `BuildGuide-Fabric-0.4.8-ghost-fix-wip.jar` |
-| SHA-256 | `1E2F5E96A659D474EF14D9CDDBF5930E6B695DF66F31C782A7C1E5654E55BDB6` |
-| Source | commit `9c3fbde`: built 2026-10-04 21:37 from the same working tree, no source file newer than the jar; the build output and the mods copy have the same SHA-256; `StateReconciler`, `IBlockProbe` and `WorldProbe` are inside |
-| Tested | the offline harness (406 asserts); the in-game ghost test result was not reported |
-| Previous jar | `BuildGuide-Fabric-0.4.8-e8-wip.jar` (SHA-256 `0B70AA5EB1DB4F419FCAF606F3771C89E53E1E8C96E0AAF5A12330ED091FFD4C`, commit `acf4904`, E8 checklist 9 of 9), kept as `.bak` |
+| Active jar in the mods folder | `BuildGuide-Fabric-0.4.8-area3-wip2.jar` |
+| SHA-256 | `B5AC963F068EFF59954521F29F24D994BBFE61CF9F55C2C1DE9256E055392A32` |
+| Source | the Area 3 code of commit `584674b` (`99fa942` only adds docs): the build output and the mods copy have the same SHA-256; `TargetOutline` and `RenderHandler` are inside |
+| Tested | the offline harness (466 asserts); the outline passed in game |
+| Previous jars | `BuildGuide-Fabric-0.4.8-area3-wip.jar` (first Area 3 test) and `BuildGuide-Fabric-0.4.8-ghost-fix-wip.jar` (SHA-256 `1E2F5E96A659D474EF14D9CDDBF5930E6B695DF66F31C782A7C1E5654E55BDB6`, commit `9c3fbde`), kept as `.bak` |
 
 - The file name still says `wip`: it was never renamed after the test. Renaming is a choice
   for Raphael (nothing depends on the name); a rebuild of `acf4904` gives the same classes.
