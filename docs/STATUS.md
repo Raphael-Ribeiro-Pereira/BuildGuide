@@ -109,8 +109,10 @@ Process
 9. Before every in-game test: build green, harness green. Declare the expected decompile diff
    *before* running it, then diff the new jar against the previous baseline
    (`BuildGuide-tools\decompiled\<NAME>`, Vineflower, CRLF normalised). The baseline is now `GHOSTFIX`.
-10. Deploy only with the game and the Modrinth App closed; check java / Modrinth processes
-    first and abort if any runs; rename the old jar to `.bak`; prove the deploy with the
+10. Deploy only with the game and the Modrinth App closed; abort if javaw, the Modrinth App, or a
+    java whose command line contains fabric, knot, net.minecraft, .minecraft, ModrinthApp,
+    `Fabulously Optimized (1)` or devlaunchinjector is running (any other java, such as an IDE
+    build server, is allowed; an unreadable command line blocks); rename the old jar to `.bak`; prove the deploy with the
     SHA-256 of the mods copy against the build. (E6 once tested the old jar for this reason.)
 11. Git scripts are fail-fast: message in a file and `git commit -F` (never `-m` with quotes in
     PowerShell 5.1), `$LASTEXITCODE` checked after every git call, hash read only after the
