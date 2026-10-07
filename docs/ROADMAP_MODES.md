@@ -117,3 +117,26 @@ From Raphael's `latest.log` with `live-apply-wip`. Not implemented; measure agai
    blocks; the limits table in `STATUS.md` is corrected.
 6. **The 50-line cap of the timing log was reached in about 5 minutes:** raise
    `TimingLog.maxLines` to 200.
+
+## Island spikes 2: requests after the block B test (2026-10-07)
+
+Raphael approved `spikes-wip` (mark 9). Requests for the next round, in three phases (each its own
+commits, so a merge can stop at the last phase that passes):
+
+1. **More spikes:** Count up to 64.
+2. **Third mode, Fill:** a regular sunflower spiral (golden angle) covering the whole outline, with
+   a seeded Jitter %.
+3. **Dripstone style** (checkbox): a thin needle on a thick base, with a 1-block tail.
+4. **Taper** (the curve of the narrowing) and **Edge falloff %** (longer in the middle, shorter
+   towards the edge).
+5. **Naturalize spikes** button and a **Spikes %** slider for Randomize (the spikes' shape).
+6. **Break:** Attached or Segmented (a part falling), 2 to 4 pieces with a gap.
+
+## Findings from the spikes-wip timing log (2026-10-07)
+
+- **The double preview rebuild is gone:** one rebuild per generation, plus one for the colours
+  when its scan lands (`reason=validation`, by design).
+- **Scan:** with 0 errors it took 24-44 ms at 22-53k blocks, so the earlier hypothesis that the
+  scan's cost depends mostly on the error count is weak: the block count (and the structure-error
+  sweep around the shape) matters as much.
+- **world-buffer:** 12-15 ms, now above the 8 ms threshold (it never was before).
