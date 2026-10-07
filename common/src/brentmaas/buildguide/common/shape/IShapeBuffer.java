@@ -8,4 +8,8 @@ public interface IShapeBuffer {
 	public void end();
 	
 	public void close();
+	
+	// Frees the vertex data kept on the CPU side (the loader's native builder), not what is on the GPU.
+	// Idempotent and callable from any thread, once nothing writes to the buffer any more. Default: nothing kept
+	public default void releaseVertexData() {}
 }

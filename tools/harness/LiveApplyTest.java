@@ -116,7 +116,7 @@ public class LiveApplyTest {
 		check(lines.size() == TimingLog.maxLines && lines.get(lines.size() - 1).contains("limit of 200") && TimingLog.maxLines == 200, "at most 200 lines per session, the last one says so (" + lines.size() + ")");
 		List<String> withReason = new ArrayList<>(); TimingLog.sink = withReason::add; java.lang.reflect.Method reset = TimingLog.class.getDeclaredMethod("reset"); reset.setAccessible(true); reset.invoke(null);
 		TimingLog.record(TimingLog.PREVIEW_REBUILD, 29, 49568, "generation");
-		check(withReason.equals(Arrays.asList("[Build Guide] timing: phase=preview-rebuild ms=29 blocks=49568 reason=generation")), "preview line carries reason=: " + withReason);
+		check(withReason.equals(Arrays.asList("[Build Guide] timing: phase=preview-rebuild ms=29 blocks=49568 reason=generation native=0.0")), "preview line carries reason= (and native=, the vertex memory still held): " + withReason);
 		System.out.println(fails == 0 ? "ALL OK" : fails + " FAILED");
 	}
 }

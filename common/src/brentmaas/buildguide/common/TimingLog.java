@@ -3,11 +3,15 @@ package brentmaas.buildguide.common;
 import java.util.Locale;
 import java.util.function.Consumer;
 
+import brentmaas.buildguide.common.shape.VertexMemory;
+
 /**
  * Diagnostic timing lines for the phases of a shape change, so where a freeze comes from shows in
  * numbers in latest.log: "[Build Guide] timing: phase=... ms=... blocks=...". Only phases of more
  * than thresholdMillis are written, at most maxLines per session (then one notice). Thread safe:
- * generation runs on the executor, the other phases on the render thread.
+ * generation runs on the executor, the other phases on the render thread. The world-buffer and
+ * preview-rebuild lines end with native=: the vertex memory still held (VertexMemory), in MiB, which
+ * must stay level while shapes are edited.
  */
 public final class TimingLog {
 	public static final long thresholdMillis = 8;
@@ -31,6 +35,7 @@ public final class TimingLog {
 		if(millis <= thresholdMillis || written >= maxLines) return;
 		++written;
 		String line = "[Build Guide] timing: phase=" + phase + " ms=" + millis + " blocks=" + blocks + (reason == null ? "" : " reason=" + reason);
+		if(PREVIEW_REBUILD.equals(phase)) line += " native=" + VertexMemory.liveMegabytes();
 		if(written == maxLines) line += " (limit of " + maxLines + " timing lines reached, no more this session)";
 		sink.accept(line);
 	}
@@ -64,7 +69,7 @@ public final class TimingLog {
 		if(totalNanos <= worldThresholdMillis * 1000000 || written >= maxLines) return;
 		++written;
 		String line = "[Build Guide] timing: phase=" + WORLD_BUFFER + " ms=" + Math.round(totalNanos / 1e6) + " blocks=" + blocks + " reason=" + reason
-				+ " world-end=" + tenths(endNanos) + " world-close=" + tenths(closeNanos) + " world-other=" + tenths(otherNanos);
+				+ " world-end=" + tenths(endNanos) + " world-close=" + tenths(closeNanos) + " world-other=" + tenths(otherNanos) + " native=" + VertexMemory.liveMegabytes();
 		if(written == maxLines) line += " (limit of " + maxLines + " timing lines reached, no more this session)";
 		sink.accept(line);
 	}

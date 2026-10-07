@@ -107,6 +107,9 @@ public abstract class Shape implements IValidatable {
 				BuildGuide.logHandler.debugThrowable("An exception occurred while generating a shape.", e);
 			}finally {
 				finishGeneration();
+				// A cancelled or failed generation never reaches the world (it needs !error): its vertex data
+				// can go now. This task owns the buffer and stopped writing to it
+				if(error && buffer != null) buffer.releaseVertexData();
 				lock.unlock();
 			}
 		});
@@ -145,11 +148,47 @@ public abstract class Shape implements IValidatable {
 		if(future != null && !(future.isDone() || future.isCancelled())) future.cancel(true);
 	}
 	
+	/**
+	 * The shape is gone (its shape set was removed): its generation stops and what it holds is freed. The GPU
+	 * buffers (the one in the world, the error overlay) are closed here, on the render thread. The vertex data
+	 * of the last generation goes under the lock: at once when no generation runs, else by a task that waits
+	 * for the running one to stop (it may still be writing). Nothing draws this shape afterwards.
+	 */
+	public void dispose() {
+		cancelFuture();
+		if(buffer != null && buffer != shownBuffer) buffer.close();
+		if(shownBuffer != null) shownBuffer.close();
+		shownBuffer = null;
+		if(overlayBuffer != null) overlayBuffer.close();
+		overlayBuffer = null;
+		Runnable release = () -> {
+			lock.lock();
+			try {
+				if(buffer != null) buffer.releaseVertexData();
+			}finally {
+				lock.unlock();
+			}
+		};
+		if(lock.tryLock()) {
+			try {
+				release.run();
+			}finally {
+				lock.unlock();
+			}
+		}else {
+			executor.submit(release);
+		}
+	}
+	
 	private void doUpdate() throws Exception {
 		nBlocks = 0;
 		// Invalidate before clearing: block events check isValidated() and never touch expectedBlocks
 		validationState.invalidate();
 		expectedBlocks.clear();
+		// The previous generation's buffer, unless it is the one the world shows: a newer generation replaces it,
+		// so its vertex data can go (the shown one already freed it when it was sent; a second release does
+		// nothing). Under the lock: no generation still writes to it and the render thread cannot be sending it
+		if(buffer != null && buffer != shownBuffer) buffer.releaseVertexData();
 		buffer = BuildGuide.shapeHandler.newBuffer();
 		buffer.setColour((int) (255 * shapeSet.getShapeColourR()), (int) (255 * shapeSet.getShapeColourG()), (int) (255 * shapeSet.getShapeColourB()), (int) (255 * shapeSet.getShapeColourA()));
 		updateShape(buffer);

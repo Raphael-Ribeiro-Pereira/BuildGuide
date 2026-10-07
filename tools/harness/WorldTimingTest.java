@@ -45,7 +45,7 @@ public class WorldTimingTest {
 		System.out.println("-- TimingLog.recordWorld");
 		reset();
 		TimingLog.recordWorld("close", 5200000, 300000, 1100000, 49568);
-		check(lines.equals(Arrays.asList("[Build Guide] timing: phase=world-buffer ms=7 blocks=49568 reason=close world-end=5.2 world-close=0.3 world-other=1.1")), "format: ms (the sum), blocks, reason, the three parts in ms with one decimal: " + lines);
+		check(lines.equals(Arrays.asList("[Build Guide] timing: phase=world-buffer ms=7 blocks=49568 reason=close world-end=5.2 world-close=0.3 world-other=1.1 native=0.0")), "format: ms (the sum), blocks, reason, the three parts in ms with one decimal, native= (vertex memory held, MiB): " + lines);
 		reset(); TimingLog.recordWorld("apply", 3000000, 500000, 500000, 10);
 		check(lines.isEmpty() && TimingLog.worldThresholdMillis == 4, "4.0 ms in total: not written (threshold 4 ms, not the 8 of the other phases)");
 		TimingLog.recordWorld("apply", 3000000, 500000, 600000, 10);

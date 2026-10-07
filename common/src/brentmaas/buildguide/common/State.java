@@ -104,7 +104,7 @@ public class State {
 	}
 	
 	public void removeShapeSet(int index) {
-		shapeSets.remove(index);
+		shapeSets.remove(index).dispose(); // its GPU buffers and vertex data are freed, not left behind
 		BaseScreen.shouldUpdatePersistence = true;
 	}
 	

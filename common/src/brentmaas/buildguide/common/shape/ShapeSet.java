@@ -69,6 +69,11 @@ public class ShapeSet {
 		shapes[index] = initialiseShape(ShapeRegistry.getClassIdentifier(index));
 	}
 	
+	// The set was removed: every shape instance it made frees its buffers (Shape.dispose)
+	public void dispose() {
+		for(Shape shape: shapes) if(shape != null) shape.dispose();
+	}
+	
 	private Shape initialiseShape(String shapeId) {
 		Shape newShape = ShapeRegistry.getNewInstance(shapeId);
 		newShape.shapeSet = this;

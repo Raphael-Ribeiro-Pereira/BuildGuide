@@ -22,18 +22,31 @@ import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.VertexFormat;
 
 import brentmaas.buildguide.common.shape.IShapeBuffer;
+import brentmaas.buildguide.common.shape.VertexMemory;
 import brentmaas.buildguide.fabric.RenderHandler;
 import net.minecraft.client.Minecraft;
 
+/**
+ * One mesh: the vertices are written into a native builder (on the generation thread for a shape, on the
+ * render thread for the overlay, the Area 3 outline and the preview), sent to the GPU by end() and drawn
+ * from there. The native copy is freed exactly once: by end() right after the upload, or, for a shape
+ * generation that never reaches the world, by Shape under its lock (releaseVertexData). close() frees the
+ * GPU buffer only.
+ */
 public class ShapeBuffer implements IShapeBuffer {
+	// POSITION_COLOR: 3 floats and 4 colour bytes, what the builder reserves per vertex
+	private static final int vertexBytes = 16, initialBytes = 28;
 	private ByteBufferBuilder byteBufferBuilder;
 	private BufferBuilder bufferBuilder;
+	// The builder's native memory for the native= diagnostic; releasing it is what frees byteBufferBuilder
+	private final VertexMemory.Account memory;
 	private GpuBuffer vertexBuffer, indexBuffer;
 	private int indexCount;
 	private int defaultR = 255, defaultG = 255, defaultB = 255, defaultA = 255;
-	
+
 	public ShapeBuffer() {
-		byteBufferBuilder = new ByteBufferBuilder(28); //28 is lowest working (4 bytes * XYZ+RGBA). Number of blocks isn't always known, so it'll have to grow on its own
+		byteBufferBuilder = new ByteBufferBuilder(initialBytes); //28 is lowest working (4 bytes * XYZ+RGBA). Number of blocks isn't always known, so it'll have to grow on its own
+		memory = VertexMemory.open(initialBytes);
 		bufferBuilder = new BufferBuilder(byteBufferBuilder, VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
 	}
 	
@@ -45,23 +58,47 @@ public class ShapeBuffer implements IShapeBuffer {
 	}
 	
 	public void pushVertex(double x, double y, double z) {
+		memory.write(vertexBytes); // throws on a released buffer, before anything is written into freed memory
 		bufferBuilder.addVertex((float) x, (float) y, (float) z).setColor(defaultR, defaultG, defaultB, defaultA);
 	}
-	
+
+	/**
+	 * Sends the vertices to the GPU and frees the native copy at once. createBuffer copies them (vanilla's
+	 * SkyRenderer and CubeMap close their MeshData right after the same call) and nothing reads them again:
+	 * render() draws the GPU buffer, with vanilla's shared index buffer. Called once, on the render thread.
+	 */
 	public void end() {
+		if(memory.isReleased()) { // a discarded generation: nothing left to send (not reached in practice)
+			indexCount = 0;
+			return;
+		}
 		MeshData meshData = bufferBuilder.build();
 		// null when nothing was pushed (a preview view that matches no cube): nothing to upload, render() draws nothing
 		if(meshData == null) {
 			indexCount = 0;
-			return;
+		}else {
+			try {
+				vertexBuffer = RenderSystem.getDevice().createBuffer(() -> "Build Guide vertices", GpuBuffer.USAGE_VERTEX, meshData.vertexBuffer());
+				indexCount = meshData.drawState().indexCount();
+				indexBuffer = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS).getBuffer(indexCount);
+			}finally {
+				meshData.close();
+			}
 		}
-		vertexBuffer = RenderSystem.getDevice().createBuffer(() -> "Build Guide vertices", GpuBuffer.USAGE_VERTEX, meshData.vertexBuffer());
-		indexCount = meshData.drawState().indexCount();
-		indexBuffer = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS).getBuffer(indexCount);
+		releaseVertexData();
 	}
-	
+
+	// The native copy, exactly once whoever calls first (end(), or Shape for a generation that never reaches the world)
+	@Override
+	public void releaseVertexData() {
+		if(memory.release()) byteBufferBuilder.close();
+	}
+
+	// The GPU buffer only, on the render thread: close() also reaches buffers whose generation may still be
+	// writing (Shape.update), so the native copy is never freed here
 	public void close() {
 		if(vertexBuffer != null) vertexBuffer.close();
+		vertexBuffer = null;
 		// Don't also close indexBuffer, it is a reference to a global buffer used everywhere
 	}
 	
