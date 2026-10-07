@@ -52,6 +52,13 @@ public class IslandUxTest {
 		boolean mirror = true; for(long k: s){ int x = LocalPos.unpackX(k), y = LocalPos.unpackY(k), z = LocalPos.unpackZ(k); mirror &= s.contains(LocalPos.pack(-x, y, z)) && s.contains(LocalPos.pack(x, y, -z)); }
 		check(mirror && !s.isEmpty(), "default island (" + s.size() + " blocks): mirror symmetric in X and in Z");
 
+		int bp = ((PropertyRangeInt) get(n, "propertyBasePercent")).value, bd = ((PropertyRangeInt) get(n, "propertyBodyPercent")).value;
+		check(bp == 15 && bd == 15, "Base % and Body % default to 15 (" + bp + ", " + bd + ")");
+		TestIsland rs = new TestIsland(); rs.captureDefaults(); /* as ShapeSet does right after construction */ setProp(rs, "propertyBasePercent", 60); setProp(rs, "propertyBodyPercent", 80); rs.setOpenSection(2); rs.resetShownToDefaults();
+		check(((PropertyRangeInt) get(rs, "propertyBasePercent")).value == 15 && ((PropertyRangeInt) get(rs, "propertyBodyPercent")).value == 15, "Reset on the Random section: Base % and Body % back to 15");
+		ShapeIsland saved = new TestIsland(); saved.restorePersistence("CIRCLE,41,41,6,0.7,0.0,0.0,6.0,2,24,BOWL,0.0,0.0,1,Runnable,30,45,Runnable,Runnable");
+		check(saved.toPersistence().endsWith(",30,45,Runnable,Runnable"), "a saved island keeps its own percentages (30, 45)");
+
 		System.out.println("-- controls per Outline");
 		for(Outline o: Outline.values()){
 			StringBuilder shown = new StringBuilder();
@@ -126,9 +133,9 @@ public class IslandUxTest {
 		PropertyRangeInt base = (PropertyRangeInt) get(new TestIsland(), "propertyBasePercent");
 		FloatStepTest.buttons.clear(); base.getWidgetList(); IButton.IPressable minus = null, plus = null;
 		for(Object[] b: FloatStepTest.buttons){ if("-".equals(b[0])) minus = (IButton.IPressable) b[1]; if("+".equals(b[0])) plus = (IButton.IPressable) b[1]; }
-		plus.onPress(); boolean up = base.value == 35; for(int i = 0; i < 20; i++) plus.onPress();
+		plus.onPress(); boolean up = base.value == 20; for(int i = 0; i < 20; i++) plus.onPress();
 		boolean top = base.value == 100; for(int i = 0; i < 30; i++) minus.onPress();
-		check(up && top && base.value == 0, "Base %: 30 + = 35, stops at 100 and at 0");
+		check(up && top && base.value == 0, "Base %: 15 + = 20, stops at 100 and at 0");
 		ShapeSpline sp = new ShapeSpline(); Field pc = ShapeSpline.class.getDeclaredField("propertyPointCount"); pc.setAccessible(true); PropertyRangeInt count = (PropertyRangeInt) pc.get(sp);
 		FloatStepTest.buttons.clear(); count.getWidgetList(); for(Object[] b: FloatStepTest.buttons) if("+".equals(b[0])) plus = (IButton.IPressable) b[1];
 		int c2 = count.value; try { plus.onPress(); } catch(Exception e){} // Spline's own onPress regenerates; only the value matters here
@@ -139,7 +146,7 @@ public class IslandUxTest {
 		ShapeIsland l = new TestIsland(); l.restorePersistence(old);
 		String now = l.toPersistence();
 		check(!l.error && now.startsWith(old + ","), "a 15-value Island from block A loads and keeps its 15 positions: " + now);
-		check(now.equals(old + ",30,30,Runnable,Runnable"), "new properties at the end, at their defaults (Base 30 %, Body 30 %, Naturalize, Undo)");
+		check(now.equals(old + ",15,15,Runnable,Runnable"), "new properties at the end, at their defaults (Base 15 %, Body 15 %, Naturalize, Undo)");
 		check(new TestIsland().properties.size() == 19, "19 persisted properties (15 + 4)");
 		System.out.println(fails == 0 ? "ALL OK" : fails + " FAILED");
 	}

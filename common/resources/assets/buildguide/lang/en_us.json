@@ -41,7 +41,7 @@
 	"property.buildguide.section.seed": "Random",
 	"property.buildguide.seed": "Seed",
 	"property.buildguide.sharpness": "Sharpness",
-	"property.buildguide.wall": "Thickness",
+	"property.buildguide.wall": "Shell (blocks)",
 	"property.buildguide.widthx": "Width X",
 	"property.buildguide.widthz": "Width Z",
 	"property.buildguide.diameter": "Diameter",

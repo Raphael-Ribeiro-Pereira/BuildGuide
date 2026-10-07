@@ -53,8 +53,8 @@ public class ShapeIsland extends Shape {
 	// PropertyRunnable renders as a button; buttons persist as a placeholder like Validate
 	private PropertyRunnable propertyRandomize = new PropertyRunnable(() -> randomize(), new Translatable("property.buildguide.newseed"));
 	// How far Randomize moves the Base (plan) and Body controls, in percent of each control's range
-	private PropertyRangeInt propertyBasePercent = new PropertyRangeInt(30, new Translatable("property.buildguide.basepercent"), null, 0, 100, percentStep);
-	private PropertyRangeInt propertyBodyPercent = new PropertyRangeInt(30, new Translatable("property.buildguide.bodypercent"), null, 0, 100, percentStep);
+	private PropertyRangeInt propertyBasePercent = new PropertyRangeInt(15, new Translatable("property.buildguide.basepercent"), null, 0, 100, percentStep);
+	private PropertyRangeInt propertyBodyPercent = new PropertyRangeInt(15, new Translatable("property.buildguide.bodypercent"), null, 0, 100, percentStep);
 	private PropertyRunnable propertyNaturalize = new PropertyRunnable(() -> naturalize(), new Translatable("property.buildguide.naturalize"));
 	private PropertyRunnable propertyUndo = new PropertyRunnable(() -> undo(), new Translatable("property.buildguide.undo"));
 

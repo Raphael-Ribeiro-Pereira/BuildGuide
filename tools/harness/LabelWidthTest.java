@@ -26,6 +26,10 @@ public class LabelWidthTest {
 			int w = width(m.group(1));
 			check(w <= 76, "\"" + m.group(1) + "\": " + w + " px (limit 76)");
 		}
+		// Thickness was unclear: the clearest candidate that fits wins (2026-10-06)
+		for(String c: new String[]{"Shell (blocks)", "Shell thick.", "Hollow wall"}) System.out.println("   candidate \"" + c + "\": " + width(c) + " px");
+		Matcher wall = Pattern.compile("\"property\\.buildguide\\.wall\": \"([^\"]*)\"").matcher(json);
+		check(wall.find() && wall.group(1).equals("Shell (blocks)") && width(wall.group(1)) <= 76, "Wall label is \"Shell (blocks)\" (" + width("Shell (blocks)") + " px, fits 76)");
 		System.out.println(fails == 0 ? "ALL OK" : fails + " FAILED");
 	}
 }
