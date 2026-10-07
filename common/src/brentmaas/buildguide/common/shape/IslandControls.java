@@ -85,6 +85,9 @@ public final class IslandControls {
 		public int falloff;
 		public float taper = 1.0f;
 		public boolean dripstone;
+		// Spikes 2, phase 3: only carried (Randomize and Naturalize spikes never change them), Undo restores them
+		public IslandGeometry.BreakMode breakMode = IslandGeometry.BreakMode.ATTACHED;
+		public int pieces = 2, gap = 2;
 
 		public Values copy() {
 			Values v = new Values();
@@ -111,6 +114,9 @@ public final class IslandControls {
 			v.falloff = falloff;
 			v.taper = taper;
 			v.dripstone = dripstone;
+			v.breakMode = breakMode;
+			v.pieces = pieces;
+			v.gap = gap;
 			return v;
 		}
 
@@ -121,7 +127,8 @@ public final class IslandControls {
 			return outline == v.outline && profile == v.profile && widthX == v.widthX && widthZ == v.widthZ && sides == v.sides && depth == v.depth && seed == v.seed
 					&& cornerRound == v.cornerRound && rotation == v.rotation && wobble == v.wobble && wobbleSize == v.wobbleSize && sharpness == v.sharpness && roughness == v.roughness
 					&& spikes == v.spikes && spikeLength == v.spikeLength && spikeBase == v.spikeBase && lengthVar == v.lengthVar && spread == v.spread && jitter == v.jitter && spikeMode == v.spikeMode
-					&& falloff == v.falloff && taper == v.taper && dripstone == v.dripstone;
+					&& falloff == v.falloff && taper == v.taper && dripstone == v.dripstone
+					&& breakMode == v.breakMode && pieces == v.pieces && gap == v.gap;
 		}
 
 		@Override

@@ -13,6 +13,7 @@ import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
 import brentmaas.buildguide.common.shape.IslandControls.Control;
 import brentmaas.buildguide.common.shape.IslandGeometry.Outline;
 import brentmaas.buildguide.common.shape.IslandGeometry.Profile;
+import brentmaas.buildguide.common.shape.IslandGeometry.BreakMode;
 import brentmaas.buildguide.common.shape.IslandGeometry.SpikeMode;
 
 /**
@@ -29,12 +30,13 @@ public class ShapeIsland extends Shape {
 	private String[] outlineNames = {"Circle", "Square", "Polygon", "Organic"};
 	private String[] profileNames = {"Bowl", "Cone", "Terraced"};
 	private String[] spikeModeNames = {"Random", "Ring", "Fill"};
+	private String[] breakNames = {"Attached", "Segmented"};
 
 	// Persistence order: outline, width X, width Z, sides, roundness, rotation, edge amplitude, edge
 	// scale, wall, depth, profile, sharpness, roughness, seed, randomize (was New seed), then base %,
 	// body %, naturalize, undo, then (block B) spikes, spike mode, spike length, spike base, length var %,
 	// spread %, then (spikes 2, phase 1) jitter %, (phase 2) dripstone, taper, edge falloff %, spikes %,
-	// naturalize spikes. New properties go at the end. Labels: roundness reads "Corner round",
+	// naturalize spikes, (phase 3) break, pieces, gap. New properties go at the end. Labels: roundness reads "Corner round",
 	// edge amplitude "Wobble", edge scale "Wobble size", wall "Thickness"
 	private PropertyEnum<Outline> propertyOutline = new PropertyEnum<Outline>(Outline.CIRCLE, new Translatable("property.buildguide.outline"), () -> onOutlineChanged(), outlineNames);
 	private PropertyRangeInt propertyWidthX = new PropertyRangeInt(41, new Translatable("property.buildguide.widthx"), () -> update(), IslandGeometry.minWidth, IslandGeometry.maxWidth);
@@ -79,13 +81,17 @@ public class ShapeIsland extends Shape {
 	private PropertyRangeInt propertyFalloff = new PropertyRangeInt(0, new Translatable("property.buildguide.falloff"), () -> update(), 0, 100, percentStep);
 	private PropertyRangeInt propertySpikesPercent = new PropertyRangeInt(15, new Translatable("property.buildguide.spikespercent"), null, 0, 100, percentStep);
 	private PropertyRunnable propertyNaturalizeSpikes = new PropertyRunnable(() -> naturalizeSpikes(), new Translatable("property.buildguide.naturalizespikes"));
+	// Spikes 2, phase 3 (after Naturalize spikes): a spike breaks into pieces, the top one attached
+	private PropertyEnum<BreakMode> propertyBreak = new PropertyEnum<BreakMode>(BreakMode.ATTACHED, new Translatable("property.buildguide.break"), () -> onSpikesChanged(), breakNames);
+	private PropertyRangeInt propertyPieces = new PropertyRangeInt(2, new Translatable("property.buildguide.pieces"), () -> update(), IslandGeometry.minPieces, IslandGeometry.maxPieces);
+	private PropertyRangeInt propertyGap = new PropertyRangeInt(2, new Translatable("property.buildguide.gap"), () -> update(), IslandGeometry.minGap, IslandGeometry.maxGap);
 
 	// Panel order per section (persistence order is the `properties` list)
 	private Property<?>[] baseRows = {propertyOutline, propertyWidthX, propertyWidthZ, propertySides, propertyRoundness, propertyRotation, propertyEdgeAmplitude, propertyEdgeScale};
 	private Control[] baseControls = {null, Control.WIDTH_X, Control.WIDTH_Z, Control.SIDES, Control.CORNER_ROUND, Control.ROTATION, Control.WOBBLE, Control.WOBBLE_SIZE};
 	private Property<?>[] otherRows = {propertyWall, propertyDepth, propertyProfile, propertySharpness, propertyRoughness, propertyBasePercent, propertyBodyPercent, propertySpikesPercent, propertyRandomize, propertyNaturalize, propertyNaturalizeSpikes, propertyUndo, propertySeed};
 	// Spike shape section: shown only with spikes
-	private Property<?>[] spikeShapeRows = {propertyDripstone, propertyTaper, propertyFalloff};
+	private Property<?>[] spikeShapeRows = {propertyDripstone, propertyTaper, propertyFalloff, propertyBreak, propertyPieces, propertyGap};
 	// Spikes section: Count alone while it is 0, then the five others
 	private Property<?>[] spikeRows = {propertySpikeMode, propertySpikeLength, propertySpikeBase, propertyLengthVar, propertySpread, propertyJitter};
 
@@ -127,6 +133,9 @@ public class ShapeIsland extends Shape {
 		properties.add(propertyFalloff);
 		properties.add(propertySpikesPercent);
 		properties.add(propertyNaturalizeSpikes);
+		properties.add(propertyBreak);
+		properties.add(propertyPieces);
+		properties.add(propertyGap);
 
 		int sectionBase = declareSection(new Translatable("property.buildguide.section.base"));
 		int sectionBody = declareSection(new Translatable("property.buildguide.section.body"));
@@ -167,7 +176,8 @@ public class ShapeIsland extends Shape {
 			else hideRow(p);
 		}
 		for(Property<?> p: spikeShapeRows) {
-			if(isShown(p) && propertySpikes.value > 0) row = placeRow(row, p);
+			boolean segmentedOnly = p == propertyPieces || p == propertyGap;
+			if(isShown(p) && propertySpikes.value > 0 && (!segmentedOnly || propertyBreak.value == BreakMode.SEGMENTED)) row = placeRow(row, p);
 			else hideRow(p);
 		}
 	}
@@ -221,6 +231,9 @@ public class ShapeIsland extends Shape {
 		v.falloff = propertyFalloff.value;
 		v.taper = propertyTaper.value;
 		v.dripstone = propertyDripstone.value;
+		v.breakMode = propertyBreak.value;
+		v.pieces = propertyPieces.value;
+		v.gap = propertyGap.value;
 		return v;
 	}
 
@@ -249,6 +262,9 @@ public class ShapeIsland extends Shape {
 		propertyFalloff.setValue(v.falloff);
 		propertyTaper.setValue(v.taper);
 		propertyDripstone.setValue(v.dripstone);
+		propertyBreak.setValue(v.breakMode);
+		propertyPieces.setValue(v.pieces);
+		propertyGap.setValue(v.gap);
 		onSelectedInGUI();
 		update();
 	}
@@ -308,6 +324,9 @@ public class ShapeIsland extends Shape {
 		p.falloff = propertyFalloff.value;
 		p.taper = propertyTaper.value;
 		p.dripstone = propertyDripstone.value;
+		p.breakMode = propertyBreak.value;
+		p.pieces = propertyPieces.value;
+		p.gap = propertyGap.value;
 		return p;
 	}
 

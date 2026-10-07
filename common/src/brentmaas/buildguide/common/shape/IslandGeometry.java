@@ -46,6 +46,12 @@ public final class IslandGeometry {
 	// (a 1-block column) until the last DRIP_TIP_BLOCKS blocks, which narrow to the tip
 	public static final double DRIP_EXP_FACTOR = 2.0, DRIP_TAIL_R = 0.5;
 	public static final int DRIP_TIP_BLOCKS = 2;
+	// Spikes 2, phase 3: a spike may break into pieces separated by gaps; each piece at least minPieceBlocks
+	public enum BreakMode{
+		ATTACHED,
+		SEGMENTED
+	}
+	public static final int minPieces = 2, maxPieces = 4, minGap = 1, maxGap = 6, minPieceBlocks = 2;
 
 	public static final class Params {
 		public Outline outline = Outline.ORGANIC;
@@ -66,6 +72,9 @@ public final class IslandGeometry {
 		// Spikes 2, phase 2: radius profile Base x (1 - t)^taper; Dripstone: a needle on a thick base
 		public double taper = 1.0;
 		public boolean dripstone = false;
+		// Spikes 2, phase 3: Segmented splits each spike into pieces (the top one attached), gap blocks apart
+		public BreakMode breakMode = BreakMode.ATTACHED;
+		public int pieces = 2, gap = 2;
 
 		// Parameters brought into their documented ranges (typed values can be anything)
 		Params clamped() {
@@ -94,6 +103,9 @@ public final class IslandGeometry {
 			p.falloff = clamp(falloff, 0, 100);
 			p.taper = clamp(taper, minTaper, maxTaper);
 			p.dripstone = dripstone;
+			p.breakMode = breakMode;
+			p.pieces = clamp(pieces, minPieces, maxPieces);
+			p.gap = clamp(gap, minGap, maxGap);
 			return p;
 		}
 	}
@@ -179,6 +191,11 @@ public final class IslandGeometry {
 	 * (x + h) * (2h + 1) + (z + h).
 	 */
 	public static int[] columns(Params params, int margin) {
+		return columns(params, margin, null);
+	}
+
+	// The same, collecting the loose spike pieces (Segmented) in `loose` when it is given
+	private static int[] columns(Params params, int margin, Loose loose) {
 		Params p = params.clamped();
 		int h = halfBox(p) + margin, n = 2 * h + 1;
 		int[] bottom = new int[n * n];
@@ -201,7 +218,8 @@ public final class IslandGeometry {
 				bottom[(x + h) * n + (z + h)] = b;
 			}
 		}
-		if(p.spikes > 0) addSpikes(p, bottom, h, n);
+		if(p.spikes > 0) addSpikes(p, bottom, h, n, loose);
+		if(loose != null) loose.finish(bottom);
 		return bottom;
 	}
 
@@ -215,7 +233,12 @@ public final class IslandGeometry {
 	public static void enumerate(Params params, IBlockConsumer out) throws InterruptedException {
 		Params p = params.clamped();
 		int w = p.wall, h = halfBox(p) + w, n = 2 * h + 1, inner = h - w;
-		int[] bottom = columns(p, w);
+		Loose loose = p.breakMode == BreakMode.SEGMENTED && p.spikes > 0 ? new Loose(n) : null;
+		int[] bottom = columns(p, w, loose);
+		if(loose != null && !loose.isEmpty()) {
+			enumerateUnion(bottom, loose, h, n, w, inner, out);
+			return;
+		}
 		for(int x = -inner;x <= inner;++x) {
 			for(int z = -inner;z <= inner;++z) {
 				int b = bottom[(x + h) * n + (z + h)];
@@ -225,6 +248,55 @@ public final class IslandGeometry {
 				}
 			}
 		}
+	}
+
+	/**
+	 * Segmented spikes: the shell of the union of the columns (body and attached pieces) with the loose
+	 * pieces, by the same definition (a solid cell within Manhattan distance wall of a non-solid one; the
+	 * gaps under the cuts are non-solid, so the cut faces are outside). Columns first, as enumerate does,
+	 * then the loose cells below them; each cell once.
+	 */
+	private static void enumerateUnion(int[] bottom, Loose loose, int h, int n, int w, int inner, IBlockConsumer out) throws InterruptedException {
+		for(int x = -inner;x <= inner;++x) {
+			for(int z = -inner;z <= inner;++z) {
+				int b = bottom[(x + h) * n + (z + h)];
+				if(b < 0) continue;
+				for(int y = 0;y >= -b;--y) {
+					if(isShellUnion(bottom, loose, h, n, w, x, y, z)) out.accept(x, y, z);
+				}
+			}
+		}
+		for(int x = -inner;x <= inner;++x) {
+			for(int z = -inner;z <= inner;++z) {
+				int[] iv = loose.at((x + h) * n + (z + h));
+				if(iv == null) continue;
+				for(int k = 0;k < iv.length;k += 2) {
+					for(int y = iv[k + 1];y >= iv[k];--y) {
+						if(isShellUnion(bottom, loose, h, n, w, x, y, z)) out.accept(x, y, z);
+					}
+				}
+			}
+		}
+	}
+
+	private static boolean isShellUnion(int[] bottom, Loose loose, int h, int n, int w, int x, int y, int z) {
+		for(int dx = -w;dx <= w;++dx) {
+			int rest = w - Math.abs(dx);
+			for(int dz = -rest;dz <= rest;++dz) {
+				int k = rest - Math.abs(dz);
+				int i = (x + dx + h) * n + (z + dz + h);
+				int nb = bottom[i];
+				int[] iv = loose.at(i);
+				if(iv == null) {
+					if(nb < 0 || y + k >= 1 || y - k <= -nb - 1) return true;
+				}else {
+					for(int yy = y - k;yy <= y + k;++yy) {
+						if(!(yy <= 0 && yy >= -nb) && !Loose.contains(iv, yy)) return true;
+					}
+				}
+			}
+		}
+		return false;
 	}
 
 	private static boolean isShell(int[] bottom, int h, int n, int w, int x, int y, int z) {
@@ -341,13 +413,15 @@ public final class IslandGeometry {
 	 * Columns outside the plan stay empty: the top is the flat cap at y = 0, so a spike cannot grow
 	 * beyond the outline. The shell is then computed on these columns exactly as for the body alone.
 	 */
-	private static void addSpikes(Params p, int[] bottom, int h, int n) {
+	private static void addSpikes(Params p, int[] bottom, int h, int n, Loose loose) {
 		int[] body = bottom.clone();
 		double[][] plan = spikePlan(p, body, h, n);
 		double radius = p.spikeBase + 0.5;
 		for(double[] s: plan) {
 			int cx = (int) s[2], cz = (int) s[3], length = (int) s[4];
 			int surface = body[(cx + h) * n + (cz + h)];
+			// Segmented: {pieces, blocks per piece}; null keeps the spike whole (Attached, or too short)
+			int[] layout = p.breakMode == BreakMode.SEGMENTED ? pieceLayout(length, p.pieces, p.gap) : null;
 			for(int x = cx - p.spikeBase;x <= cx + p.spikeBase;++x) {
 				for(int z = cz - p.spikeBase;z <= cz + p.spikeBase;++z) {
 					if(Math.abs(x) > h || Math.abs(z) > h) continue;
@@ -356,6 +430,16 @@ public final class IslandGeometry {
 					double d = Math.sqrt((x - cx) * (x - cx) + (z - cz) * (z - cz));
 					int reach = spikeReach(p, d, length, radius);
 					if(reach < 0) continue;
+					if(layout != null) {
+						// Piece k spans the offsets k x (blocks + gap) + 1 .. k x (blocks + gap) + blocks below the
+						// surface, each a cut of the same profile; the top one stays attached to the body
+						int step = layout[1] + p.gap;
+						for(int k = 1;k < layout[0] && loose != null;++k) {
+							int from = k * step + 1, to = Math.min(k * step + layout[1], reach);
+							if(from <= to) loose.add(i, -(surface + to), -(surface + from));
+						}
+						reach = Math.min(reach, layout[1]);
+					}
 					int depth = surface + reach;
 					if(depth > bottom[i]) bottom[i] = depth;
 				}
@@ -403,5 +487,88 @@ public final class IslandGeometry {
 		double aboveTip = (1.0 - t) * length;
 		if(aboveTip < DRIP_TIP_BLOCKS) return DRIP_TAIL_R * aboveTip / DRIP_TIP_BLOCKS;
 		return Math.max(p.spikeBase * Math.pow(1.0 - t, DRIP_EXP_FACTOR * p.taper), DRIP_TAIL_R);
+	}
+
+	/**
+	 * Segmented: how a spike of this length breaks, {pieces, blocks per piece}: each piece is
+	 * (length - (pieces - 1) x gap) / pieces blocks (rounded down); with fewer than minPieceBlocks a piece
+	 * less is tried, down to 2. Null when even two do not fit: the spike stays whole.
+	 */
+	public static int[] pieceLayout(int length, int pieces, int gap) {
+		for(int count = clamp(pieces, minPieces, maxPieces);count >= minPieces;--count) {
+			int each = (length - (count - 1) * gap) / count;
+			if(each >= minPieceBlocks) return new int[] {count, each};
+		}
+		return null;
+	}
+
+	// Every cell of the loose pieces (Segmented), {x, y, z}, below the columns; empty otherwise
+	public static java.util.List<int[]> looseCells(Params params) {
+		Params p = params.clamped();
+		java.util.List<int[]> cells = new java.util.ArrayList<int[]>();
+		if(p.breakMode != BreakMode.SEGMENTED || p.spikes == 0) return cells;
+		int h = halfBox(p), n = 2 * h + 1;
+		Loose loose = new Loose(n);
+		columns(p, 0, loose);
+		for(int i = 0;i < n * n;++i) {
+			int[] iv = loose.at(i);
+			if(iv == null) continue;
+			for(int k = 0;k < iv.length;k += 2) for(int y = iv[k];y <= iv[k + 1];++y) cells.add(new int[] {i / n - h, y, i % n - h});
+		}
+		return cells;
+	}
+
+	/**
+	 * The loose spike pieces, column by column: per column a sorted list of disjoint y intervals
+	 * {low, high, low, high, ...}, all below the column's own bottom (what overlaps the column is part of
+	 * it anyway). The body keeps its one depth per column; only this sparse list is added.
+	 */
+	static final class Loose {
+		private final java.util.Map<Integer, java.util.List<int[]>> raw = new java.util.HashMap<Integer, java.util.List<int[]>>();
+		private final int[][] merged;
+
+		Loose(int n) {
+			merged = new int[n * n][];
+		}
+
+		void add(int column, int low, int high) {
+			raw.computeIfAbsent(column, c -> new java.util.ArrayList<int[]>()).add(new int[] {low, high});
+		}
+
+		// Clip below each column's bottom, then merge overlapping or touching intervals
+		void finish(int[] bottom) {
+			for(java.util.Map.Entry<Integer, java.util.List<int[]>> e: raw.entrySet()) {
+				int top = -bottom[e.getKey()] - 1;
+				java.util.List<int[]> list = new java.util.ArrayList<int[]>();
+				for(int[] r: e.getValue()) if(r[0] <= Math.min(r[1], top)) list.add(new int[] {r[0], Math.min(r[1], top)});
+				if(list.isEmpty()) continue;
+				list.sort((a, b) -> Integer.compare(a[0], b[0]));
+				java.util.List<int[]> out = new java.util.ArrayList<int[]>();
+				for(int[] r: list) {
+					if(!out.isEmpty() && r[0] <= out.get(out.size() - 1)[1] + 1) out.get(out.size() - 1)[1] = Math.max(out.get(out.size() - 1)[1], r[1]);
+					else out.add(r);
+				}
+				int[] flat = new int[out.size() * 2];
+				for(int k = 0;k < out.size();++k) {
+					flat[2 * k] = out.get(k)[0];
+					flat[2 * k + 1] = out.get(k)[1];
+				}
+				merged[e.getKey()] = flat;
+			}
+		}
+
+		boolean isEmpty() {
+			for(int[] iv: merged) if(iv != null) return false;
+			return true;
+		}
+
+		int[] at(int column) {
+			return merged[column];
+		}
+
+		static boolean contains(int[] iv, int y) {
+			for(int k = 0;k < iv.length;k += 2) if(y >= iv[k] && y <= iv[k + 1]) return true;
+			return false;
+		}
 	}
 }

@@ -65,7 +65,7 @@ public class AccordionTest {
 				int worst = ORIGIN_ROWS;
 				for(int i = 0;i < s.getSectionCount();++i) worst = Math.max(worst, s.countRows(i));
 				int shapeRows = s.countRows(3), randomRows = s.countRows(s.getSectionCount() - 1);
-				check(worst <= capacity && s.countRows(2) == (count == 0 ? 1 : count > 0 ? 6 : 7) && shapeRows == (count == 0 ? 0 : 3) && randomRows == 7, "height " + h + ", Island with " + Math.abs(count) + (count < 0 ? " spikes in Fill" : " spikes") + ": Spikes " + s.countRows(2) + " rows, Spike shape " + shapeRows + ", Random " + randomRows + ", capacity " + capacity);
+				check(worst <= capacity && s.countRows(2) == (count == 0 ? 1 : count > 0 ? 6 : 7) && shapeRows == (count == 0 ? 0 : 4) && randomRows == 7, "height " + h + ", Island with " + Math.abs(count) + (count < 0 ? " spikes in Fill" : " spikes") + ": Spikes " + s.countRows(2) + " rows, Spike shape " + shapeRows + ", Random " + randomRows + ", capacity " + capacity);
 			}
 		}
 		System.out.println(fails == 0 ? "ALL OK" : fails + " FAILED");
