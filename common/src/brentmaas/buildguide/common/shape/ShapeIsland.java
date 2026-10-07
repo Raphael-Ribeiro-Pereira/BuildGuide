@@ -26,12 +26,12 @@ public class ShapeIsland extends Shape {
 
 	private String[] outlineNames = {"Circle", "Square", "Polygon", "Organic"};
 	private String[] profileNames = {"Bowl", "Cone", "Terraced"};
-	private String[] spikeModeNames = {"Random", "Ring"};
+	private String[] spikeModeNames = {"Random", "Ring", "Fill"};
 
 	// Persistence order: outline, width X, width Z, sides, roundness, rotation, edge amplitude, edge
 	// scale, wall, depth, profile, sharpness, roughness, seed, randomize (was New seed), then base %,
 	// body %, naturalize, undo, then (block B) spikes, spike mode, spike length, spike base, length var %,
-	// spread %. New properties go at the end. Labels: roundness reads "Corner round",
+	// spread %, then (spikes 2, phase 1) jitter %. New properties go at the end. Labels: roundness reads "Corner round",
 	// edge amplitude "Wobble", edge scale "Wobble size", wall "Thickness"
 	private PropertyEnum<Outline> propertyOutline = new PropertyEnum<Outline>(Outline.CIRCLE, new Translatable("property.buildguide.outline"), () -> onOutlineChanged(), outlineNames);
 	private PropertyRangeInt propertyWidthX = new PropertyRangeInt(41, new Translatable("property.buildguide.widthx"), () -> update(), IslandGeometry.minWidth, IslandGeometry.maxWidth);
@@ -62,18 +62,20 @@ public class ShapeIsland extends Shape {
 	private PropertyRunnable propertyUndo = new PropertyRunnable(() -> undo(), new Translatable("property.buildguide.undo"));
 	// Spikes (block B), after the 19 above: cones under the body. Count 0 = none (the body exactly as without)
 	private PropertyRangeInt propertySpikes = new PropertyRangeInt(0, new Translatable("property.buildguide.spikes"), () -> onSpikesChanged(), 0, IslandGeometry.maxSpikes);
-	private PropertyEnum<SpikeMode> propertySpikeMode = new PropertyEnum<SpikeMode>(SpikeMode.RANDOM, new Translatable("property.buildguide.spikemode"), () -> update(), spikeModeNames);
+	private PropertyEnum<SpikeMode> propertySpikeMode = new PropertyEnum<SpikeMode>(SpikeMode.RANDOM, new Translatable("property.buildguide.spikemode"), () -> onSpikesChanged(), spikeModeNames);
 	private PropertyRangeInt propertySpikeLength = new PropertyRangeInt(12, new Translatable("property.buildguide.spikelength"), () -> update(), IslandGeometry.minSpikeLength, IslandGeometry.maxSpikeLength);
 	private PropertyRangeInt propertySpikeBase = new PropertyRangeInt(3, new Translatable("property.buildguide.spikebase"), () -> update(), IslandGeometry.minSpikeBase, IslandGeometry.maxSpikeBase);
 	private PropertyRangeInt propertyLengthVar = new PropertyRangeInt(0, new Translatable("property.buildguide.lengthvar"), () -> update(), 0, 100, percentStep);
 	private PropertyRangeInt propertySpread = new PropertyRangeInt(50, new Translatable("property.buildguide.spread"), () -> update(), 0, 100, percentStep);
+	// Spikes 2, phase 1 (after the 25 above): Fill only, how far each spike may leave the spiral
+	private PropertyRangeInt propertyJitter = new PropertyRangeInt(20, new Translatable("property.buildguide.jitter"), () -> update(), 0, 100, percentStep);
 
 	// Panel order per section (persistence order is the `properties` list)
 	private Property<?>[] baseRows = {propertyOutline, propertyWidthX, propertyWidthZ, propertySides, propertyRoundness, propertyRotation, propertyEdgeAmplitude, propertyEdgeScale};
 	private Control[] baseControls = {null, Control.WIDTH_X, Control.WIDTH_Z, Control.SIDES, Control.CORNER_ROUND, Control.ROTATION, Control.WOBBLE, Control.WOBBLE_SIZE};
 	private Property<?>[] otherRows = {propertyWall, propertyDepth, propertyProfile, propertySharpness, propertyRoughness, propertyBasePercent, propertyBodyPercent, propertyRandomize, propertyNaturalize, propertyUndo, propertySeed};
 	// Spikes section: Count alone while it is 0, then the five others
-	private Property<?>[] spikeRows = {propertySpikeMode, propertySpikeLength, propertySpikeBase, propertyLengthVar, propertySpread};
+	private Property<?>[] spikeRows = {propertySpikeMode, propertySpikeLength, propertySpikeBase, propertyLengthVar, propertySpread, propertyJitter};
 
 	// Randomize / Naturalize source; one-step Undo, in memory only
 	Random random = new Random();
@@ -107,6 +109,7 @@ public class ShapeIsland extends Shape {
 		properties.add(propertySpikeBase);
 		properties.add(propertyLengthVar);
 		properties.add(propertySpread);
+		properties.add(propertyJitter);
 
 		int sectionBase = declareSection(new Translatable("property.buildguide.section.base"));
 		int sectionBody = declareSection(new Translatable("property.buildguide.section.body"));
@@ -137,13 +140,13 @@ public class ShapeIsland extends Shape {
 		if(isShown(propertySpikes)) row = placeRow(row, propertySpikes);
 		else hideRow(propertySpikes);
 		for(Property<?> p: spikeRows) {
-			if(isShown(p) && propertySpikes.value > 0) row = placeRow(row, p);
+			if(isShown(p) && propertySpikes.value > 0 && (p != propertyJitter || propertySpikeMode.value == SpikeMode.FILL)) row = placeRow(row, p);
 			else hideRow(p);
 		}
 	}
 
 	private void onSpikesChanged() {
-		onSelectedInGUI(); // the five spike controls show only with spikes
+		onSelectedInGUI(); // the spike controls show only with spikes, Jitter only in Fill
 		update();
 	}
 
@@ -181,6 +184,7 @@ public class ShapeIsland extends Shape {
 		v.spikeBase = propertySpikeBase.value;
 		v.lengthVar = propertyLengthVar.value;
 		v.spread = propertySpread.value;
+		v.jitter = propertyJitter.value;
 		return v;
 	}
 
@@ -205,6 +209,7 @@ public class ShapeIsland extends Shape {
 		propertySpikeBase.setValue(v.spikeBase);
 		propertyLengthVar.setValue(v.lengthVar);
 		propertySpread.setValue(v.spread);
+		propertyJitter.setValue(v.jitter);
 		onSelectedInGUI();
 		update();
 	}
@@ -253,6 +258,7 @@ public class ShapeIsland extends Shape {
 		p.spikeBase = propertySpikeBase.value;
 		p.lengthVar = propertyLengthVar.value;
 		p.spread = propertySpread.value;
+		p.jitter = propertyJitter.value;
 		return p;
 	}
 

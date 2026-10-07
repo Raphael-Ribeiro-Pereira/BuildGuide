@@ -80,6 +80,8 @@ public class ShapeScreen extends BaseScreen{
 	private Translatable textEmpty = new Translatable("screen.buildguide.previewempty");
 	private Translatable textNoMatch = new Translatable("screen.buildguide.previewnomatch");
 	private Translatable textWorldPending = new Translatable("screen.buildguide.worldupdatepending");
+	// The preview's warning above this many blocks
+	public static final int largeShapeBlocks = 200000;
 
 	public void init() {
 		super.init();
@@ -200,6 +202,9 @@ public class ShapeScreen extends BaseScreen{
 		else wrapper.drawShapePreview(x1 + 1, y1, x2 - 1, y2, model, preview.camera);
 		// Live apply: the world still shows an older generation (Idle or On close mode)
 		if(BuildGuide.stateManager.getState().getCurrentShape().worldGate.isPending()) drawShadowLeft(textWorldPending.toString(), x1 + 3, y2 - 10, 0xFFCC66);
+		// Spikes 2: a shape this large costs memory and time in the world (about 672 bytes of vertex buffer per block)
+		int blocks = BuildGuide.stateManager.getState().getCurrentShape().getNumberOfBlocks();
+		if(blocks > largeShapeBlocks) drawShadowRight(new Translatable("screen.buildguide.largeshape", "" + blocks).toString(), x2 - 3, y2 - 10, 0xFFCC66);
 	}
 	
 	private void initPreviewControls() {

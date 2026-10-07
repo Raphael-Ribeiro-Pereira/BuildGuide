@@ -69,7 +69,7 @@ public final class IslandControls {
 		public int widthX, widthZ, sides, depth, seed;
 		public float cornerRound, rotation, wobble, wobbleSize, sharpness, roughness;
 		// Spikes (block B); the mode is only carried, Randomize never changes it
-		public int spikes, spikeLength, spikeBase, lengthVar, spread;
+		public int spikes, spikeLength, spikeBase, lengthVar, spread, jitter;
 		public IslandGeometry.SpikeMode spikeMode = IslandGeometry.SpikeMode.RANDOM;
 
 		public Values copy() {
@@ -92,6 +92,7 @@ public final class IslandControls {
 			v.spikeBase = spikeBase;
 			v.lengthVar = lengthVar;
 			v.spread = spread;
+			v.jitter = jitter;
 			v.spikeMode = spikeMode;
 			return v;
 		}
@@ -102,7 +103,7 @@ public final class IslandControls {
 			Values v = (Values) o;
 			return outline == v.outline && profile == v.profile && widthX == v.widthX && widthZ == v.widthZ && sides == v.sides && depth == v.depth && seed == v.seed
 					&& cornerRound == v.cornerRound && rotation == v.rotation && wobble == v.wobble && wobbleSize == v.wobbleSize && sharpness == v.sharpness && roughness == v.roughness
-					&& spikes == v.spikes && spikeLength == v.spikeLength && spikeBase == v.spikeBase && lengthVar == v.lengthVar && spread == v.spread && spikeMode == v.spikeMode;
+					&& spikes == v.spikes && spikeLength == v.spikeLength && spikeBase == v.spikeBase && lengthVar == v.lengthVar && spread == v.spread && jitter == v.jitter && spikeMode == v.spikeMode;
 		}
 
 		@Override

@@ -31,7 +31,7 @@ public class IslandSpikesTest {
 	static void setRandom(ShapeIsland s, long seed) throws Exception { Field x = ShapeIsland.class.getDeclaredField("random"); x.setAccessible(true); x.set(s, new Random(seed)); }
 	static Values values(ShapeIsland s) throws Exception { return (Values) call(s, "values"); }
 	static boolean spikeSame(Values a, Values b){ return a.spikes == b.spikes && a.spikeMode == b.spikeMode && a.spikeLength == b.spikeLength && a.spikeBase == b.spikeBase && a.lengthVar == b.lengthVar && a.spread == b.spread; }
-	static boolean spikeInLimits(Values v){ return v.spikes >= 1 && v.spikes <= 12 && v.spikeLength >= 1 && v.spikeLength <= 40 && v.spikeBase >= 1 && v.spikeBase <= 8 && v.lengthVar >= 0 && v.lengthVar <= 100 && v.lengthVar % 5 == 0 && v.spread >= 0 && v.spread <= 100 && v.spread % 5 == 0; }
+	static boolean spikeInLimits(Values v){ return v.spikes >= 1 && v.spikes <= IslandGeometry.maxSpikes && v.spikeLength >= 1 && v.spikeLength <= 40 && v.spikeBase >= 1 && v.spikeBase <= 8 && v.lengthVar >= 0 && v.lengthVar <= 100 && v.lengthVar % 5 == 0 && v.spread >= 0 && v.spread <= 100 && v.spread % 5 == 0; }
 
 	public static void main(String[] a) throws Exception {
 		BuildGuide.widgetHandler = new FloatStepTest.Widgets();
@@ -114,7 +114,7 @@ public class IslandSpikesTest {
 		System.out.println("-- persistence and panel");
 		String old = "ORGANIC,51,37,6,0.7,15.0,0.25,6.0,3,30,TERRACED,0.4,0.3,777,Runnable,20,35,Runnable,Runnable";
 		ShapeIsland l = new TestIsland(); l.restorePersistence(old); String now = l.toPersistence();
-		check(!l.error && now.equals(old + ",0,RANDOM,12,3,0,50"), "a 19-value Island loads, its 19 values intact, the 6 new at their defaults (Count 0): " + now);
+		check(!l.error && now.startsWith(old + ",0,RANDOM,12,3,0,50"), "a 19-value Island loads, its 19 values intact, the 6 block B values at their defaults (Count 0; later properties follow): " + now);
 		Values lv = values(l); check(lv.spikes == 0, "an old island has no spikes");
 		ShapeIsland panel = new TestIsland();
 		check(panel.getSectionCount() == 4 && panel.getSectionName(2).getTranslationKey().equals("property.buildguide.section.spikes"), "sections: Base, Body, Spikes, Random");

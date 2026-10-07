@@ -55,15 +55,16 @@ public class AccordionTest {
 		// Spikes section: 1 row (Count) with no spikes, 6 with some; every section must still fit
 		for(int h: HEIGHTS) {
 			int accordion = ShapeLayout.accordionHeight(h);
-			for(int count: new int[]{0, IslandGeometry.maxSpikes}) {
+			for(int count: new int[]{0, IslandGeometry.maxSpikes, -IslandGeometry.maxSpikes}) { // negative: that many spikes in Fill
 				Shape s = new ShapeIsland();
 				Field f = ShapeIsland.class.getDeclaredField("propertySpikes");
 				f.setAccessible(true);
-				((Property<Object>) f.get(s)).value = count;
+				((Property<Object>) f.get(s)).value = Math.abs(count);
+				if(count < 0) { Field m = ShapeIsland.class.getDeclaredField("propertySpikeMode"); m.setAccessible(true); ((Property<Object>) m.get(s)).value = IslandGeometry.SpikeMode.FILL; }
 				int capacity = (accordion - (1 + s.getSectionCount()) * HEADER) / Property.rowHeight;
 				int worst = ORIGIN_ROWS;
 				for(int i = 0;i < s.getSectionCount();++i) worst = Math.max(worst, s.countRows(i));
-				check(worst <= capacity && s.countRows(2) == (count == 0 ? 1 : 6), "height " + h + ", Island with " + count + " spikes: Spikes section " + s.countRows(2) + " rows, capacity " + capacity);
+				check(worst <= capacity && s.countRows(2) == (count == 0 ? 1 : count > 0 ? 6 : 7), "height " + h + ", Island with " + Math.abs(count) + (count < 0 ? " spikes in Fill" : " spikes") + ": Spikes section " + s.countRows(2) + " rows, capacity " + capacity);
 			}
 		}
 		System.out.println(fails == 0 ? "ALL OK" : fails + " FAILED");

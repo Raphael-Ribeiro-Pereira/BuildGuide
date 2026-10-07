@@ -28,15 +28,19 @@ public final class IslandGeometry {
 	// Spikes (block B): cones under the body, pointing down
 	public enum SpikeMode{
 		RANDOM,
-		RING
+		RING,
+		// Spikes 2: a sunflower spiral over the whole outline, with a seeded jitter
+		FILL
 	}
 
 	public static final int maxWidth = 121, minWidth = 3, maxDepth = 80, minSides = 3, maxSides = 12, minWall = 1, maxWall = 3;
-	public static final int maxSpikes = 12, minSpikeLength = 1, maxSpikeLength = 40, minSpikeBase = 1, maxSpikeBase = 8;
+	public static final int maxSpikes = 64, minSpikeLength = 1, maxSpikeLength = 40, minSpikeBase = 1, maxSpikeBase = 8;
 	// Seed salts so the edge and the depth noise are independent fields
 	private static final long edgeSalt = 0x5DEECE66DL, depthSalt = 0x2545F4914F6CDD1DL;
 	// The spikes' own random stream: with no spikes nothing reads it, so the body is exactly as before
 	private static final long spikeSalt = 0x7F4A7C159E3779B9L;
+	// Fill: the golden angle, pi x (3 - sqrt 5), between consecutive spikes of the spiral
+	public static final double goldenAngle = Math.PI * (3.0 - Math.sqrt(5.0));
 
 	public static final class Params {
 		public Outline outline = Outline.ORGANIC;
@@ -51,6 +55,9 @@ public final class IslandGeometry {
 		public int spikes = 0;
 		public SpikeMode spikeMode = SpikeMode.RANDOM;
 		public int spikeLength = 12, spikeBase = 3, lengthVar = 0, spread = 50;
+		// Spikes 2: Fill jitter in percent of half the mean spacing; edge falloff in percent (0 = every
+		// spike full length, 100 = a spike on the edge is 1 long)
+		public int jitter = 20, falloff = 0;
 
 		// Parameters brought into their documented ranges (typed values can be anything)
 		Params clamped() {
@@ -75,6 +82,8 @@ public final class IslandGeometry {
 			p.spikeBase = clamp(spikeBase, minSpikeBase, maxSpikeBase);
 			p.lengthVar = clamp(lengthVar, 0, 100);
 			p.spread = clamp(spread, 0, 100);
+			p.jitter = clamp(jitter, 0, 100);
+			p.falloff = clamp(falloff, 0, 100);
 			return p;
 		}
 	}
@@ -230,9 +239,11 @@ public final class IslandGeometry {
 	 * Where the spikes grow, from the body alone: one row per spike, {u, v, x, z, length}. (u, v) is the
 	 * root in the normalised plan, (x, z) its column after the rotation. Random: radius Spread x sqrt(r)
 	 * and a uniform angle, from the spikes' own stream of the seed; Ring: equal angles on a ring of
-	 * radius Spread (one spike: the centre), independent of the seed. A root outside the outline, or on a
-	 * column outside the plan, is pulled towards the centre (same angle) until it is inside. Length:
-	 * Spike length x (1 + var x U(-1, 1)), clamped to [1, 40]. Empty when there are no spikes.
+	 * radius Spread (one spike: the centre), independent of the seed; Fill: a sunflower spiral (golden
+	 * angle, radial fraction sqrt((i + 0.5) / N) x Spread of the edge at its angle; one spike: the centre)
+	 * moved by the seeded jitter. A root outside the outline, or on a column outside the plan, is pulled
+	 * towards the centre (same angle) until it is inside. Length: Spike length x (1 - falloff x rho^2) x
+	 * (1 + var x U(-1, 1)), clamped to [1, 40]. Empty when there are no spikes.
 	 */
 	public static double[][] spikePlan(Params params) {
 		Params p = params.clamped();
@@ -249,6 +260,7 @@ public final class IslandGeometry {
 		double rot = Math.toRadians(p.rotationDeg), cr = Math.cos(rot), sr = Math.sin(rot);
 		double spread = p.spread / 100.0;
 		double[][] plan = new double[p.spikes][];
+		double jitterReach = p.spikeMode == SpikeMode.FILL ? p.jitter / 100.0 * 0.5 * fillSpacing(p, spread) : 0;
 		for(int i = 0;i < p.spikes;++i) {
 			double u, v;
 			if(p.spikeMode == SpikeMode.RANDOM) {
@@ -258,12 +270,21 @@ public final class IslandGeometry {
 			}else if(p.spikes == 1) {
 				u = 0;
 				v = 0;
+			}else if(p.spikeMode == SpikeMode.FILL) {
+				// Spiral: radial fraction sqrt((i + 0.5) / N) x Spread of the edge at that angle, so the
+				// spikes reach every part of the outline, corners included; then the seeded jitter
+				double angle = i * goldenAngle, fraction = Math.sqrt((i + 0.5) / p.spikes) * spread * edge(p, angle);
+				u = fraction * Math.cos(angle);
+				v = fraction * Math.sin(angle);
+				double jitterAngle = random.nextDouble() * 2 * Math.PI, jitterDistance = jitterReach * random.nextDouble();
+				u += jitterDistance * Math.cos(jitterAngle);
+				v += jitterDistance * Math.sin(jitterAngle);
 			}else {
 				double angle = 2 * Math.PI * i / p.spikes;
 				u = spread * Math.cos(angle);
 				v = spread * Math.sin(angle);
 			}
-			double length = p.spikeLength * (1.0 + p.lengthVar / 100.0 * (random.nextDouble() * 2.0 - 1.0));
+			double vary = 1.0 + p.lengthVar / 100.0 * (random.nextDouble() * 2.0 - 1.0);
 			int x = 0, z = 0;
 			for(int k = 0;;++k) {
 				// Into the grid: undo the normalisation, then apply the rotation (the inverse of columns())
@@ -282,9 +303,24 @@ public final class IslandGeometry {
 				u *= 0.9;
 				v *= 0.9;
 			}
+			// Edge falloff from the final root: m = 1 - falloff x rho^2, rho = 0 at the centre, 1 on the edge
+			double rho = Math.sqrt(u * u + v * v) / edge(p, Math.atan2(v, u));
+			double length = p.spikeLength * (1.0 - p.falloff / 100.0 * rho * rho) * vary;
 			plan[i] = new double[] {u, v, x, z, clamp(Math.round(length), minSpikeLength, maxSpikeLength)};
 		}
 		return plan;
+	}
+
+	// Fill: mean distance between spikes in the normalised plan, sqrt(area / N), the area being the
+	// outline's (half the integral of edge^2) scaled by Spread^2
+	public static double fillSpacing(Params p, double spread) {
+		double area = 0;
+		int samples = 720;
+		for(int k = 0;k < samples;++k) {
+			double e = edge(p, 2 * Math.PI * k / samples);
+			area += 0.5 * e * e * (2 * Math.PI / samples);
+		}
+		return Math.sqrt(area * spread * spread / p.spikes);
 	}
 
 	/**

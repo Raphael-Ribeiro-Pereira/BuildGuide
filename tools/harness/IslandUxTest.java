@@ -146,8 +146,8 @@ public class IslandUxTest {
 		ShapeIsland l = new TestIsland(); l.restorePersistence(old);
 		String now = l.toPersistence();
 		check(!l.error && now.startsWith(old + ","), "a 15-value Island from block A loads and keeps its 15 positions: " + now);
-		check(now.equals(old + ",15,15,Runnable,Runnable,0,RANDOM,12,3,0,50"), "new properties at the end, at their defaults (Base 15 %, Body 15 %, Naturalize, Undo, then the 6 spike controls)");
-		check(new TestIsland().properties.size() == 25, "25 persisted properties (15 + 4 + 6 spikes)");
+		check(now.startsWith(old + ",15,15,Runnable,Runnable,0,RANDOM,12,3,0,50"), "new properties at the end, at their defaults (Base 15 %, Body 15 %, Naturalize, Undo, then the 6 spike controls; later ones follow)");
+		check(new TestIsland().properties.size() >= 25, "at least 25 persisted properties (15 + 4 + 6 spikes; spikes 2 adds more at the end)");
 		System.out.println(fails == 0 ? "ALL OK" : fails + " FAILED");
 	}
 }
