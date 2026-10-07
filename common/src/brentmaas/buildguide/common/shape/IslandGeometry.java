@@ -41,6 +41,11 @@ public final class IslandGeometry {
 	private static final long spikeSalt = 0x7F4A7C159E3779B9L;
 	// Fill: the golden angle, pi x (3 - sqrt 5), between consecutive spikes of the spiral
 	public static final double goldenAngle = Math.PI * (3.0 - Math.sqrt(5.0));
+	public static final double minTaper = 0.5, maxTaper = 3.0;
+	// Dripstone: the curve's exponent is DRIP_EXP_FACTOR x Taper, the radius never drops below DRIP_TAIL_R
+	// (a 1-block column) until the last DRIP_TIP_BLOCKS blocks, which narrow to the tip
+	public static final double DRIP_EXP_FACTOR = 2.0, DRIP_TAIL_R = 0.5;
+	public static final int DRIP_TIP_BLOCKS = 2;
 
 	public static final class Params {
 		public Outline outline = Outline.ORGANIC;
@@ -58,6 +63,9 @@ public final class IslandGeometry {
 		// Spikes 2: Fill jitter in percent of half the mean spacing; edge falloff in percent (0 = every
 		// spike full length, 100 = a spike on the edge is 1 long)
 		public int jitter = 20, falloff = 0;
+		// Spikes 2, phase 2: radius profile Base x (1 - t)^taper; Dripstone: a needle on a thick base
+		public double taper = 1.0;
+		public boolean dripstone = false;
 
 		// Parameters brought into their documented ranges (typed values can be anything)
 		Params clamped() {
@@ -84,6 +92,8 @@ public final class IslandGeometry {
 			p.spread = clamp(spread, 0, 100);
 			p.jitter = clamp(jitter, 0, 100);
 			p.falloff = clamp(falloff, 0, 100);
+			p.taper = clamp(taper, minTaper, maxTaper);
+			p.dripstone = dripstone;
 			return p;
 		}
 	}
@@ -344,11 +354,54 @@ public final class IslandGeometry {
 					int i = (x + h) * n + (z + h);
 					if(body[i] < 0) continue;
 					double d = Math.sqrt((x - cx) * (x - cx) + (z - cz) * (z - cz));
-					if(d >= radius) continue;
-					int depth = surface + (int) Math.round(length * (1.0 - d / radius));
+					int reach = spikeReach(p, d, length, radius);
+					if(reach < 0) continue;
+					int depth = surface + reach;
 					if(depth > bottom[i]) bottom[i] = depth;
 				}
 			}
 		}
+	}
+
+	/**
+	 * How many blocks below the bottom surface a spike of this length reaches in a column at horizontal
+	 * distance d from its axis, or -1 when that column is not part of it. radius = Spike base + 0.5 (the
+	 * cell). Taper 1 without Dripstone is the block B cone, computed exactly as before; another Taper
+	 * gives radius x (1 - t)^taper; Dripstone follows dripRadius layer by layer.
+	 */
+	static int spikeReach(Params p, double d, int length, double radius) {
+		if(!p.dripstone) {
+			if(d >= radius) return -1;
+			if(p.taper == 1.0) return (int) Math.round(length * (1.0 - d / radius));
+			return (int) Math.round(length * (1.0 - Math.pow(d / radius, 1.0 / p.taper)));
+		}
+		int reach = -1;
+		for(int j = 1;j <= length;++j) {
+			if(d < dripRadius(p, (j - 0.5) / length, length, radius)) reach = j;
+			else break;
+		}
+		return reach;
+	}
+
+	// Dripstone: the radius within which a cell belongs to the spike at t (0 root, 1 tip); the floor is
+	// DRIP_TAIL_R + 0.5 (only the axis cell) and the last DRIP_TIP_BLOCKS blocks narrow from it to 0
+	static double dripRadius(Params p, double t, int length, double radius) {
+		double floor = DRIP_TAIL_R + 0.5, aboveTip = (1.0 - t) * length;
+		if(aboveTip < DRIP_TIP_BLOCKS) return floor * aboveTip / DRIP_TIP_BLOCKS;
+		return Math.max(radius * Math.pow(1.0 - t, DRIP_EXP_FACTOR * p.taper), floor);
+	}
+
+	/**
+	 * The spike's radius profile in blocks at t (0 root, 1 tip), as specified: Base x (1 - t)^Taper, or
+	 * with Dripstone Base x (1 - t)^(2 x Taper) held at DRIP_TAIL_R until the last DRIP_TIP_BLOCKS of
+	 * `length`, which narrow to 0. (Cells are included up to that radius + 0.5, see spikeReach.)
+	 */
+	public static double spikeRadius(Params params, double t, int length) {
+		Params p = params.clamped();
+		t = clamp(t, 0.0, 1.0);
+		if(!p.dripstone) return p.spikeBase * Math.pow(1.0 - t, p.taper);
+		double aboveTip = (1.0 - t) * length;
+		if(aboveTip < DRIP_TIP_BLOCKS) return DRIP_TAIL_R * aboveTip / DRIP_TIP_BLOCKS;
+		return Math.max(p.spikeBase * Math.pow(1.0 - t, DRIP_EXP_FACTOR * p.taper), DRIP_TAIL_R);
 	}
 }

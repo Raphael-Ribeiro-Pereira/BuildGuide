@@ -31,6 +31,16 @@ public final class IslandControls {
 	public static final float unitGrid = 0.05f, rotationGrid = 1.0f, wobbleSizeGrid = 0.5f;
 	public static final int seedBound = 1000000;
 	public static final int percentGrid = 5;
+	public static final float taperGrid = 0.1f;
+
+	// Naturalize spikes recipe (spikes 2): centre value and spread, drawn from the current seed. With no
+	// spikes it turns naturalSpikeCount on
+	public static final int naturalSpikeCount = 8;
+	public static final int naturalFalloff = 60, naturalFalloffSpread = 15;
+	public static final int naturalLengthVar = 30, naturalLengthVarSpread = 10;
+	public static final float naturalTaper = 1.4f, naturalTaperSpread = 0.3f;
+	public static final int naturalJitter = 25, naturalJitterSpread = 10;
+	private static final long naturalSpikesSalt = 0x3C6EF372FE94F82BL;
 
 	// Naturalize recipe: centre value and how far a fresh seed moves it either way
 	public static final float naturalCornerRound = 0.75f, naturalCornerRoundSpread = 0.15f;
@@ -71,6 +81,10 @@ public final class IslandControls {
 		// Spikes (block B); the mode is only carried, Randomize never changes it
 		public int spikes, spikeLength, spikeBase, lengthVar, spread, jitter;
 		public IslandGeometry.SpikeMode spikeMode = IslandGeometry.SpikeMode.RANDOM;
+		// Spikes 2, phase 2: shape of the spikes; Dripstone is only carried, Randomize never changes it
+		public int falloff;
+		public float taper = 1.0f;
+		public boolean dripstone;
 
 		public Values copy() {
 			Values v = new Values();
@@ -94,6 +108,9 @@ public final class IslandControls {
 			v.spread = spread;
 			v.jitter = jitter;
 			v.spikeMode = spikeMode;
+			v.falloff = falloff;
+			v.taper = taper;
+			v.dripstone = dripstone;
 			return v;
 		}
 
@@ -103,7 +120,8 @@ public final class IslandControls {
 			Values v = (Values) o;
 			return outline == v.outline && profile == v.profile && widthX == v.widthX && widthZ == v.widthZ && sides == v.sides && depth == v.depth && seed == v.seed
 					&& cornerRound == v.cornerRound && rotation == v.rotation && wobble == v.wobble && wobbleSize == v.wobbleSize && sharpness == v.sharpness && roughness == v.roughness
-					&& spikes == v.spikes && spikeLength == v.spikeLength && spikeBase == v.spikeBase && lengthVar == v.lengthVar && spread == v.spread && jitter == v.jitter && spikeMode == v.spikeMode;
+					&& spikes == v.spikes && spikeLength == v.spikeLength && spikeBase == v.spikeBase && lengthVar == v.lengthVar && spread == v.spread && jitter == v.jitter && spikeMode == v.spikeMode
+					&& falloff == v.falloff && taper == v.taper && dripstone == v.dripstone;
 		}
 
 		@Override
@@ -115,13 +133,14 @@ public final class IslandControls {
 	/**
 	 * A new seed, and each control of a group moved by up to its percentage of its range:
 	 * new = clamp(current + U(-1, 1) x percent x range). Base moves the plan controls that apply to
-	 * the current Outline; Body moves Depth, Sharpness and Roughness. A group at 0 % is left alone.
-	 * Outline and Profile never change.
+	 * the current Outline; Body moves Depth, Sharpness and Roughness; Spikes (only when there are spikes)
+	 * moves Count (kept >= 1), Length, Base, Length var, Spread, Taper, Edge falloff and, in Fill, Jitter. A
+	 * group at 0 % is left alone. Outline, Profile, Spike mode and Dripstone never change.
 	 */
-	public static Values randomize(Values current, int basePercent, int bodyPercent, Random random) {
+	public static Values randomize(Values current, int basePercent, int bodyPercent, int spikesPercent, Random random) {
 		Values v = current.copy();
 		v.seed = random.nextInt(seedBound);
-		double base = Math.max(0, Math.min(100, basePercent)) / 100.0, body = Math.max(0, Math.min(100, bodyPercent)) / 100.0;
+		double base = Math.max(0, Math.min(100, basePercent)) / 100.0, body = Math.max(0, Math.min(100, bodyPercent)) / 100.0, spike = Math.max(0, Math.min(100, spikesPercent)) / 100.0;
 		if(base > 0) {
 			Outline o = v.outline;
 			if(applies(o, Control.WIDTH_X)) v.widthX = moveInt(v.widthX, IslandGeometry.minWidth, IslandGeometry.maxWidth, base, random);
@@ -136,17 +155,42 @@ public final class IslandControls {
 			v.depth = moveInt(v.depth, 0, IslandGeometry.maxDepth, body, random);
 			v.sharpness = move(v.sharpness, 0.0f, 1.0f, unitGrid, body, random);
 			v.roughness = move(v.roughness, 0.0f, 1.0f, unitGrid, body, random);
-			// Spikes belong to Body, but Randomize never turns them on or off: with none, nothing is drawn for
-			// them (so islands without spikes randomize exactly as before); with some, the count stays >= 1
-			if(v.spikes > 0) {
-				v.spikes = moveInt(v.spikes, 1, IslandGeometry.maxSpikes, body, random);
-				v.spikeLength = moveInt(v.spikeLength, IslandGeometry.minSpikeLength, IslandGeometry.maxSpikeLength, body, random);
-				v.spikeBase = moveInt(v.spikeBase, IslandGeometry.minSpikeBase, IslandGeometry.maxSpikeBase, body, random);
-				v.lengthVar = movePercent(v.lengthVar, body, random);
-				v.spread = movePercent(v.spread, body, random);
-			}
+		}
+		// Spikes % (spikes 2: no longer part of Body). Randomize never turns spikes on or off: with none,
+		// nothing is drawn for them; with some, the count stays >= 1
+		if(spike > 0 && v.spikes > 0) {
+			v.spikes = moveInt(v.spikes, 1, IslandGeometry.maxSpikes, spike, random);
+			v.spikeLength = moveInt(v.spikeLength, IslandGeometry.minSpikeLength, IslandGeometry.maxSpikeLength, spike, random);
+			v.spikeBase = moveInt(v.spikeBase, IslandGeometry.minSpikeBase, IslandGeometry.maxSpikeBase, spike, random);
+			v.lengthVar = movePercent(v.lengthVar, spike, random);
+			v.spread = movePercent(v.spread, spike, random);
+			v.taper = move(v.taper, (float) IslandGeometry.minTaper, (float) IslandGeometry.maxTaper, taperGrid, spike, random);
+			v.falloff = movePercent(v.falloff, spike, random);
+			if(v.spikeMode == IslandGeometry.SpikeMode.FILL) v.jitter = movePercent(v.jitter, spike, random);
 		}
 		return v;
+	}
+
+	/**
+	 * The natural spikes recipe: Edge falloff, Length var, Taper and Jitter at the recipe's centre values,
+	 * moved by up to their spread with a stream drawn from the current seed (the same seed gives the same
+	 * spikes). With no spikes it turns naturalSpikeCount on; otherwise Count stays. Seed, Spike mode,
+	 * Dripstone, Break, Length, Base and Spread are kept.
+	 */
+	public static Values naturalizeSpikes(Values current) {
+		Values v = current.copy();
+		Random random = new Random(IslandNoise.mix(v.seed ^ naturalSpikesSalt));
+		if(v.spikes == 0) v.spikes = naturalSpikeCount;
+		v.falloff = aroundPercent(naturalFalloff, naturalFalloffSpread, random);
+		v.lengthVar = aroundPercent(naturalLengthVar, naturalLengthVarSpread, random);
+		v.taper = around(naturalTaper, naturalTaperSpread, (float) IslandGeometry.minTaper, (float) IslandGeometry.maxTaper, taperGrid, random);
+		v.jitter = aroundPercent(naturalJitter, naturalJitterSpread, random);
+		return v;
+	}
+
+	private static int aroundPercent(int centre, int spread, Random random) {
+		long value = Math.round((centre + unit(random) * spread) / percentGrid) * percentGrid;
+		return (int) Math.max(0, Math.min(100, value));
 	}
 
 	/**

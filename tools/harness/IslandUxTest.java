@@ -54,7 +54,7 @@ public class IslandUxTest {
 
 		int bp = ((PropertyRangeInt) get(n, "propertyBasePercent")).value, bd = ((PropertyRangeInt) get(n, "propertyBodyPercent")).value;
 		check(bp == 15 && bd == 15, "Base % and Body % default to 15 (" + bp + ", " + bd + ")");
-		TestIsland rs = new TestIsland(); rs.captureDefaults(); /* as ShapeSet does right after construction */ setProp(rs, "propertyBasePercent", 60); setProp(rs, "propertyBodyPercent", 80); rs.setOpenSection(3); /* Random is the 4th section since block B (Base, Body, Spikes, Random) */ rs.resetShownToDefaults();
+		TestIsland rs = new TestIsland(); rs.captureDefaults(); /* as ShapeSet does right after construction */ setProp(rs, "propertyBasePercent", 60); setProp(rs, "propertyBodyPercent", 80); rs.setOpenSection(rs.getSectionCount() - 1); /* Random is the last section (Base, Body, Spikes, Spike shape, Random since spikes 2) */ rs.resetShownToDefaults();
 		check(((PropertyRangeInt) get(rs, "propertyBasePercent")).value == 15 && ((PropertyRangeInt) get(rs, "propertyBodyPercent")).value == 15, "Reset on the Random section: Base % and Body % back to 15");
 		ShapeIsland saved = new TestIsland(); saved.restorePersistence("CIRCLE,41,41,6,0.7,0.0,0.0,6.0,2,24,BOWL,0.0,0.0,1,Runnable,30,45,Runnable,Runnable");
 		check(saved.toPersistence().contains(",Runnable,30,45,Runnable,Runnable,"), "a saved island keeps its own percentages (30, 45)");
@@ -81,8 +81,8 @@ public class IslandUxTest {
 		}
 		ShapeIsland v = new TestIsland(); updates = 0;
 		int[] expectBase = {4, 5, 6, 7}; // Outline, widths, rotation (+ Corner round, + Sides, + Wobble and its size)
-		for(Outline o: Outline.values()){ setProp(v, "propertyOutline", o); check(v.countRows(0) == expectBase[o.ordinal()], o + ": Base shows " + v.countRows(0) + " rows (Body " + v.countRows(1) + ", Random " + v.countRows(3) + ")"); }
-		check(v.countRows(3) == 6, "Random rows: Base %, Body %, Randomize, Naturalize, Undo, Seed");
+		for(Outline o: Outline.values()){ setProp(v, "propertyOutline", o); check(v.countRows(0) == expectBase[o.ordinal()], o + ": Base shows " + v.countRows(0) + " rows (Body " + v.countRows(1) + ", Random " + v.countRows(v.getSectionCount() - 1) + ")"); }
+		check(v.countRows(v.getSectionCount() - 1) == 7, "Random rows: Base %, Body %, Spikes %, Randomize, Naturalize, Natural spikes, Undo (Seed is saved but not shown since spikes 2: 7 rows fit at 270)");
 
 		System.out.println("-- Randomize (seeded)");
 		TestIsland r1 = island(42), r2 = island(42);

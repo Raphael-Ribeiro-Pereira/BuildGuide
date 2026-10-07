@@ -49,7 +49,7 @@ public class AccordionTest {
 				int capacity = (accordion - (1 + s.getSectionCount()) * HEADER) / Property.rowHeight;
 				int worst = ORIGIN_ROWS;
 				for(int i = 0;i < s.getSectionCount();++i) worst = Math.max(worst, s.countRows(i));
-				check(worst <= capacity, "height " + h + ", Island " + o + ": capacity " + capacity + " rows, base=" + s.countRows(0) + " body=" + s.countRows(1) + " spikes=" + s.countRows(2) + " random=" + s.countRows(3));
+				check(worst <= capacity, "height " + h + ", Island " + o + ": capacity " + capacity + " rows, base=" + s.countRows(0) + " body=" + s.countRows(1) + " spikes=" + s.countRows(2) + " spikeshape=" + s.countRows(3) + " random=" + s.countRows(s.getSectionCount() - 1));
 			}
 		}
 		// Spikes section: 1 row (Count) with no spikes, 6 with some; every section must still fit
@@ -64,7 +64,8 @@ public class AccordionTest {
 				int capacity = (accordion - (1 + s.getSectionCount()) * HEADER) / Property.rowHeight;
 				int worst = ORIGIN_ROWS;
 				for(int i = 0;i < s.getSectionCount();++i) worst = Math.max(worst, s.countRows(i));
-				check(worst <= capacity && s.countRows(2) == (count == 0 ? 1 : count > 0 ? 6 : 7), "height " + h + ", Island with " + Math.abs(count) + (count < 0 ? " spikes in Fill" : " spikes") + ": Spikes section " + s.countRows(2) + " rows, capacity " + capacity);
+				int shapeRows = s.countRows(3), randomRows = s.countRows(s.getSectionCount() - 1);
+				check(worst <= capacity && s.countRows(2) == (count == 0 ? 1 : count > 0 ? 6 : 7) && shapeRows == (count == 0 ? 0 : 3) && randomRows == 7, "height " + h + ", Island with " + Math.abs(count) + (count < 0 ? " spikes in Fill" : " spikes") + ": Spikes " + s.countRows(2) + " rows, Spike shape " + shapeRows + ", Random " + randomRows + ", capacity " + capacity);
 			}
 		}
 		System.out.println(fails == 0 ? "ALL OK" : fails + " FAILED");

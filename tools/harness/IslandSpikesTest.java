@@ -96,15 +96,15 @@ public class IslandSpikesTest {
 		check(within && varied, "Length var 100 %: every length within [1, 40], and they differ");
 
 		System.out.println("-- Randomize, Naturalize, Undo");
-		TestIsland none = new TestIsland(); setRandom(none, 1); setProp(none, "propertyBodyPercent", 100); Values n0 = values(none);
+		TestIsland none = new TestIsland(); setRandom(none, 1); setProp(none, "propertyBodyPercent", 100); setProp(none, "propertySpikesPercent", 100); Values n0 = values(none);
 		for(int i = 0; i < 50; i++) call(none, "randomize");
-		check(spikeSame(n0, values(none)) && values(none).spikes == 0, "Count 0: 50 Randomize at Body 100 % never touch a spike control (still none)");
-		TestIsland some = new TestIsland(); setRandom(some, 2); setProp(some, "propertySpikes", 1); setProp(some, "propertySpikeMode", SpikeMode.RING); setProp(some, "propertyBodyPercent", 100);
+		check(spikeSame(n0, values(none)) && values(none).spikes == 0, "Count 0: 50 Randomize at Body and Spikes 100 % never touch a spike control (still none)");
+		TestIsland some = new TestIsland(); setRandom(some, 2); setProp(some, "propertySpikes", 1); setProp(some, "propertySpikeMode", SpikeMode.RING); setProp(some, "propertySpikesPercent", 100); /* spikes 2: the Spikes group, no longer Body */
 		boolean ok = true, mode = true, moved = false; Values s0 = values(some);
 		for(int i = 0; i < 300; i++){ updates = 0; call(some, "randomize"); Values x = values(some); ok &= spikeInLimits(x) && updates == 1; mode &= x.spikeMode == SpikeMode.RING; moved |= !spikeSame(s0, x); }
 		check(ok && moved, "Count >= 1: 300 Randomize keep Count >= 1 and every spike control in range (percentages on 5), one regeneration each");
 		check(mode, "Randomize never changes Spike mode");
-		TestIsland u = new TestIsland(); setRandom(u, 3); setProp(u, "propertySpikes", 4); setProp(u, "propertyBodyPercent", 80); Values before = values(u);
+		TestIsland u = new TestIsland(); setRandom(u, 3); setProp(u, "propertySpikes", 4); setProp(u, "propertySpikesPercent", 80); Values before = values(u);
 		call(u, "randomize"); Values after = values(u); updates = 0; call(u, "undo");
 		check(!spikeSame(before, after) && values(u).equals(before) && updates == 1, "Undo restores every spike control and the seed, one regeneration");
 		TestIsland nat = new TestIsland(); setRandom(nat, 4); setProp(nat, "propertySpikes", 7); setProp(nat, "propertySpikeLength", 33); setProp(nat, "propertySpikeBase", 6); setProp(nat, "propertyLengthVar", 25); setProp(nat, "propertySpread", 80); setProp(nat, "propertySpikeMode", SpikeMode.RING);
@@ -117,7 +117,7 @@ public class IslandSpikesTest {
 		check(!l.error && now.startsWith(old + ",0,RANDOM,12,3,0,50"), "a 19-value Island loads, its 19 values intact, the 6 block B values at their defaults (Count 0; later properties follow): " + now);
 		Values lv = values(l); check(lv.spikes == 0, "an old island has no spikes");
 		ShapeIsland panel = new TestIsland();
-		check(panel.getSectionCount() == 4 && panel.getSectionName(2).getTranslationKey().equals("property.buildguide.section.spikes"), "sections: Base, Body, Spikes, Random");
+		check(panel.getSectionCount() >= 4 && panel.getSectionName(2).getTranslationKey().equals("property.buildguide.section.spikes") && panel.getSectionName(panel.getSectionCount() - 1).getTranslationKey().equals("property.buildguide.section.seed"), "sections: Base, Body, Spikes, ..., Random (spikes 2 adds Spike shape before Random)");
 		check(panel.countRows(2) == 1, "Count 0: the Spikes section shows 1 row (Count)");
 		setProp(panel, "propertySpikes", 3);
 		check(panel.countRows(2) == 6, "Count 3: the Spikes section shows 6 rows");

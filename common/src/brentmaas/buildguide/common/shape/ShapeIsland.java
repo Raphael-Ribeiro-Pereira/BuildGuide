@@ -3,6 +3,7 @@ package brentmaas.buildguide.common.shape;
 import java.util.Random;
 
 import brentmaas.buildguide.common.property.Property;
+import brentmaas.buildguide.common.property.PropertyBoolean;
 import brentmaas.buildguide.common.property.PropertyEnum;
 import brentmaas.buildguide.common.property.PropertyFloat;
 import brentmaas.buildguide.common.property.PropertyInt;
@@ -23,6 +24,7 @@ import brentmaas.buildguide.common.shape.IslandGeometry.SpikeMode;
 public class ShapeIsland extends Shape {
 	static final float unitStep = 0.05f;
 	static final int percentStep = 5;
+	static final float taperStep = 0.1f;
 
 	private String[] outlineNames = {"Circle", "Square", "Polygon", "Organic"};
 	private String[] profileNames = {"Bowl", "Cone", "Terraced"};
@@ -31,7 +33,8 @@ public class ShapeIsland extends Shape {
 	// Persistence order: outline, width X, width Z, sides, roundness, rotation, edge amplitude, edge
 	// scale, wall, depth, profile, sharpness, roughness, seed, randomize (was New seed), then base %,
 	// body %, naturalize, undo, then (block B) spikes, spike mode, spike length, spike base, length var %,
-	// spread %, then (spikes 2, phase 1) jitter %. New properties go at the end. Labels: roundness reads "Corner round",
+	// spread %, then (spikes 2, phase 1) jitter %, (phase 2) dripstone, taper, edge falloff %, spikes %,
+	// naturalize spikes. New properties go at the end. Labels: roundness reads "Corner round",
 	// edge amplitude "Wobble", edge scale "Wobble size", wall "Thickness"
 	private PropertyEnum<Outline> propertyOutline = new PropertyEnum<Outline>(Outline.CIRCLE, new Translatable("property.buildguide.outline"), () -> onOutlineChanged(), outlineNames);
 	private PropertyRangeInt propertyWidthX = new PropertyRangeInt(41, new Translatable("property.buildguide.widthx"), () -> update(), IslandGeometry.minWidth, IslandGeometry.maxWidth);
@@ -69,11 +72,20 @@ public class ShapeIsland extends Shape {
 	private PropertyRangeInt propertySpread = new PropertyRangeInt(50, new Translatable("property.buildguide.spread"), () -> update(), 0, 100, percentStep);
 	// Spikes 2, phase 1 (after the 25 above): Fill only, how far each spike may leave the spiral
 	private PropertyRangeInt propertyJitter = new PropertyRangeInt(20, new Translatable("property.buildguide.jitter"), () -> update(), 0, 100, percentStep);
+	// Spikes 2, phase 2 (after Jitter): the spikes' shape, and the Spikes group of Randomize
+	private PropertyBoolean propertyDripstone = new PropertyBoolean(false, new Translatable("property.buildguide.dripstone"), () -> update());
+	// Radius profile Base x (1 - t)^Taper, 0.5 to 3 by 0.1 (held in range here, as the 0..1 floats)
+	private PropertyFloat propertyTaper = new PropertyFloat(1.0f, new Translatable("property.buildguide.taper"), () -> onTaperChanged(), taperStep);
+	private PropertyRangeInt propertyFalloff = new PropertyRangeInt(0, new Translatable("property.buildguide.falloff"), () -> update(), 0, 100, percentStep);
+	private PropertyRangeInt propertySpikesPercent = new PropertyRangeInt(15, new Translatable("property.buildguide.spikespercent"), null, 0, 100, percentStep);
+	private PropertyRunnable propertyNaturalizeSpikes = new PropertyRunnable(() -> naturalizeSpikes(), new Translatable("property.buildguide.naturalizespikes"));
 
 	// Panel order per section (persistence order is the `properties` list)
 	private Property<?>[] baseRows = {propertyOutline, propertyWidthX, propertyWidthZ, propertySides, propertyRoundness, propertyRotation, propertyEdgeAmplitude, propertyEdgeScale};
 	private Control[] baseControls = {null, Control.WIDTH_X, Control.WIDTH_Z, Control.SIDES, Control.CORNER_ROUND, Control.ROTATION, Control.WOBBLE, Control.WOBBLE_SIZE};
-	private Property<?>[] otherRows = {propertyWall, propertyDepth, propertyProfile, propertySharpness, propertyRoughness, propertyBasePercent, propertyBodyPercent, propertyRandomize, propertyNaturalize, propertyUndo, propertySeed};
+	private Property<?>[] otherRows = {propertyWall, propertyDepth, propertyProfile, propertySharpness, propertyRoughness, propertyBasePercent, propertyBodyPercent, propertySpikesPercent, propertyRandomize, propertyNaturalize, propertyNaturalizeSpikes, propertyUndo, propertySeed};
+	// Spike shape section: shown only with spikes
+	private Property<?>[] spikeShapeRows = {propertyDripstone, propertyTaper, propertyFalloff};
 	// Spikes section: Count alone while it is 0, then the five others
 	private Property<?>[] spikeRows = {propertySpikeMode, propertySpikeLength, propertySpikeBase, propertyLengthVar, propertySpread, propertyJitter};
 
@@ -110,16 +122,27 @@ public class ShapeIsland extends Shape {
 		properties.add(propertyLengthVar);
 		properties.add(propertySpread);
 		properties.add(propertyJitter);
+		properties.add(propertyDripstone);
+		properties.add(propertyTaper);
+		properties.add(propertyFalloff);
+		properties.add(propertySpikesPercent);
+		properties.add(propertyNaturalizeSpikes);
 
 		int sectionBase = declareSection(new Translatable("property.buildguide.section.base"));
 		int sectionBody = declareSection(new Translatable("property.buildguide.section.body"));
 		int sectionSpikes = declareSection(new Translatable("property.buildguide.section.spikes"));
+		// Always declared (sections are fixed per shape); with no spikes it shows no rows
+		int sectionSpikeShape = declareSection(new Translatable("property.buildguide.section.spikeshape"));
 		int sectionRandom = declareSection(new Translatable("property.buildguide.section.seed"));
 		assignSection(sectionBase, baseRows);
 		assignSection(sectionBody, propertyWall, propertyDepth, propertyProfile, propertySharpness, propertyRoughness);
 		assignSection(sectionSpikes, propertySpikes);
 		assignSection(sectionSpikes, spikeRows);
-		assignSection(sectionRandom, propertyBasePercent, propertyBodyPercent, propertyRandomize, propertyNaturalize, propertyUndo, propertySeed);
+		assignSection(sectionSpikeShape, spikeShapeRows);
+		assignSection(sectionRandom, propertyBasePercent, propertyBodyPercent, propertySpikesPercent, propertyRandomize, propertyNaturalize, propertyNaturalizeSpikes, propertyUndo, propertySeed);
+		// Random has 8 rows with Seed; at the minimum GUI height (270) five sections leave room for 7, so the
+		// Seed row is not shown (still saved, still in presets, still drawn by Randomize and New seed)
+		hideFromGui(propertySeed);
 		// Reset on the Random section must not throw away an island one likes
 		protectFromReset(propertySeed);
 	}
@@ -143,6 +166,16 @@ public class ShapeIsland extends Shape {
 			if(isShown(p) && propertySpikes.value > 0 && (p != propertyJitter || propertySpikeMode.value == SpikeMode.FILL)) row = placeRow(row, p);
 			else hideRow(p);
 		}
+		for(Property<?> p: spikeShapeRows) {
+			if(isShown(p) && propertySpikes.value > 0) row = placeRow(row, p);
+			else hideRow(p);
+		}
+	}
+
+	private void onTaperChanged() {
+		if(!(propertyTaper.value >= IslandGeometry.minTaper)) propertyTaper.setValue((float) IslandGeometry.minTaper);
+		else if(propertyTaper.value > IslandGeometry.maxTaper) propertyTaper.setValue((float) IslandGeometry.maxTaper);
+		update();
 	}
 
 	private void onSpikesChanged() {
@@ -185,6 +218,9 @@ public class ShapeIsland extends Shape {
 		v.lengthVar = propertyLengthVar.value;
 		v.spread = propertySpread.value;
 		v.jitter = propertyJitter.value;
+		v.falloff = propertyFalloff.value;
+		v.taper = propertyTaper.value;
+		v.dripstone = propertyDripstone.value;
 		return v;
 	}
 
@@ -210,13 +246,16 @@ public class ShapeIsland extends Shape {
 		propertyLengthVar.setValue(v.lengthVar);
 		propertySpread.setValue(v.spread);
 		propertyJitter.setValue(v.jitter);
+		propertyFalloff.setValue(v.falloff);
+		propertyTaper.setValue(v.taper);
+		propertyDripstone.setValue(v.dripstone);
 		onSelectedInGUI();
 		update();
 	}
 
 	void randomize() {
 		IslandControls.Values before = values();
-		IslandControls.Values next = IslandControls.randomize(before, propertyBasePercent.value, propertyBodyPercent.value, random);
+		IslandControls.Values next = IslandControls.randomize(before, propertyBasePercent.value, propertyBodyPercent.value, propertySpikesPercent.value, random);
 		undoValues = before;
 		apply(next);
 	}
@@ -228,7 +267,14 @@ public class ShapeIsland extends Shape {
 		apply(next);
 	}
 
-	// One step back from the last Randomize or Naturalize; a second Undo does nothing
+	void naturalizeSpikes() {
+		IslandControls.Values before = values();
+		IslandControls.Values next = IslandControls.naturalizeSpikes(before);
+		undoValues = before;
+		apply(next);
+	}
+
+	// One step back from the last Randomize, Naturalize or Naturalize spikes; a second Undo does nothing
 	void undo() {
 		if(undoValues == null) return;
 		IslandControls.Values v = undoValues;
@@ -259,6 +305,9 @@ public class ShapeIsland extends Shape {
 		p.lengthVar = propertyLengthVar.value;
 		p.spread = propertySpread.value;
 		p.jitter = propertyJitter.value;
+		p.falloff = propertyFalloff.value;
+		p.taper = propertyTaper.value;
+		p.dripstone = propertyDripstone.value;
 		return p;
 	}
 
