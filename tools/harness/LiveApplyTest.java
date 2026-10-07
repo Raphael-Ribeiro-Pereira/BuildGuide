@@ -112,8 +112,11 @@ public class LiveApplyTest {
 		List<String> lines = new ArrayList<>(); TimingLog.sink = lines::add;
 		TimingLog.record(TimingLog.SCAN, 8, 10); TimingLog.record(TimingLog.SCAN, 9, 10);
 		check(lines.size() == 1 && lines.get(0).equals("[Build Guide] timing: phase=scan ms=9 blocks=10"), "only phases above 8 ms, in the agreed format: " + lines);
-		for(int i = 0; i < 100; i++) TimingLog.record(TimingLog.GENERATION, 20, i);
-		check(lines.size() == TimingLog.maxLines && lines.get(lines.size() - 1).contains("limit of 50"), "at most 50 lines per session, the last one says so (" + lines.size() + ")");
+		for(int i = 0; i < 300; i++) TimingLog.record(TimingLog.GENERATION, 20, i);
+		check(lines.size() == TimingLog.maxLines && lines.get(lines.size() - 1).contains("limit of 200") && TimingLog.maxLines == 200, "at most 200 lines per session, the last one says so (" + lines.size() + ")");
+		List<String> withReason = new ArrayList<>(); TimingLog.sink = withReason::add; java.lang.reflect.Method reset = TimingLog.class.getDeclaredMethod("reset"); reset.setAccessible(true); reset.invoke(null);
+		TimingLog.record(TimingLog.PREVIEW_REBUILD, 29, 49568, "generation");
+		check(withReason.equals(Arrays.asList("[Build Guide] timing: phase=preview-rebuild ms=29 blocks=49568 reason=generation")), "preview line carries reason=: " + withReason);
 		System.out.println(fails == 0 ? "ALL OK" : fails + " FAILED");
 	}
 }

@@ -79,7 +79,11 @@ public class PreviewController {
 				lastGeometry = now;
 				lastColour = now;
 			}
-		}else if(state.getVersion() != model.stateVersion && now - lastColour >= colourRefreshMillis) {
+		// Colours only for the geometry on screen: not while the shape regenerates (the generation starts by
+		// invalidating the state, which would recolour the old model all white and rebuild its mesh for nothing,
+		// 2026-10-07 timing log) and not while a newer generation waits for the geometry throttle (its snapshot
+		// reads the colours anyway). ready is read without the lock: a hint, worst case one refresh a frame late
+		}else if(current.ready && !newGeneration && state.getVersion() != model.stateVersion && now - lastColour >= colourRefreshMillis) {
 			model = model.withValidation(state);
 			lastColour = now;
 		}

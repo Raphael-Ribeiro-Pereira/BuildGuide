@@ -101,6 +101,20 @@ public final class PreviewModel {
 		return new PreviewModel(positions, boundsArray(), status, errors, stateVersion, generation, filter, sliceAxis, sliceValue);
 	}
 
+	/**
+	 * Why a mesh built for `built` must be rebuilt to show `next`, or null when it shows the same thing:
+	 * same positions (same generation), same validation version, same filter and slice. A new instance with
+	 * that same key does not rebuild. Reasons: view (no mesh yet), generation, filter, slice, validation.
+	 */
+	public static String meshChange(PreviewModel built, PreviewModel next) {
+		if(built == null) return "view";
+		if(built.positions != next.positions || built.generation != next.generation) return "generation";
+		if(built.filter != next.filter) return "filter";
+		if(built.sliceAxis != next.sliceAxis || built.sliceValue != next.sliceValue) return "slice";
+		if(built.stateVersion != next.stateVersion) return "validation";
+		return null;
+	}
+	
 	// Whether position i is drawn under this view
 	public boolean shows(int i) {
 		return filter.showsStatus(status == null ? ValidationState.UNKNOWN : status[i]) && inSlice(positions[i]);

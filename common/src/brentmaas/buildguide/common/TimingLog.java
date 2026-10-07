@@ -10,7 +10,7 @@ import java.util.function.Consumer;
  */
 public final class TimingLog {
 	public static final long thresholdMillis = 8;
-	public static final int maxLines = 50;
+	public static final int maxLines = 200;
 	public static final String GENERATION = "generation", WORLD_BUFFER = "world-buffer", SCAN = "scan", PREVIEW_SNAPSHOT = "preview-snapshot", PREVIEW_REBUILD = "preview-rebuild";
 
 	private static int written = 0;
@@ -19,10 +19,15 @@ public final class TimingLog {
 
 	private TimingLog() {}
 
-	public static synchronized void record(String phase, long millis, int blocks) {
+	public static void record(String phase, long millis, int blocks) {
+		record(phase, millis, blocks, null);
+	}
+	
+	// With what caused the phase (the preview rebuild: generation, view, validation, slice or filter)
+	public static synchronized void record(String phase, long millis, int blocks, String reason) {
 		if(millis <= thresholdMillis || written >= maxLines) return;
 		++written;
-		String line = "[Build Guide] timing: phase=" + phase + " ms=" + millis + " blocks=" + blocks;
+		String line = "[Build Guide] timing: phase=" + phase + " ms=" + millis + " blocks=" + blocks + (reason == null ? "" : " reason=" + reason);
 		if(written == maxLines) line += " (limit of " + maxLines + " timing lines reached, no more this session)";
 		sink.accept(line);
 	}

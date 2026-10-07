@@ -64,7 +64,11 @@ public class PreviewRenderer extends PictureInPictureRenderer<PreviewRenderState
 	@Override
 	protected void renderToTexture(PreviewRenderState state, PoseStack poseStack) {
 		PreviewModel model = state.model();
-		if(model != meshModel) buildMesh(model);
+		// Rebuild only when the mesh would show something else (PreviewModel.meshChange): a new instance with the
+		// same generation, view and validation version keeps the mesh
+		String reason = PreviewModel.meshChange(meshModel, model);
+		if(reason != null) buildMesh(model, reason);
+		else meshModel = model;
 
 		float scale = (float) PreviewCamera.fitScale(model, state.x1() - state.x0(), state.y1() - state.y0(), state.zoom());
 		// guiScale, read back from the pose vanilla prepared; depth is compressed if the model would leave +-maxDepth
@@ -90,7 +94,7 @@ public class PreviewRenderer extends PictureInPictureRenderer<PreviewRenderState
 	}
 
 	// Geometry and colours come from common (PreviewMesh); this only uploads them
-	private void buildMesh(PreviewModel model) {
+	private void buildMesh(PreviewModel model, String reason) {
 		long started = System.currentTimeMillis();
 		if(mesh != null) mesh.close();
 		ShapeBuffer buffer = new ShapeBuffer();
@@ -98,7 +102,7 @@ public class PreviewRenderer extends PictureInPictureRenderer<PreviewRenderState
 		buffer.end();
 		mesh = buffer;
 		meshModel = model;
-		TimingLog.record(TimingLog.PREVIEW_REBUILD, System.currentTimeMillis() - started, model.positions.length);
+		TimingLog.record(TimingLog.PREVIEW_REBUILD, System.currentTimeMillis() - started, model.positions.length, reason);
 	}
 
 	@Override
