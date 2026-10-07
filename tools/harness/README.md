@@ -40,7 +40,7 @@ java  -cp "$CLASSES;$OUT" GhostTest         # not an assert test: prints how a g
 ```
 
 `CentreTest`, `Step4Test`, `BaseSetTest` are the Step 3/4 and 2.2c checks;
-`ScanCostTest`, `MemTest`, `OverlayCost`, `OverlayCost2` are timing/memory probes.
+`ScanCostTest`, `MemTest`, `OverlayCost`, `OverlayCost2`, `WorldCost` are timing/memory probes.
 
 Run the `java -cp` lines from PowerShell or cmd: Git Bash (MSYS) rewrites the `;`-separated
 classpath and every test fails with `ClassNotFoundException`. `javac` and `gradlew` are fine

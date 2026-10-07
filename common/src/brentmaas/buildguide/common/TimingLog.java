@@ -1,5 +1,6 @@
 package brentmaas.buildguide.common;
 
+import java.util.Locale;
 import java.util.function.Consumer;
 
 /**
@@ -10,6 +11,8 @@ import java.util.function.Consumer;
  */
 public final class TimingLog {
 	public static final long thresholdMillis = 8;
+	// The world update (recordWorld) has its own, lower threshold: it was never seen above 8 ms
+	public static final long worldThresholdMillis = 4;
 	public static final int maxLines = 200;
 	public static final String GENERATION = "generation", WORLD_BUFFER = "world-buffer", SCAN = "scan", PREVIEW_SNAPSHOT = "preview-snapshot", PREVIEW_REBUILD = "preview-rebuild";
 
@@ -34,11 +37,41 @@ public final class TimingLog {
 
 	// The scan in Y layers (SliceScan): its total time, the frames it was spread over and the longest one
 	public static synchronized void recordScan(long totalMillis, int slices, long maxSliceMillis, int blocks) {
-		if(totalMillis <= thresholdMillis || written >= maxLines) return;
+		recordScan(totalMillis, slices, maxSliceMillis, blocks, -1, -1);
+	}
+
+	// With the two steps outside the layers, each in a single frame: preparing the scan (the expected positions
+	// in world coordinates and the SliceScan) and publishing its result. Negative: not measured, left out
+	public static synchronized void recordScan(long totalMillis, int slices, long maxSliceMillis, int blocks, long startMillis, long publishMillis) {
+		if(totalMillis + Math.max(0, startMillis) + Math.max(0, publishMillis) <= thresholdMillis || written >= maxLines) return;
 		++written;
 		String line = "[Build Guide] timing: phase=" + SCAN + " ms=" + totalMillis + " slices=" + slices + " maxslice=" + maxSliceMillis + " blocks=" + blocks;
+		if(startMillis >= 0) line += " start=" + startMillis;
+		if(publishMillis >= 0) line += " publish=" + publishMillis;
 		if(written == maxLines) line += " (limit of " + maxLines + " timing lines reached, no more this session)";
 		sink.accept(line);
+	}
+
+	/**
+	 * The frame in which a new buffer replaces the one drawn in the world (live apply), split in three:
+	 * world-end (the buffer's end(): the vertices and, when it grows, the shared index buffer sent to the
+	 * GPU), world-close (the old buffer discarded) and world-other (the rest of the mod's work for that shape
+	 * in the same frame: drawing, the error overlay, the scan's start, the safety net, the Area 3 target).
+	 * ms is the sum. reason: what let the update through (WorldUpdateGate.reason). Threshold: 4 ms.
+	 */
+	public static synchronized void recordWorld(String reason, long endNanos, long closeNanos, long otherNanos, int blocks) {
+		long totalNanos = endNanos + closeNanos + otherNanos;
+		if(totalNanos <= worldThresholdMillis * 1000000 || written >= maxLines) return;
+		++written;
+		String line = "[Build Guide] timing: phase=" + WORLD_BUFFER + " ms=" + Math.round(totalNanos / 1e6) + " blocks=" + blocks + " reason=" + reason
+				+ " world-end=" + tenths(endNanos) + " world-close=" + tenths(closeNanos) + " world-other=" + tenths(otherNanos);
+		if(written == maxLines) line += " (limit of " + maxLines + " timing lines reached, no more this session)";
+		sink.accept(line);
+	}
+
+	// Milliseconds with one decimal, the same in every locale
+	private static String tenths(long nanos) {
+		return String.format(Locale.ROOT, "%.1f", nanos / 1e6);
 	}
 
 	// Offline harness only

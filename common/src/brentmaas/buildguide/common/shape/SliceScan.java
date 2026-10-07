@@ -60,6 +60,8 @@ public class SliceScan {
 	private final Set<Long> dirty = new LinkedHashSet<Long>();
 	private int frames = 0;
 	private long totalNanos = 0, maxSliceNanos = 0;
+	// What the loader spent preparing this scan (outside the layers, in the frame the scan started), for the timing line
+	private long startNanos = -1;
 
 	/**
 	 * @param shapeExpected the shape's expected positions (local), in its iteration order
@@ -229,6 +231,15 @@ public class SliceScan {
 
 	public long getMaxSliceMillis() {
 		return maxSliceNanos / 1000000;
+	}
+
+	public void setStartNanos(long nanos) {
+		startNanos = nanos;
+	}
+
+	// -1 when the loader did not measure it
+	public long getStartMillis() {
+		return startNanos < 0 ? -1 : startNanos / 1000000;
 	}
 
 	public int getExpectedCount() {

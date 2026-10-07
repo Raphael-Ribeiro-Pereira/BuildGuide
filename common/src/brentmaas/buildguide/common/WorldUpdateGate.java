@@ -48,6 +48,13 @@ public class WorldUpdateGate {
 		}
 	}
 
+	// What lets an update through, for the timing line: "close" (the menu is closed, whatever the mode),
+	// "apply" (Live, menu open) or "idle" (Idle, menu open, the pause has passed)
+	public static String reason(Mode mode, boolean menuOpen) {
+		if(!menuOpen || mode == Mode.ON_CLOSE) return "close";
+		return mode == Mode.LIVE ? "apply" : "idle";
+	}
+
 	public void applied() {
 		pending = false;
 	}

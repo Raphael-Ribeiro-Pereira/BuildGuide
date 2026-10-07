@@ -183,18 +183,22 @@ public class RenderHandler extends AbstractRenderHandler {
 		ClientLevel world = Minecraft.getInstance().level;
 		if(world == null) return;
 		if(scan == null) {
+			long started = System.nanoTime();
 			scan = startScan(shapeSet, validatable, state, manual, world);
 			if(scan == null) return;
+			scan.setStartNanos(System.nanoTime() - started);
 		}
 		WorldProbe probe = new WorldProbe(world);
 		if(!scan.step(probe, BuildGuide.config.scanSpeed.value.budgetMillis * 1000000L, System::nanoTime)) {
 			state.setScanPercent(scan.percent());
 			return;
 		}
+		long publishing = System.nanoTime();
 		scan.publish(probe);
+		long publishNanos = System.nanoTime() - publishing;
 		state.setActiveScan(null);
 		state.setScanPercent(-1);
-		TimingLog.recordScan(scan.getTotalMillis(), scan.getFrames(), scan.getMaxSliceMillis(), scan.getExpectedCount());
+		TimingLog.recordScan(scan.getTotalMillis(), scan.getFrames(), scan.getMaxSliceMillis(), scan.getExpectedCount(), scan.getStartMillis(), publishNanos / 1000000);
 		logValidation(state);
 	}
 

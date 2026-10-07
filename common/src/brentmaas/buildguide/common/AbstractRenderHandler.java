@@ -98,16 +98,25 @@ public abstract class AbstractRenderHandler {
 	protected void renderShapeSetDeferred(ShapeSet shapeSet) {
 		Shape shape = shapeSet.getShape();
 		boolean locked = shape.lock.tryLock();
+		// Timing of the frame that applies a new buffer (TimingLog.recordWorld); reason stays null in any other frame
+		String reason = null;
+		long endNanos = 0, closeNanos = 0, otherStarted = 0;
+		int blocks = 0;
 		try {
 			boolean current = locked && shape.ready && !shape.error;
 			if(current && shape.buffer != shape.shownBuffer && shape.worldGate.shouldApply(worldUpdateMode(), isMenuOpen())) {
-				long started = System.currentTimeMillis();
+				reason = WorldUpdateGate.reason(worldUpdateMode(), isMenuOpen());
+				blocks = shape.getNumberOfBlocks();
+				long started = System.nanoTime();
 				shape.buffer.end();
 				shape.vertexBufferUnpacked = true;
+				long ended = System.nanoTime();
 				if(shape.shownBuffer != null) shape.shownBuffer.close();
 				shape.shownBuffer = shape.buffer;
 				shape.worldGate.applied();
-				TimingLog.record(TimingLog.WORLD_BUFFER, System.currentTimeMillis() - started, shape.getNumberOfBlocks());
+				otherStarted = System.nanoTime();
+				endNanos = ended - started;
+				closeNanos = otherStarted - ended;
 			}else if(current && shape.buffer == shape.shownBuffer && shape.worldGate.isPending()) {
 				shape.worldGate.applied(); // a change that did not need a new buffer
 			}
@@ -126,5 +135,6 @@ public abstract class AbstractRenderHandler {
 		}finally {
 			if(locked) shape.lock.unlock();
 		}
+		if(reason != null) TimingLog.recordWorld(reason, endNanos, closeNanos, System.nanoTime() - otherStarted, blocks);
 	}
 }
