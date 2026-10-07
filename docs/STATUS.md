@@ -97,6 +97,19 @@ none; the 6-connected shell is always closed.
 
 Offline harness after Island block A: 571 asserts, 0 failures; Bridge 466 / 159 / 360.
 
+### Island, block A2 (clarity, Randomize / Naturalize)
+
+Built on `wip/island-ux` and fast-forwarded into `feat/cone-expanded` on 2026-10-06 after the
+`island-ux-wip` in-game test passed (7 of 7, with the two finishing tweaks of `cddf0c9`).
+
+| Stage | Commit | What |
+|---|---|---|
+| Core | `5a30b97` | `IslandControls` (pure): which plan controls apply to each Outline, Randomize (new = clamp(current + U(-1, 1) x % x range), never Outline or Profile), the Naturalize recipe in named constants, `Values` for one-step Undo; `PropertyRangeInt` optional -/+ step (default 1, unchanged) |
+| Shape | `07d554c` | Base shows only the controls of the Outline (Circle: widths, rotation; Square: + Corner round; Polygon: + Sides; Organic: + Wobble, Wobble size); neutral defaults for a new island and Reset; section Random (Base %, Body %, Randomize, Naturalize, Undo, Seed); labels Wobble, Wobble size, Corner round, Rotation (deg) (own key `islandrotation`: the shared `rotation` key labels other shapes' enum); the 15 block A positions unchanged, 4 new ones at the end |
+| Tweaks | `cddf0c9` | Base % and Body % default 15 (new island and Reset; saved values kept); Wall reads "Shell (blocks)" (70 px; key unchanged) |
+
+Offline harness after block A2: 633 asserts, 0 failures; Bridge 466 / 159 / 360.
+
 Offline harness at the close: 406 asserts, 0 failures; Bridge reference sizes 466 / 159 / 360.
 E6 (after two fixes), E7, P4 and E8 passed their in-game checklists before being committed
 (E7 7 of 7, P4 9 of 9, E8 9 of 9). The ghost fix was committed on Raphael's go-ahead after the
@@ -109,11 +122,11 @@ Build output: `fabric1.21.11/build/libs/BuildGuide-Fabric-0.4.8.jar` (mod versio
 
 | Item | Value |
 |---|---|
-| Active jar in the mods folder | `BuildGuide-Fabric-0.4.8-island-wip.jar` |
-| SHA-256 | `556D80E49975B12802361D5CB8971EE632415A7E841C0EC71D8AF06826C92DE9` |
-| Source | commit `f7937be`: the build output and the mods copy have the same SHA-256; `ShapeIsland`, `IslandGeometry`, `IslandNoise` and the stepped `PropertyFloat` are inside |
-| Tested | the offline harness (571 asserts); the island passed in game |
-| Previous jars | `BuildGuide-Fabric-0.4.8-area3-wip2.jar` (SHA-256 `B5AC963F068EFF59954521F29F24D994BBFE61CF9F55C2C1DE9256E055392A32`, commit `584674b`), `BuildGuide-Fabric-0.4.8-area3-wip.jar` (first Area 3 test) and `BuildGuide-Fabric-0.4.8-ghost-fix-wip.jar` (SHA-256 `1E2F5E96A659D474EF14D9CDDBF5930E6B695DF66F31C782A7C1E5654E55BDB6`, commit `9c3fbde`), kept as `.bak` |
+| Active jar in the mods folder | `BuildGuide-Fabric-0.4.8-island-ux-wip.jar` |
+| SHA-256 | `DD5B7BD8ADF1714F0BC152A303B6ED3F2FB2EA5E9C8F79034B52BD27DAE76557` |
+| Source | commit `07d554c`: the build output and the mods copy have the same SHA-256; `IslandControls`, `ShapeIsland` and `PropertyRangeInt` are inside. **Not yet in the jar:** the two tweaks of `cddf0c9` (Base % and Body % default 15, the label "Shell (blocks)"); they reach the jar with the next deploy |
+| Tested | the offline harness (629 asserts at `07d554c`); in game 7 of 7 |
+| Previous jars | `BuildGuide-Fabric-0.4.8-island-wip.jar` (SHA-256 `556D80E49975B12802361D5CB8971EE632415A7E841C0EC71D8AF06826C92DE9`, commit `f7937be`), `BuildGuide-Fabric-0.4.8-area3-wip2.jar` (SHA-256 `B5AC963F068EFF59954521F29F24D994BBFE61CF9F55C2C1DE9256E055392A32`, commit `584674b`), `BuildGuide-Fabric-0.4.8-area3-wip.jar` (first Area 3 test) and `BuildGuide-Fabric-0.4.8-ghost-fix-wip.jar` (SHA-256 `1E2F5E96A659D474EF14D9CDDBF5930E6B695DF66F31C782A7C1E5654E55BDB6`, commit `9c3fbde`), kept as `.bak` |
 
 - The file name still says `wip`: it was never renamed after the test. Renaming is a choice
   for Raphael (nothing depends on the name); a rebuild of `acf4904` gives the same classes.
