@@ -61,6 +61,7 @@ public class PropertyCompactInt extends PropertyInt {
 	 */
 	public boolean commitTextField() {
 		getWidgetList(); // Initialise `valueTextField` if still null
+		valueTextField.markApplied(); // the row applies this text now: live apply must not apply it again
 		try {
 			this.value = Integer.parseInt(valueTextField.getTextValue());
 			valueTextField.setTextColour(0xFFFFFF);
