@@ -90,9 +90,17 @@ Built on `wip/island` and fast-forwarded into `feat/cone-expanded` on 2026-10-06
 | Shape | `643d540`  | `ShapeIsland` registered last, sections Base / Body / Seed, 15 persisted properties, New seed |
 | Float step | `f7937be` | `PropertyFloat` gains an optional -/+ step (default 1.0, the old path unchanged; a fractional step uses decimal arithmetic, so 0.05 x 3 reads 0.15); Island's Roundness, Edge noise, Sharpness and Roughness step 0.05 and the shape holds them in [0, 1] (no float property type has a maximum) |
 
-Limits: width 3 to 121 (radius 60), depth 0 to 80, Wall 1 to 3. Measured worst case (Square,
-radius 60, depth 80, Wall 2): 83 657 blocks, 19 ms of geometry, about 54 MB of vertex buffer,
-5.0 MB of expected-block set. Diagonal (26-connected) leaks: Wall 1 and 2 have some, Wall 3
+Limits: width 3 to 121 (radius 60), depth 0 to 80, Wall 1 to 3. Block counts at radius 60, depth 80 (roughness 0.3, measured 2026-10-07; the block A text quoted
+only Wall 2, which is not the worst case):
+
+| Outline | Wall 1 | Wall 2 | Wall 3 |
+|---|---|---|---|
+| Circle | 32 576 | 63 262 | 92 139 |
+| Square | 43 015 | 83 657 | **121 636** |
+
+The true worst case is Square, Wall 3: 121 636 blocks, about 78 MB of vertex buffer (672 B per
+block) and about 7.5 MB of expected-block set (62 B per entry). The 107 518 blocks seen in the
+live-apply log fit a Wall 3 island between these two rows. Diagonal (26-connected) leaks: Wall 1 and 2 have some, Wall 3
 none; the 6-connected shell is always closed.
 
 Offline harness after Island block A: 571 asserts, 0 failures; Bridge 466 / 159 / 360.
@@ -110,6 +118,24 @@ Built on `wip/island-ux` and fast-forwarded into `feat/cone-expanded` on 2026-10
 
 Offline harness after block A2: 633 asserts, 0 failures; Bridge 466 / 159 / 360.
 
+### Live apply (all shapes)
+
+Built on `wip/live-apply` and fast-forwarded into `feat/cone-expanded` on 2026-10-07 after the
+`live-apply-wip` in-game test passed (9 of 9).
+
+| Stage | Commit | What |
+|---|---|---|
+| Core | `4b94cf4` | `FieldDebounce`, `WorldUpdateGate`, `TimingLog` (pure, injectable clocks); `ITextField.markApplied` (default) so a point row applies its three fields with one regeneration |
+| Fabric | `8a9c810` | text fields apply 500 ms after the last keystroke or on focus loss (code changes and text equal to the applied text never fire; Enter and -/+ stay immediate); the world keeps the last applied buffer (`Shape.shownBuffer`) until the gate allows the new one; scan, error overlay and Area 3 target wait for it; "World update pending" in the preview corner; timing lines |
+| Config | `416b5e0` | World update mode in Configuration, saved in `buildguide.cfg`: **Live** (as soon as the generation is ready), **Idle** (default: 1 s after the last change), **On close** (when the menu closes). Closing the menu always applies at once |
+| Docs | `d1988dc` | `CLAUDE.md` baseline `ISLANDUX2` |
+
+The deferred path is opt-in (`AbstractRenderHandler.deferredWorldUpdates`, default false): only
+`fabric1.21.11` uses it; the other loaders keep the original render path. Timing lines go to the
+profile's `logs/latest.log` as `[Build Guide] timing: phase=... ms=... blocks=...`.
+
+Offline harness after live apply: 658 asserts, 0 failures; Bridge 466 / 159 / 360.
+
 Offline harness at the close: 406 asserts, 0 failures; Bridge reference sizes 466 / 159 / 360.
 E6 (after two fixes), E7, P4 and E8 passed their in-game checklists before being committed
 (E7 7 of 7, P4 9 of 9, E8 9 of 9). The ghost fix was committed on Raphael's go-ahead after the
@@ -122,11 +148,11 @@ Build output: `fabric1.21.11/build/libs/BuildGuide-Fabric-0.4.8.jar` (mod versio
 
 | Item | Value |
 |---|---|
-| Active jar in the mods folder | `BuildGuide-Fabric-0.4.8-island-ux-wip.jar` |
-| SHA-256 | `DD5B7BD8ADF1714F0BC152A303B6ED3F2FB2EA5E9C8F79034B52BD27DAE76557` |
-| Source | commit `07d554c`: the build output and the mods copy have the same SHA-256; `IslandControls`, `ShapeIsland` and `PropertyRangeInt` are inside. **Not yet in the jar:** the two tweaks of `cddf0c9` (Base % and Body % default 15, the label "Shell (blocks)"); they reach the jar with the next deploy |
-| Tested | the offline harness (629 asserts at `07d554c`); in game 7 of 7 |
-| Previous jars | `BuildGuide-Fabric-0.4.8-island-wip.jar` (SHA-256 `556D80E49975B12802361D5CB8971EE632415A7E841C0EC71D8AF06826C92DE9`, commit `f7937be`), `BuildGuide-Fabric-0.4.8-area3-wip2.jar` (SHA-256 `B5AC963F068EFF59954521F29F24D994BBFE61CF9F55C2C1DE9256E055392A32`, commit `584674b`), `BuildGuide-Fabric-0.4.8-area3-wip.jar` (first Area 3 test) and `BuildGuide-Fabric-0.4.8-ghost-fix-wip.jar` (SHA-256 `1E2F5E96A659D474EF14D9CDDBF5930E6B695DF66F31C782A7C1E5654E55BDB6`, commit `9c3fbde`), kept as `.bak` |
+| Active jar in the mods folder | `BuildGuide-Fabric-0.4.8-live-apply-wip.jar` |
+| SHA-256 | `8DB5202C0AFEC1F4645D0E4052852B188BE4CA9CF35C9FC969DF5CC092994198` |
+| Source | commit `416b5e0` (`d1988dc` only changes `CLAUDE.md`): the build output and the mods copy have the same SHA-256, and a rebuild of the merged `d1988dc` gives the same SHA-256 again; `FieldDebounce`, `WorldUpdateGate`, `TimingLog`, `ShapeScreen`, `ScreenWrapper`, `TextFieldImpl` and `RenderHandler` are inside. It contains the two A2 tweaks of `cddf0c9` |
+| Tested | the offline harness (658 asserts); in game 9 of 9 |
+| Previous jars | `BuildGuide-Fabric-0.4.8-island-ux-wip.jar` (SHA-256 `DD5B7BD8ADF1714F0BC152A303B6ED3F2FB2EA5E9C8F79034B52BD27DAE76557`, commit `07d554c`), `BuildGuide-Fabric-0.4.8-island-wip.jar` (SHA-256 `556D80E49975B12802361D5CB8971EE632415A7E841C0EC71D8AF06826C92DE9`, commit `f7937be`), `BuildGuide-Fabric-0.4.8-area3-wip2.jar` (SHA-256 `B5AC963F068EFF59954521F29F24D994BBFE61CF9F55C2C1DE9256E055392A32`, commit `584674b`), `BuildGuide-Fabric-0.4.8-area3-wip.jar` (first Area 3 test) and `BuildGuide-Fabric-0.4.8-ghost-fix-wip.jar` (SHA-256 `1E2F5E96A659D474EF14D9CDDBF5930E6B695DF66F31C782A7C1E5654E55BDB6`, commit `9c3fbde`), kept as `.bak` |
 
 - The file name still says `wip`: it was never renamed after the test. Renaming is a choice
   for Raphael (nothing depends on the name); a rebuild of `acf4904` gives the same classes.
