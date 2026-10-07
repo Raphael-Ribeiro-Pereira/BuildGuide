@@ -93,3 +93,27 @@ Phases: `[PARE-1]` investigation (no code); `[PARE-2]` voxel raycast (DDA) in `c
 and tested; `[PARE-3]` outline of the target position in the world; `[PARE-4]` toggle key and
 HUD indicator; `[PARE-5]` replacing the click at the approved point; `[PARE-6]` decompile-diff
 declared beforehand and deploy `area3-wip`; `[PARE-7]` commit and push.
+
+## Backlog: findings from the live-apply timing log (2026-10-07)
+
+From Raphael's `latest.log` with `live-apply-wip`. Not implemented; measure again after each fix.
+
+1. **preview-rebuild (render thread): 13 ms at 7k blocks, 36 ms at 49k, 81 ms at 107k, and twice
+   per change**, the first time over the old model (eight cases in a row). Likely cause, to
+   confirm: a generation starts by invalidating the validation state, so `PreviewController` makes
+   a new instance of the old model with fresh colours (`withValidation`), and the renderer
+   rebuilds its mesh for it before the new geometry's snapshot arrives. Rebuilding once per
+   generation would halve the cost.
+2. **scan (render thread): 15-18 ms at 45k blocks with 3 errors; 99-128 ms at 72-75k blocks with
+   thousands of errors.** The cost grows with the error count, not only the block count.
+3. **generation (its own thread): 23-90 ms.** No problem: it does not run on the render thread.
+4. **world-buffer and preview-snapshot never went above 8 ms.** Checked in the code (2026-10-07):
+   both are recorded every time they run (`AbstractRenderHandler.renderShapeSetDeferred` around
+   the buffer upload, `PreviewController.update` around `PreviewModel.snapshot`), and both run on
+   every applied change, so they did run and stayed at 8 ms or below. A lower threshold for one
+   session would show their real values.
+5. **107 518 blocks seen, above the ~84k worst case in `STATUS.md`.** Confirmed: the old figure
+   was Wall 2 only. At radius 60, depth 80, Wall 3 gives 92 139 (Circle) to 121 636 (Square)
+   blocks; the limits table in `STATUS.md` is corrected.
+6. **The 50-line cap of the timing log was reached in about 5 minutes:** raise
+   `TimingLog.maxLines` to 200.
