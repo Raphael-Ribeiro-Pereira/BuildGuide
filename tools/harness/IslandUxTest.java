@@ -54,10 +54,10 @@ public class IslandUxTest {
 
 		int bp = ((PropertyRangeInt) get(n, "propertyBasePercent")).value, bd = ((PropertyRangeInt) get(n, "propertyBodyPercent")).value;
 		check(bp == 15 && bd == 15, "Base % and Body % default to 15 (" + bp + ", " + bd + ")");
-		TestIsland rs = new TestIsland(); rs.captureDefaults(); /* as ShapeSet does right after construction */ setProp(rs, "propertyBasePercent", 60); setProp(rs, "propertyBodyPercent", 80); rs.setOpenSection(2); rs.resetShownToDefaults();
+		TestIsland rs = new TestIsland(); rs.captureDefaults(); /* as ShapeSet does right after construction */ setProp(rs, "propertyBasePercent", 60); setProp(rs, "propertyBodyPercent", 80); rs.setOpenSection(3); /* Random is the 4th section since block B (Base, Body, Spikes, Random) */ rs.resetShownToDefaults();
 		check(((PropertyRangeInt) get(rs, "propertyBasePercent")).value == 15 && ((PropertyRangeInt) get(rs, "propertyBodyPercent")).value == 15, "Reset on the Random section: Base % and Body % back to 15");
 		ShapeIsland saved = new TestIsland(); saved.restorePersistence("CIRCLE,41,41,6,0.7,0.0,0.0,6.0,2,24,BOWL,0.0,0.0,1,Runnable,30,45,Runnable,Runnable");
-		check(saved.toPersistence().endsWith(",30,45,Runnable,Runnable"), "a saved island keeps its own percentages (30, 45)");
+		check(saved.toPersistence().contains(",Runnable,30,45,Runnable,Runnable,"), "a saved island keeps its own percentages (30, 45)");
 
 		System.out.println("-- controls per Outline");
 		for(Outline o: Outline.values()){
@@ -81,8 +81,8 @@ public class IslandUxTest {
 		}
 		ShapeIsland v = new TestIsland(); updates = 0;
 		int[] expectBase = {4, 5, 6, 7}; // Outline, widths, rotation (+ Corner round, + Sides, + Wobble and its size)
-		for(Outline o: Outline.values()){ setProp(v, "propertyOutline", o); check(v.countRows(0) == expectBase[o.ordinal()], o + ": Base shows " + v.countRows(0) + " rows (Body " + v.countRows(1) + ", Random " + v.countRows(2) + ")"); }
-		check(v.countRows(2) == 6, "Random rows: Base %, Body %, Randomize, Naturalize, Undo, Seed");
+		for(Outline o: Outline.values()){ setProp(v, "propertyOutline", o); check(v.countRows(0) == expectBase[o.ordinal()], o + ": Base shows " + v.countRows(0) + " rows (Body " + v.countRows(1) + ", Random " + v.countRows(3) + ")"); }
+		check(v.countRows(3) == 6, "Random rows: Base %, Body %, Randomize, Naturalize, Undo, Seed");
 
 		System.out.println("-- Randomize (seeded)");
 		TestIsland r1 = island(42), r2 = island(42);
@@ -146,8 +146,8 @@ public class IslandUxTest {
 		ShapeIsland l = new TestIsland(); l.restorePersistence(old);
 		String now = l.toPersistence();
 		check(!l.error && now.startsWith(old + ","), "a 15-value Island from block A loads and keeps its 15 positions: " + now);
-		check(now.equals(old + ",15,15,Runnable,Runnable"), "new properties at the end, at their defaults (Base 15 %, Body 15 %, Naturalize, Undo)");
-		check(new TestIsland().properties.size() == 19, "19 persisted properties (15 + 4)");
+		check(now.equals(old + ",15,15,Runnable,Runnable,0,RANDOM,12,3,0,50"), "new properties at the end, at their defaults (Base 15 %, Body 15 %, Naturalize, Undo, then the 6 spike controls)");
+		check(new TestIsland().properties.size() == 25, "25 persisted properties (15 + 4 + 6 spikes)");
 		System.out.println(fails == 0 ? "ALL OK" : fails + " FAILED");
 	}
 }

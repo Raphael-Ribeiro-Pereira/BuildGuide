@@ -19,7 +19,7 @@ public class LabelWidthTest {
 
 	public static void main(String[] a) throws Exception {
 		String json = new String(Files.readAllBytes(Paths.get("common/resources/assets/buildguide/lang/en_us.json")), "UTF-8");
-		String[] keys = {"outline", "widthx", "widthz", "sides", "roundness", "islandrotation", "edgeamplitude", "edgescale", "wall", "depth", "profile", "sharpness", "roughness", "seed", "basepercent", "bodypercent"};
+		String[] keys = {"outline", "widthx", "widthz", "sides", "roundness", "islandrotation", "edgeamplitude", "edgescale", "wall", "depth", "profile", "sharpness", "roughness", "seed", "basepercent", "bodypercent", "spikes", "spikemode", "spikelength", "spikebase", "lengthvar", "spread"};
 		for(String k: keys){
 			Matcher m = Pattern.compile("\"property\\.buildguide\\." + k + "\": \"([^\"]*)\"").matcher(json);
 			if(!m.find()){ check(false, k + ": key missing"); continue; }
