@@ -170,7 +170,8 @@ Only the latest one matters; diff the next change against it.
 | `9c3fbde` | Ghost fix — second block-change hook (`setServerVerifiedBlockState`) and the `StateReconciler` safety net for validation errors that outlive their block | `GHOSTFIX` |
 | `584674b` | Area 3 — place a block into the guideline: `GuidelinePicker`, toggle key G and HUD, `MixinMinecraft` click swap, `TargetOutline` (phases `229c3fe`..`584674b`) | `AREA3B` |
 | `f7937be` | Island block A — `IslandNoise`, `IslandGeometry` (plan, body, hollow shell), `ShapeIsland` registered last; `PropertyFloat` optional -/+ step (phases `3fe71f7`..`f7937be`) | `ISLANDSTEP` |
-| `cddf0c9` | Island block A2 — controls per Outline, neutral defaults, Random section (Randomize, Naturalize, Undo), `IslandControls`, `PropertyRangeInt` optional step (phases `5a30b97`..`cddf0c9`) | `ISLANDUX` (current; decompiled at `07d554c`, the label and default tweaks of `cddf0c9` are not in it) |
+| `cddf0c9` | Island block A2 — controls per Outline, neutral defaults, Random section (Randomize, Naturalize, Undo), `IslandControls`, `PropertyRangeInt` optional step (phases `5a30b97`..`cddf0c9`) | `ISLANDUX` (decompiled at `07d554c`, before the tweaks of `cddf0c9`) |
+| `9269789` | Same code as `cddf0c9` (only docs after it): Island block A2 with the Base % / Body % default 15 and the "Shell (blocks)" label | `ISLANDUX2` (current; differs from `ISLANDUX` only in `ShapeIsland` and `en_us.json`) |
 
 GUI redesign plan and decisions: `docs/GUI_REDESIGN.md` (stages E1–E8). Project status, final
 jars, rules going forward and backlog: `docs/STATUS.md`.
