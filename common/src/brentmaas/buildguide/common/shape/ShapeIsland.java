@@ -36,7 +36,8 @@ public class ShapeIsland extends Shape {
 	// scale, wall, depth, profile, sharpness, roughness, seed, randomize (was New seed), then base %,
 	// body %, naturalize, undo, then (block B) spikes, spike mode, spike length, spike base, length var %,
 	// spread %, then (spikes 2, phase 1) jitter %, (phase 2) dripstone, taper, edge falloff %, spikes %,
-	// naturalize spikes, (phase 3) break, pieces, gap. New properties go at the end. Labels: roundness reads "Corner round",
+	// naturalize spikes, (phase 3) break, pieces, gap, then (layers, 4C) layers, cut 1 %, cut 2 %, cut 3 %.
+	// New properties go at the end. Labels: roundness reads "Corner round",
 	// edge amplitude "Wobble", edge scale "Wobble size", wall "Thickness"
 	private PropertyEnum<Outline> propertyOutline = new PropertyEnum<Outline>(Outline.CIRCLE, new Translatable("property.buildguide.outline"), () -> onOutlineChanged(), outlineNames);
 	private PropertyRangeInt propertyWidthX = new PropertyRangeInt(41, new Translatable("property.buildguide.widthx"), () -> update(), IslandGeometry.minWidth, IslandGeometry.maxWidth);
@@ -85,6 +86,14 @@ public class ShapeIsland extends Shape {
 	private PropertyEnum<BreakMode> propertyBreak = new PropertyEnum<BreakMode>(BreakMode.ATTACHED, new Translatable("property.buildguide.break"), () -> onSpikesChanged(), breakNames);
 	private PropertyRangeInt propertyPieces = new PropertyRangeInt(2, new Translatable("property.buildguide.pieces"), () -> update(), IslandGeometry.minPieces, IslandGeometry.maxPieces);
 	private PropertyRangeInt propertyGap = new PropertyRangeInt(2, new Translatable("property.buildguide.gap"), () -> update(), IslandGeometry.minGap, IslandGeometry.maxGap);
+	// Layers (palette stage 4C, after Gap): the world and the preview coloured by depth, four layers cut at
+	// three percentages of Depth (ShapeLayers). Visual only: the blocks are the same with or without
+	private PropertyBoolean propertyLayers = new PropertyBoolean(false, new Translatable("property.buildguide.layers"), () -> onLayersChanged());
+	private PropertyRangeInt propertyCut1 = new PropertyRangeInt(ShapeLayers.defaultCut1, new Translatable("property.buildguide.cut1"), () -> onCutChanged(0), ShapeLayers.minCut, ShapeLayers.maxCut, ShapeLayers.cutStep);
+	private PropertyRangeInt propertyCut2 = new PropertyRangeInt(ShapeLayers.defaultCut2, new Translatable("property.buildguide.cut2"), () -> onCutChanged(1), ShapeLayers.minCut, ShapeLayers.maxCut, ShapeLayers.cutStep);
+	private PropertyRangeInt propertyCut3 = new PropertyRangeInt(ShapeLayers.defaultCut3, new Translatable("property.buildguide.cut3"), () -> onCutChanged(2), ShapeLayers.minCut, ShapeLayers.maxCut, ShapeLayers.cutStep);
+	// The layers the last generation coloured the world with (null: Layers off), for the preview
+	private volatile ShapeLayers generatedLayers = null;
 
 	// Panel order per section (persistence order is the `properties` list)
 	private Property<?>[] baseRows = {propertyOutline, propertyWidthX, propertyWidthZ, propertySides, propertyRoundness, propertyRotation, propertyEdgeAmplitude, propertyEdgeScale};
@@ -94,6 +103,8 @@ public class ShapeIsland extends Shape {
 	private Property<?>[] spikeShapeRows = {propertyDripstone, propertyTaper, propertyFalloff, propertyBreak, propertyPieces, propertyGap};
 	// Spikes section: Count alone while it is 0, then the five others
 	private Property<?>[] spikeRows = {propertySpikeMode, propertySpikeLength, propertySpikeBase, propertyLengthVar, propertySpread, propertyJitter};
+	// Layers section: the box alone while it is off, then the three cuts
+	private PropertyRangeInt[] cutRows = {propertyCut1, propertyCut2, propertyCut3};
 
 	// Randomize / Naturalize source; one-step Undo, in memory only
 	Random random = new Random();
@@ -136,21 +147,29 @@ public class ShapeIsland extends Shape {
 		properties.add(propertyBreak);
 		properties.add(propertyPieces);
 		properties.add(propertyGap);
+		properties.add(propertyLayers);
+		properties.add(propertyCut1);
+		properties.add(propertyCut2);
+		properties.add(propertyCut3);
 
 		int sectionBase = declareSection(new Translatable("property.buildguide.section.base"));
 		int sectionBody = declareSection(new Translatable("property.buildguide.section.body"));
 		int sectionSpikes = declareSection(new Translatable("property.buildguide.section.spikes"));
 		// Always declared (sections are fixed per shape); with no spikes it shows no rows
 		int sectionSpikeShape = declareSection(new Translatable("property.buildguide.section.spikeshape"));
+		int sectionLayers = declareSection(new Translatable("property.buildguide.section.layers"));
 		int sectionRandom = declareSection(new Translatable("property.buildguide.section.seed"));
 		assignSection(sectionBase, baseRows);
 		assignSection(sectionBody, propertyWall, propertyDepth, propertyProfile, propertySharpness, propertyRoughness);
 		assignSection(sectionSpikes, propertySpikes);
 		assignSection(sectionSpikes, spikeRows);
 		assignSection(sectionSpikeShape, spikeShapeRows);
+		assignSection(sectionLayers, propertyLayers);
+		assignSection(sectionLayers, cutRows);
 		assignSection(sectionRandom, propertyBasePercent, propertyBodyPercent, propertySpikesPercent, propertyRandomize, propertyNaturalize, propertyNaturalizeSpikes, propertyUndo, propertySeed);
-		// Random has 8 rows with Seed; at the minimum GUI height (270) five sections leave room for 7, so the
-		// Seed row is not shown (still saved, still in presets, still drawn by Randomize and New seed)
+		// Random has 8 rows with Seed; at the minimum GUI height (270) the sections leave room for 7 (six of
+		// them since Layers, with 11-px headers), so the Seed row is not shown (still saved, still in presets,
+		// still drawn by Randomize and New seed)
 		hideFromGui(propertySeed);
 		// Reset on the Random section must not throw away an island one likes
 		protectFromReset(propertySeed);
@@ -180,6 +199,37 @@ public class ShapeIsland extends Shape {
 			if(isShown(p) && propertySpikes.value > 0 && (!segmentedOnly || propertyBreak.value == BreakMode.SEGMENTED)) row = placeRow(row, p);
 			else hideRow(p);
 		}
+		if(isShown(propertyLayers)) row = placeRow(row, propertyLayers);
+		else hideRow(propertyLayers);
+		for(Property<?> p: cutRows) {
+			if(isShown(p) && propertyLayers.value) row = placeRow(row, p);
+			else hideRow(p);
+		}
+	}
+
+	private void onLayersChanged() {
+		onSelectedInGUI(); // the cuts show only with Layers on
+		update();
+	}
+
+	// A cut that changed keeps its value and pushes the others so each stays at least 5 above the one before
+	// (ShapeLayers.normalize); setValue shows the moved ones in their fields without running their actions
+	private void onCutChanged(int changed) {
+		int[] c = ShapeLayers.normalize(propertyCut1.value, propertyCut2.value, propertyCut3.value, changed);
+		for(int i = 0;i < cutRows.length;++i) {
+			if(cutRows[i].value != c[i]) cutRows[i].setValue(c[i]);
+		}
+		update();
+	}
+
+	@Override
+	public boolean hasLayers() {
+		return propertyLayers.value;
+	}
+
+	@Override
+	public ShapeLayers getLayers() {
+		return generatedLayers;
 	}
 
 	private void onTaperChanged() {
@@ -330,8 +380,27 @@ public class ShapeIsland extends Shape {
 		return p;
 	}
 
+	// The layers for the current values, or null with Layers off. Depth as the geometry clamps it; the top is y 0
+	ShapeLayers layers() {
+		if(!propertyLayers.value) return null;
+		return new ShapeLayers(0, Math.max(0, Math.min(IslandGeometry.maxDepth, propertyDepth.value)), propertyCut1.value, propertyCut2.value, propertyCut3.value);
+	}
+
+	// With Layers on, each cube takes its layer's colour (and the shape's alpha) before it is added: the
+	// blocks and their order are exactly those of Layers off, only the vertex colours differ
 	protected void updateShape(IShapeBuffer buffer) throws InterruptedException {
 		setOriginOffset(0, 0, 0);
-		IslandGeometry.enumerate(params(), (x, y, z) -> addShapeCube(buffer, x, y, z));
+		ShapeLayers layers = layers();
+		generatedLayers = layers;
+		if(layers == null) {
+			IslandGeometry.enumerate(params(), (x, y, z) -> addShapeCube(buffer, x, y, z));
+			return;
+		}
+		int alpha = (int) (255 * shapeSet.getShapeColourA());
+		IslandGeometry.enumerate(params(), (x, y, z) -> {
+			int rgb = ShapeLayers.colour(layers.layerOf(y));
+			buffer.setColour((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF, alpha);
+			addShapeCube(buffer, x, y, z);
+		});
 	}
 }

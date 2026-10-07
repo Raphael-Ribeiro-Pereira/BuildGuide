@@ -127,9 +127,9 @@ public class IslandSegmentedTest {
 		setProp(panel, "propertyBreak", BreakMode.SEGMENTED); check(panel.countRows(3) == 6, "Segmented: + Pieces and Gap (6 rows)");
 		String old = "ORGANIC,51,37,6,0.7,15.0,0.25,6.0,3,30,TERRACED,0.4,0.3,777,Runnable,20,35,Runnable,Runnable,9,FILL,22,5,15,70,35,true,2.3,45,60,Runnable";
 		ShapeIsland l = new TestIsland(); l.restorePersistence(old);
-		check(!l.error && l.toPersistence().equals(old + ",ATTACHED,2,2"), "a 31-value Island loads unchanged, Break Attached, Pieces 2, Gap 2: " + l.toPersistence());
+		check(!l.error && l.toPersistence().startsWith(old + ",ATTACHED,2,2,"), "a 31-value Island loads unchanged, Break Attached, Pieces 2, Gap 2 (later values follow): " + l.toPersistence());
 		ShapeIsland g = new TestIsland(); g.restorePersistence(old + ",SEGMENTED,4,6");
-		check(!g.error && g.toPersistence().equals(old + ",SEGMENTED,4,6") && new TestIsland().properties.size() == 34, "Segmented, 4 pieces, gap 6 saved and loaded; 34 persisted properties");
+		check(!g.error && g.toPersistence().startsWith(old + ",SEGMENTED,4,6,") && new TestIsland().properties.size() >= 34, "Segmented, 4 pieces, gap 6 saved and loaded; the 34 persisted properties of spikes 2 in their places");
 		System.out.println(fails == 0 ? "ALL OK" : fails + " FAILED");
 	}
 }

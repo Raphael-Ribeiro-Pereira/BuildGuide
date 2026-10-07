@@ -5,20 +5,21 @@ import brentmaas.buildguide.common.screen.ShapeLayout;
 // GUI redesign E5: row counts of every accordion section of every shape, from the same dry run the
 // headers use (Shape.countRows). Any widget access would throw here (no widget handler outside the
 // game), so passing also proves the count pass moves nothing. Point counts are set to the maximum.
-// Capacity: the accordion is 206 px (y 42..248 since E6; 184 from y 64 in E5) = headers x 12 + open section rows x 18, and the
-// Origin section (4 rows) must fit too.
+// Capacity: the accordion is 206 px (y 42..248 since E6; 184 from y 64 in E5) = headers x ShapeScreen.headerHeight (12
+// until the Island's sixth section, 11 since) + open section rows x 18, and the Origin section (4 rows) must fit too.
 public class AccordionTest {
 	static int fails = 0;
 	static void check(boolean c, String m){ System.out.println((c?"OK   ":"FAIL ")+m); if(!c) ++fails; }
 	// E7: the accordion height comes from the GUI height (ShapeLayout); 270 is the minimum (the binding
 	// case, 206 px as in E6), 360 is GUI scale 3 on 1080p
 	static final int[] HEIGHTS = {ShapeLayout.minHeight, 360};
-	static final int HEADER = 12, ORIGIN_ROWS = 4;
+	static final int HEADER = brentmaas.buildguide.common.screen.ShapeScreen.headerHeight, ORIGIN_ROWS = 4;
 	static final Class<?>[] SHAPES = {ShapeCatenary.class, ShapeCircle.class, ShapeCone.class, ShapeCuboid.class, ShapeEllipse.class, ShapeEllipsoid.class, ShapeGrid.class, ShapeLine.class, ShapeParabola.class, ShapeParaboloid.class, ShapePolygon.class, ShapePolygonalPyramid.class, ShapeSphere.class, ShapeTorus.class, ShapeSpline.class, ShapeBridge.class, ShapeIsland.class};
 
 	public static void main(String[] a) throws Exception {
 		check(Property.rowHeight == 18, "row height 18");
 		check(ShapeLayout.accordionHeight(ShapeLayout.minHeight) == 206, "accordion at the minimum height: 206 px, as in E6");
+		check(HEADER == 11 && 1 * HEADER + 6 * HEADER + 7 * Property.rowHeight <= 206, "headers 11 px: Origin and six sections leave room for 7 rows at 270 (" + (7 * HEADER + 7 * Property.rowHeight) + " of 206 px)");
 		for(int h: HEIGHTS) {
 			int accordion = ShapeLayout.accordionHeight(h);
 			System.out.println("-- height " + h + ": accordion " + accordion + " px");
@@ -50,6 +51,21 @@ public class AccordionTest {
 				int worst = ORIGIN_ROWS;
 				for(int i = 0;i < s.getSectionCount();++i) worst = Math.max(worst, s.countRows(i));
 				check(worst <= capacity, "height " + h + ", Island " + o + ": capacity " + capacity + " rows, base=" + s.countRows(0) + " body=" + s.countRows(1) + " spikes=" + s.countRows(2) + " spikeshape=" + s.countRows(3) + " random=" + s.countRows(s.getSectionCount() - 1));
+			}
+		}
+		// Layers section (4C, between Spike shape and Random): the box alone while off, the three cuts with it on
+		for(int h: HEIGHTS) {
+			int accordion = ShapeLayout.accordionHeight(h);
+			for(boolean on: new boolean[]{false, true}) {
+				Shape s = new ShapeIsland();
+				Field f = ShapeIsland.class.getDeclaredField("propertyLayers");
+				f.setAccessible(true);
+				((Property<Object>) f.get(s)).value = on;
+				int capacity = (accordion - (1 + s.getSectionCount()) * HEADER) / Property.rowHeight;
+				int worst = ORIGIN_ROWS;
+				for(int i = 0;i < s.getSectionCount();++i) worst = Math.max(worst, s.countRows(i));
+				int layers = s.countRows(4);
+				check(s.getSectionCount() == 6 && s.getSectionName(4).getTranslationKey().equals("property.buildguide.section.layers") && layers == (on ? 4 : 1) && worst <= capacity, "height " + h + ", Island with Layers " + (on ? "on" : "off") + ": Layers " + layers + " rows, 6 sections, capacity " + capacity);
 			}
 		}
 		// Spikes section: 1 row (Count) with no spikes, 6 with some; every section must still fit

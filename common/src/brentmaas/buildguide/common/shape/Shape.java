@@ -366,6 +366,17 @@ public abstract class Shape implements IValidatable {
 		if(!ready) return 0;
 		return nBlocks;
 	}
+
+	// Layers by depth (palette stage 4C, visual only): whether this shape's layers are switched on now (the
+	// panel's setting), and the layers its last generation coloured the world with (null: none). Shapes
+	// without layers keep both defaults
+	public boolean hasLayers() {
+		return false;
+	}
+
+	public ShapeLayers getLayers() {
+		return null;
+	}
 	
 	public long getHowLongAgoCompletedMillis() {
 		return System.currentTimeMillis() - completedAt;

@@ -17,9 +17,11 @@ import brentmaas.buildguide.common.shape.ShapeRegistry;
 
 public class ShapeScreen extends BaseScreen{
 	// Left panel (GUI redesign E5, plan §2.2): x 0..188, the accordion from y 42 (the shape dropdown
-	// moved to the header in E6): one 12-px header per section (Origin first, then the shape's
-	// sections), the open section's rows under its header. The right panel (x 192..480) is E6
-	public static final int panelWidth = 188, accordionTop = 42, headerHeight = 12;
+	// moved to the header in E6): one 11-px header per section (Origin first, then the shape's
+	// sections), the open section's rows under its header. The right panel (x 192..480) is E6.
+	// Headers were 12 px until the Island's sixth section (Layers, 4C): at 11, Origin and six sections
+	// still leave room for 7 rows at the minimum height (77 + 7 x 18 = 203 of 206 px)
+	public static final int panelWidth = 188, accordionTop = 42, headerHeight = 11;
 	// Header row (E6), y 0..20: Enabled checkbox 2..19 (BaseScreen), set selector < N/Total > 22..78,
 	// type dropdown 80..160, instance name 164..Save-4, Save (width - 64, 40 px), close X (BaseScreen)
 	private static final int setPrevX = 22, setNextX = 64, arrowWidth = 14, typeX = 80, typeWidth = 80, nameX = 164, saveWidth = 40;
@@ -379,11 +381,12 @@ public class ShapeScreen extends BaseScreen{
 		BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Shape));
 	}
 	
-	// Header row: "> Name" (closed) or "v Name" (open) on a dark strip, the row count on the right
+	// Header row: "> Name" (closed) or "v Name" (open) on a dark strip, the row count on the right. The
+	// text starts 1 px into the 10-px strip, so a descender's shadow still ends inside it
 	private void renderHeader(int y, String name, int rows, boolean open) {
 		fillRect(0, y, panelWidth, y + headerHeight - 1, open ? 0xC0505050 : 0xC0202020);
-		drawShadowLeft((open ? "v " : "> ") + name, 4, y + 2, 0xFFFFFF);
-		drawShadowRight("" + rows, panelWidth - 4, y + 2, 0xAAAAAA);
+		drawShadowLeft((open ? "v " : "> ") + name, 4, y + 1, 0xFFFFFF);
+		drawShadowRight("" + rows, panelWidth - 4, y + 1, 0xAAAAAA);
 	}
 
 	/**
