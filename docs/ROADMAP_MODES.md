@@ -159,3 +159,16 @@ GOLDEN-SPIKES capture `ceb4479`; installed as `spikes2-wip` for Raphael's test, 
    the colours) was not measured further.
 3. **world-buffer investigation:** the 12-15 ms upload seen in the spikes-wip log was not
    investigated.
+
+Item 1 was done right after (`6802ac9`..`7762309`, merged 2026-10-07; see `docs/STATUS.md`).
+
+## Backlog: the world stutter (2026-10-07)
+
+Reported by Raphael after the `scan-slices-wip` test, not investigated yet:
+
+- **The stutter comes when the blocks enter the world.** With World update mode On close, editing
+  runs smoothly; the stutter comes when the menu is **closed**, which is when the new shape is
+  applied to the world.
+- **The preview is not the culprit.**
+- **The timing log has shown no world-buffer line since `spikes2-wip`** (the `spikes-wip` log had
+  12-15 ms at 22k-51k blocks).

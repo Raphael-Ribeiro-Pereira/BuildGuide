@@ -155,6 +155,36 @@ geometry.
 
 Offline harness after block B: 719 asserts, 0 failures; Bridge 466 / 159 / 360.
 
+### Island spikes 2 and the scan in Y layers
+
+Built on `wip/spikes2` and `wip/scan-slices` (which grew from it) and fast-forwarded into
+`feat/cone-expanded` on 2026-10-07 after the `scan-slices-wip` in-game test passed.
+
+| Stage | Commit | What |
+|---|---|---|
+| GOLDEN-SPIKES | `ceb4479` | block-set hashes of 16 islands with spikes, from the block B code; spikes 2 keeps every one at its defaults |
+| Spikes 2, phase 1 | `73fcd08` | spike cap 64; Spike mode Fill (sunflower spiral, golden angle) with Jitter %; edge falloff in the geometry; "Large shape: N blocks" in the preview corner above 200 000 blocks |
+| Spikes 2, phase 2 | `b23952d` | Taper (0.5 to 3.0), Dripstone, Edge falloff %, in a new Spike shape section between Spikes and Random; Spikes % for Randomize; Natural spikes (Naturalize spikes); the Seed row is no longer shown (still saved) |
+| Spikes 2, phase 3 | `3e63cbd` | Break Attached / Segmented (a part falling), Pieces 2 to 4, Gap 1 to 6 |
+| Scan slices, core | `6802ac9` | `SliceScan` (pure): the validation scan in Y layers, bottom to top, within a time budget per frame (at least one layer), published in one go and identical to the instantaneous scan; blocks changed meanwhile are read again; scan epoch in `ValidationState` (a scan whose inputs changed starts over) |
+| Scan slices, Fabric | `76ca97d` | `RenderHandler.validateShape` runs the scan in layers; "Scanning N%" in the preview corner; timing line `phase=scan ms= slices= maxslice= blocks=` |
+| Scan slices, Config | `7762309` | Scan speed in Configuration, saved in `buildguide.cfg` after `worldUpdateMode`: Instant, Fast 12 ms, **Normal 6 ms** (default), Slow 3 ms |
+
+Spike cap 64, worst case (121 x 121, depth 80, Wall 3, 64 spikes 40 long with base 8, Taper 0.5,
+Segmented with 4 pieces and gap 1, Fill): **278 151 blocks**, about **178 MB**, **119 ms** of
+geometry.
+
+Pending from this stage:
+- Test 10 (the worst case with 64 spikes) was not tested in game.
+- With Count 0 the Spike shape section shows an empty header (accordion sections are fixed per
+  shape): no answer from Raphael yet.
+- The Seed row is hidden (Random would need 8 rows and 7 fit at height 270; the value is still
+  saved, in presets and in Randomize): no answer yet.
+- The meaning of Pieces 2 (Pieces counts the attached top piece: 2 is the top piece plus one loose
+  piece): no answer yet.
+
+Offline harness after the scan in Y layers: 846 asserts, 0 failures; Bridge 466 / 159 / 360.
+
 Offline harness at the close: 406 asserts, 0 failures; Bridge reference sizes 466 / 159 / 360.
 E6 (after two fixes), E7, P4 and E8 passed their in-game checklists before being committed
 (E7 7 of 7, P4 9 of 9, E8 9 of 9). The ghost fix was committed on Raphael's go-ahead after the
@@ -167,11 +197,11 @@ Build output: `fabric1.21.11/build/libs/BuildGuide-Fabric-0.4.8.jar` (mod versio
 
 | Item | Value |
 |---|---|
-| Active jar in the mods folder | `BuildGuide-Fabric-0.4.8-spikes-wip.jar` |
-| SHA-256 | `C3564E26FD888E46E106724E051C27C19D74EE962365FD9BB90775E77DE03A6E` |
-| Source | commit `a6d1c23`: the build output and the mods copy have the same SHA-256, and a rebuild of the merged branch gives it again; `IslandGeometry`, `IslandControls`, `ShapeIsland`, `PreviewModel`, `PreviewController`, `TimingLog` and `PreviewRenderer` are inside |
-| Tested | the offline harness (719 asserts); in game, mark 9 |
-| Previous jars | `BuildGuide-Fabric-0.4.8-live-apply-wip.jar` (SHA-256 `8DB5202C0AFEC1F4645D0E4052852B188BE4CA9CF35C9FC969DF5CC092994198`, commit `416b5e0`), `BuildGuide-Fabric-0.4.8-island-ux-wip.jar` (SHA-256 `DD5B7BD8ADF1714F0BC152A303B6ED3F2FB2EA5E9C8F79034B52BD27DAE76557`, commit `07d554c`), `BuildGuide-Fabric-0.4.8-island-wip.jar` (SHA-256 `556D80E49975B12802361D5CB8971EE632415A7E841C0EC71D8AF06826C92DE9`, commit `f7937be`), `BuildGuide-Fabric-0.4.8-area3-wip2.jar` (SHA-256 `B5AC963F068EFF59954521F29F24D994BBFE61CF9F55C2C1DE9256E055392A32`, commit `584674b`), `BuildGuide-Fabric-0.4.8-area3-wip.jar` (first Area 3 test) and `BuildGuide-Fabric-0.4.8-ghost-fix-wip.jar` (SHA-256 `1E2F5E96A659D474EF14D9CDDBF5930E6B695DF66F31C782A7C1E5654E55BDB6`, commit `9c3fbde`), kept as `.bak` |
+| Active jar in the mods folder | `BuildGuide-Fabric-0.4.8-scan-slices-wip.jar` |
+| SHA-256 | `A280A6440BB423878D6AAFA316709E852D63EF2EEBB3FF3F643E826C4724A067` |
+| Source | commit `7762309`: the build output and the mods copy have the same SHA-256, and a build of the merged branch gives it again; `SliceScan`, `ValidationState`, `Config`, `ConfigurationScreen`, `ShapeScreen`, `RenderHandler`, `IncrementalValidator` and `WorldProbe` are inside |
+| Tested | the offline harness (846 asserts); in game, approved for the merge (2026-10-07) |
+| Previous jars | `BuildGuide-Fabric-0.4.8-spikes2-wip.jar` (SHA-256 `89F6B80A37150060E598EF0988446699E8B43F5E050267E83A9398909BE5D87B`, commit `3e63cbd`), `BuildGuide-Fabric-0.4.8-spikes-wip.jar` (SHA-256 `C3564E26FD888E46E106724E051C27C19D74EE962365FD9BB90775E77DE03A6E`, commit `a6d1c23`), `BuildGuide-Fabric-0.4.8-live-apply-wip.jar` (SHA-256 `8DB5202C0AFEC1F4645D0E4052852B188BE4CA9CF35C9FC969DF5CC092994198`, commit `416b5e0`), `BuildGuide-Fabric-0.4.8-island-ux-wip.jar` (SHA-256 `DD5B7BD8ADF1714F0BC152A303B6ED3F2FB2EA5E9C8F79034B52BD27DAE76557`, commit `07d554c`), `BuildGuide-Fabric-0.4.8-island-wip.jar` (SHA-256 `556D80E49975B12802361D5CB8971EE632415A7E841C0EC71D8AF06826C92DE9`, commit `f7937be`), `BuildGuide-Fabric-0.4.8-area3-wip2.jar` (SHA-256 `B5AC963F068EFF59954521F29F24D994BBFE61CF9F55C2C1DE9256E055392A32`, commit `584674b`), `BuildGuide-Fabric-0.4.8-area3-wip.jar` (first Area 3 test) and `BuildGuide-Fabric-0.4.8-ghost-fix-wip.jar` (SHA-256 `1E2F5E96A659D474EF14D9CDDBF5930E6B695DF66F31C782A7C1E5654E55BDB6`, commit `9c3fbde`), kept as `.bak` |
 
 - The file name still says `wip`: it was never renamed after the test. Renaming is a choice
   for Raphael (nothing depends on the name); a rebuild of `acf4904` gives the same classes.
@@ -205,7 +235,7 @@ Process
    user has confirmed the stage in-game; the user runs the in-game tests.
 9. Before every in-game test: build green, harness green. Declare the expected decompile diff
    *before* running it, then diff the new jar against the previous baseline
-   (`BuildGuide-tools\decompiled\<NAME>`, Vineflower, CRLF normalised). The baseline is now `GHOSTFIX`.
+   (`BuildGuide-tools\decompiled\<NAME>`, Vineflower, CRLF normalised). The baseline is now `SCANSLICES`.
 10. Deploy only with the game and the Modrinth App closed; abort if javaw, the Modrinth App, or a
     java whose command line contains fabric, knot, net.minecraft, .minecraft, ModrinthApp,
     `Fabulously Optimized (1)` or devlaunchinjector is running (any other java, such as an IDE
