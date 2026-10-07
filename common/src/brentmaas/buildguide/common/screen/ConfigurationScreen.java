@@ -2,6 +2,7 @@ package brentmaas.buildguide.common.screen;
 
 import brentmaas.buildguide.common.BuildGuide;
 import brentmaas.buildguide.common.WorldUpdateGate;
+import brentmaas.buildguide.common.shape.SliceScan;
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
 import brentmaas.buildguide.common.screen.widget.AbstractWidgetHandler;
 import brentmaas.buildguide.common.screen.widget.IButton;
@@ -15,6 +16,8 @@ public class ConfigurationScreen extends BaseScreen {
 	private IButton buttonIgnoredBlocksSet, buttonIgnoredBlocksDefault;
 	// Live apply: cycles Live, Idle, On close (WorldUpdateGate.Mode)
 	private IButton buttonWorldUpdate;
+	// Scan in Y layers: cycles Instant, Fast, Normal, Slow (SliceScan.Speed); top right, where no comment runs
+	private IButton buttonScanSpeed;
 	
 	public void init() {
 		super.init();
@@ -75,7 +78,15 @@ public class ConfigurationScreen extends BaseScreen {
 			buttonWorldUpdate.setTitle(modeTitle());
 		});
 		
+		buttonScanSpeed = BuildGuide.widgetHandler.createButton(370, 58, 105, AbstractWidgetHandler.defaultSize, speedTitle(), () -> {
+			SliceScan.Speed[] speeds = SliceScan.Speed.values();
+			BuildGuide.config.scanSpeed.setValue(speeds[(BuildGuide.config.scanSpeed.value.ordinal() + 1) % speeds.length]);
+			BuildGuide.config.write();
+			buttonScanSpeed.setTitle(speedTitle());
+		});
+		
 		addWidget(textFieldIgnoredBlocks);
+		addWidget(buttonScanSpeed);
 		addWidget(buttonWorldUpdate);
 		addWidget(buttonIgnoredBlocksSet);
 		addWidget(buttonIgnoredBlocksDefault);
@@ -99,6 +110,11 @@ public class ConfigurationScreen extends BaseScreen {
 		drawShadowLeft(new Translatable(BuildGuide.config.ignoredBlocks.commentTranslationKey).toString(), 10, 234, 0xFFFFFF);
 		
 		drawShadowLeft(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + new Translatable(BuildGuide.config.worldUpdateMode.translationKey), 370, 195, 0xFFFFFF);
+		drawShadowLeft(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + new Translatable(BuildGuide.config.scanSpeed.translationKey), 370, 45, 0xFFFFFF);
+	}
+	
+	private static Translatable speedTitle() {
+		return new Translatable("screen.buildguide.scanspeed." + BuildGuide.config.scanSpeed.value.name().toLowerCase(java.util.Locale.ROOT));
 	}
 	
 	private static Translatable modeTitle() {
