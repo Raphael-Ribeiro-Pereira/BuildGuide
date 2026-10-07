@@ -25,9 +25,18 @@ public final class IslandGeometry {
 		TERRACED
 	}
 
+	// Spikes (block B): cones under the body, pointing down
+	public enum SpikeMode{
+		RANDOM,
+		RING
+	}
+
 	public static final int maxWidth = 121, minWidth = 3, maxDepth = 80, minSides = 3, maxSides = 12, minWall = 1, maxWall = 3;
+	public static final int maxSpikes = 12, minSpikeLength = 1, maxSpikeLength = 40, minSpikeBase = 1, maxSpikeBase = 8;
 	// Seed salts so the edge and the depth noise are independent fields
 	private static final long edgeSalt = 0x5DEECE66DL, depthSalt = 0x2545F4914F6CDD1DL;
+	// The spikes' own random stream: with no spikes nothing reads it, so the body is exactly as before
+	private static final long spikeSalt = 0x7F4A7C159E3779B9L;
 
 	public static final class Params {
 		public Outline outline = Outline.ORGANIC;
@@ -37,6 +46,11 @@ public final class IslandGeometry {
 		public Profile profile = Profile.BOWL;
 		public double sharpness = 0.4, roughness = 0.3;
 		public long seed = 0;
+		// Spikes: count (0 = none), placement, length below the bottom surface, base radius, length variation
+		// and spread in percent (spread: of the outline's half widths)
+		public int spikes = 0;
+		public SpikeMode spikeMode = SpikeMode.RANDOM;
+		public int spikeLength = 12, spikeBase = 3, lengthVar = 0, spread = 50;
 
 		// Parameters brought into their documented ranges (typed values can be anything)
 		Params clamped() {
@@ -55,6 +69,12 @@ public final class IslandGeometry {
 			p.sharpness = clamp(sharpness, 0.0, 1.0);
 			p.roughness = clamp(roughness, 0.0, 1.0);
 			p.seed = seed;
+			p.spikes = clamp(spikes, 0, maxSpikes);
+			p.spikeMode = spikeMode;
+			p.spikeLength = clamp(spikeLength, minSpikeLength, maxSpikeLength);
+			p.spikeBase = clamp(spikeBase, minSpikeBase, maxSpikeBase);
+			p.lengthVar = clamp(lengthVar, 0, 100);
+			p.spread = clamp(spread, 0, 100);
 			return p;
 		}
 	}
@@ -162,6 +182,7 @@ public final class IslandGeometry {
 				bottom[(x + h) * n + (z + h)] = b;
 			}
 		}
+		if(p.spikes > 0) addSpikes(p, bottom, h, n);
 		return bottom;
 	}
 
@@ -197,5 +218,101 @@ public final class IslandGeometry {
 			}
 		}
 		return false;
+	}
+
+	// Whether a point of the normalised plan (u, v, before the rotation) is inside the outline
+	public static boolean insideOutline(Params params, double u, double v) {
+		Params p = params.clamped();
+		return Math.sqrt(u * u + v * v) <= edge(p, Math.atan2(v, u));
+	}
+
+	/**
+	 * Where the spikes grow, from the body alone: one row per spike, {u, v, x, z, length}. (u, v) is the
+	 * root in the normalised plan, (x, z) its column after the rotation. Random: radius Spread x sqrt(r)
+	 * and a uniform angle, from the spikes' own stream of the seed; Ring: equal angles on a ring of
+	 * radius Spread (one spike: the centre), independent of the seed. A root outside the outline, or on a
+	 * column outside the plan, is pulled towards the centre (same angle) until it is inside. Length:
+	 * Spike length x (1 + var x U(-1, 1)), clamped to [1, 40]. Empty when there are no spikes.
+	 */
+	public static double[][] spikePlan(Params params) {
+		Params p = params.clamped();
+		if(p.spikes == 0) return new double[0][];
+		Params body = p.clamped();
+		body.spikes = 0;
+		int h = halfBox(p), n = 2 * h + 1;
+		return spikePlan(p, columns(body, 0), h, n);
+	}
+
+	private static double[][] spikePlan(Params p, int[] bodyBottom, int h, int n) {
+		java.util.Random random = new java.util.Random(IslandNoise.mix(p.seed ^ spikeSalt));
+		double rx = p.widthX / 2.0, rz = p.widthZ / 2.0;
+		double rot = Math.toRadians(p.rotationDeg), cr = Math.cos(rot), sr = Math.sin(rot);
+		double spread = p.spread / 100.0;
+		double[][] plan = new double[p.spikes][];
+		for(int i = 0;i < p.spikes;++i) {
+			double u, v;
+			if(p.spikeMode == SpikeMode.RANDOM) {
+				double angle = random.nextDouble() * 2 * Math.PI, radius = spread * Math.sqrt(random.nextDouble());
+				u = radius * Math.cos(angle);
+				v = radius * Math.sin(angle);
+			}else if(p.spikes == 1) {
+				u = 0;
+				v = 0;
+			}else {
+				double angle = 2 * Math.PI * i / p.spikes;
+				u = spread * Math.cos(angle);
+				v = spread * Math.sin(angle);
+			}
+			double length = p.spikeLength * (1.0 + p.lengthVar / 100.0 * (random.nextDouble() * 2.0 - 1.0));
+			int x = 0, z = 0;
+			for(int k = 0;;++k) {
+				// Into the grid: undo the normalisation, then apply the rotation (the inverse of columns())
+				double a = u * rx, b = v * rz;
+				x = (int) Math.round(a * cr - b * sr);
+				z = (int) Math.round(a * sr + b * cr);
+				boolean inPlan = Math.abs(x) <= h && Math.abs(z) <= h && bodyBottom[(x + h) * n + (z + h)] >= 0;
+				if(inPlan && Math.sqrt(u * u + v * v) <= edge(p, Math.atan2(v, u))) break;
+				if(k >= 200) {
+					u = 0;
+					v = 0;
+					x = 0;
+					z = 0;
+					break;
+				}
+				u *= 0.9;
+				v *= 0.9;
+			}
+			plan[i] = new double[] {u, v, x, z, clamp(Math.round(length), minSpikeLength, maxSpikeLength)};
+		}
+		return plan;
+	}
+
+	/**
+	 * The union of the body with the spikes, column by column (the body is one column per position, so
+	 * the union stays one): a column under a spike goes down to the cone. Each spike is a vertical cone,
+	 * tip down, whose radius is Spike base (+ 0.5, the cell) at the body's bottom surface under its root
+	 * and 0 at length below it. Upwards it runs into the body as far as needed, so the joint has no gap.
+	 * Columns outside the plan stay empty: the top is the flat cap at y = 0, so a spike cannot grow
+	 * beyond the outline. The shell is then computed on these columns exactly as for the body alone.
+	 */
+	private static void addSpikes(Params p, int[] bottom, int h, int n) {
+		int[] body = bottom.clone();
+		double[][] plan = spikePlan(p, body, h, n);
+		double radius = p.spikeBase + 0.5;
+		for(double[] s: plan) {
+			int cx = (int) s[2], cz = (int) s[3], length = (int) s[4];
+			int surface = body[(cx + h) * n + (cz + h)];
+			for(int x = cx - p.spikeBase;x <= cx + p.spikeBase;++x) {
+				for(int z = cz - p.spikeBase;z <= cz + p.spikeBase;++z) {
+					if(Math.abs(x) > h || Math.abs(z) > h) continue;
+					int i = (x + h) * n + (z + h);
+					if(body[i] < 0) continue;
+					double d = Math.sqrt((x - cx) * (x - cx) + (z - cz) * (z - cz));
+					if(d >= radius) continue;
+					int depth = surface + (int) Math.round(length * (1.0 - d / radius));
+					if(depth > bottom[i]) bottom[i] = depth;
+				}
+			}
+		}
 	}
 }

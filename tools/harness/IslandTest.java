@@ -31,8 +31,9 @@ public class IslandTest {
 
 	// Reference shell, closure and diagonal leaks over a padded 3D grid. Returns {mismatches, reached interior (6), leaks (26), interior cells}
 	static int[] shellCheck(Params p, Set<Long> emitted){
-		int h = IslandGeometry.halfBox(p) + 2, n = 2 * h + 1, d = p.depth + 4, ny = d + 3; // y from -d-1 .. 1
 		int[] col = IslandGeometry.columns(p, 2);
+		int deepest = 0; for(int b: col) deepest = Math.max(deepest, b); // spikes reach below Depth
+		int h = IslandGeometry.halfBox(p) + 2, n = 2 * h + 1, d = deepest + 4, ny = d + 3; // y from -d-1 .. 1
 		boolean[] solid = new boolean[n * ny * n];
 		for(int x = 0; x < n; x++) for(int z = 0; z < n; z++){ int b = col[x * n + z]; if(b < 0) continue; for(int y = -b; y <= 0; y++) solid[(x * ny + (y + d + 1)) * n + z] = true; }
 		// Multi-source BFS distance from every non-solid cell (6-connected)

@@ -30,6 +30,7 @@ public final class IslandControls {
 	// Grids the randomized values are rounded to, so the fields read clean numbers
 	public static final float unitGrid = 0.05f, rotationGrid = 1.0f, wobbleSizeGrid = 0.5f;
 	public static final int seedBound = 1000000;
+	public static final int percentGrid = 5;
 
 	// Naturalize recipe: centre value and how far a fresh seed moves it either way
 	public static final float naturalCornerRound = 0.75f, naturalCornerRoundSpread = 0.15f;
@@ -67,6 +68,9 @@ public final class IslandControls {
 		public Profile profile;
 		public int widthX, widthZ, sides, depth, seed;
 		public float cornerRound, rotation, wobble, wobbleSize, sharpness, roughness;
+		// Spikes (block B); the mode is only carried, Randomize never changes it
+		public int spikes, spikeLength, spikeBase, lengthVar, spread;
+		public IslandGeometry.SpikeMode spikeMode = IslandGeometry.SpikeMode.RANDOM;
 
 		public Values copy() {
 			Values v = new Values();
@@ -83,6 +87,12 @@ public final class IslandControls {
 			v.wobbleSize = wobbleSize;
 			v.sharpness = sharpness;
 			v.roughness = roughness;
+			v.spikes = spikes;
+			v.spikeLength = spikeLength;
+			v.spikeBase = spikeBase;
+			v.lengthVar = lengthVar;
+			v.spread = spread;
+			v.spikeMode = spikeMode;
 			return v;
 		}
 
@@ -91,7 +101,8 @@ public final class IslandControls {
 			if(!(o instanceof Values)) return false;
 			Values v = (Values) o;
 			return outline == v.outline && profile == v.profile && widthX == v.widthX && widthZ == v.widthZ && sides == v.sides && depth == v.depth && seed == v.seed
-					&& cornerRound == v.cornerRound && rotation == v.rotation && wobble == v.wobble && wobbleSize == v.wobbleSize && sharpness == v.sharpness && roughness == v.roughness;
+					&& cornerRound == v.cornerRound && rotation == v.rotation && wobble == v.wobble && wobbleSize == v.wobbleSize && sharpness == v.sharpness && roughness == v.roughness
+					&& spikes == v.spikes && spikeLength == v.spikeLength && spikeBase == v.spikeBase && lengthVar == v.lengthVar && spread == v.spread && spikeMode == v.spikeMode;
 		}
 
 		@Override
@@ -124,6 +135,15 @@ public final class IslandControls {
 			v.depth = moveInt(v.depth, 0, IslandGeometry.maxDepth, body, random);
 			v.sharpness = move(v.sharpness, 0.0f, 1.0f, unitGrid, body, random);
 			v.roughness = move(v.roughness, 0.0f, 1.0f, unitGrid, body, random);
+			// Spikes belong to Body, but Randomize never turns them on or off: with none, nothing is drawn for
+			// them (so islands without spikes randomize exactly as before); with some, the count stays >= 1
+			if(v.spikes > 0) {
+				v.spikes = moveInt(v.spikes, 1, IslandGeometry.maxSpikes, body, random);
+				v.spikeLength = moveInt(v.spikeLength, IslandGeometry.minSpikeLength, IslandGeometry.maxSpikeLength, body, random);
+				v.spikeBase = moveInt(v.spikeBase, IslandGeometry.minSpikeBase, IslandGeometry.maxSpikeBase, body, random);
+				v.lengthVar = movePercent(v.lengthVar, body, random);
+				v.spread = movePercent(v.spread, body, random);
+			}
 		}
 		return v;
 	}
@@ -131,7 +151,8 @@ public final class IslandControls {
 	/**
 	 * The natural island recipe with a fresh seed: Organic outline, Bowl body, and Corner round,
 	 * Wobble, Wobble size, Sharpness and Roughness at the recipe's centre values moved by up to their
-	 * spread. Widths, Depth, Rotation and Sides are kept (Wall and the origin are not in Values).
+	 * spread. Widths, Depth, Rotation, Sides and every spike control are kept (Wall and the origin are
+	 * not in Values).
 	 */
 	public static Values naturalize(Values current, Random random) {
 		Values v = current.copy();
@@ -153,6 +174,12 @@ public final class IslandControls {
 	private static int moveInt(int value, int min, int max, double fraction, Random random) {
 		long moved = Math.round(value + unit(random) * fraction * (max - min));
 		return (int) Math.max(min, Math.min(max, moved));
+	}
+
+	// A 0..100 percentage on its 5 grid (the fields step by 5)
+	private static int movePercent(int value, double fraction, Random random) {
+		long moved = Math.round((value + unit(random) * fraction * 100) / percentGrid) * percentGrid;
+		return (int) Math.max(0, Math.min(100, moved));
 	}
 
 	private static float move(float value, float min, float max, float grid, double fraction, Random random) {
