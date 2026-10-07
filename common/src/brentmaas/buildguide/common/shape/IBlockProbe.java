@@ -18,6 +18,12 @@ public interface IBlockProbe {
 
 	public int flags(int x, int y, int z);
 
+	// The structure-error sweep only needs FLAG_AIR, FLAG_SOLID and, for solid blocks, FLAG_IGNORED: a loader
+	// may answer it more cheaply (SliceScan reads many cells this way). Default: flags()
+	public default int nearFlags(int x, int y, int z) {
+		return flags(x, y, z);
+	}
+
 	// Display name of the block, only asked for when a status is set to IGNORED
 	public String name(int x, int y, int z);
 }

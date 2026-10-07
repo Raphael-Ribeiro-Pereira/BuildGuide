@@ -82,6 +82,11 @@ public class ValidationState {
 	private long reconcileCorrections = 0;
 	private int reconcileLogged = 0;
 	public static final int maxLoggedCorrections = 200;
+	// Scan in Y layers (SliceScan): bumped by every invalidation and scan request, so a scan in progress knows
+	// its inputs changed and starts over; the scan in progress itself; its progress for the GUI (-1 = none)
+	private long scanEpoch = 0;
+	private SliceScan activeScan = null;
+	private int scanPercent = -1;
 
 	// The shape regenerated: everything known so far is stale
 	public synchronized void invalidate() {
@@ -93,6 +98,7 @@ public class ValidationState {
 		nearBlocks.clear();
 		ok = missing = ignored = 0;
 		validated = false;
+		++scanEpoch;
 		minX = minY = minZ = Integer.MAX_VALUE;
 		maxX = maxY = maxZ = Integer.MIN_VALUE;
 	}
@@ -135,6 +141,28 @@ public class ValidationState {
 	public synchronized void requestScan(long nowMillis) {
 		scanRequested = true;
 		lastScanRequestAt = nowMillis;
+		++scanEpoch;
+	}
+
+	public synchronized long getScanEpoch() {
+		return scanEpoch;
+	}
+
+	public synchronized SliceScan getActiveScan() {
+		return activeScan;
+	}
+
+	public synchronized void setActiveScan(SliceScan scan) {
+		activeScan = scan;
+	}
+
+	// Progress of the scan in progress, 0..100, or -1 when none runs
+	public synchronized int getScanPercent() {
+		return scanPercent;
+	}
+
+	public synchronized void setScanPercent(int percent) {
+		scanPercent = percent;
 	}
 
 	// A request is pending and no new one came in the last idleMillis

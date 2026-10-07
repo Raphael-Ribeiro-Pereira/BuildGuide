@@ -32,6 +32,15 @@ public final class TimingLog {
 		sink.accept(line);
 	}
 
+	// The scan in Y layers (SliceScan): its total time, the frames it was spread over and the longest one
+	public static synchronized void recordScan(long totalMillis, int slices, long maxSliceMillis, int blocks) {
+		if(totalMillis <= thresholdMillis || written >= maxLines) return;
+		++written;
+		String line = "[Build Guide] timing: phase=" + SCAN + " ms=" + totalMillis + " slices=" + slices + " maxslice=" + maxSliceMillis + " blocks=" + blocks;
+		if(written == maxLines) line += " (limit of " + maxLines + " timing lines reached, no more this session)";
+		sink.accept(line);
+	}
+
 	// Offline harness only
 	static synchronized void reset() {
 		written = 0;
