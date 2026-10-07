@@ -140,3 +140,22 @@ commits, so a merge can stop at the last phase that passes):
   scan's cost depends mostly on the error count is weak: the block count (and the structure-error
   sweep around the shape) matters as much.
 - **world-buffer:** 12-15 ms, now above the 8 ms threshold (it never was before).
+
+## Spikes 2: outcome and what stays pending (2026-10-07)
+
+Built on `wip/spikes2` in three phases (`73fcd08` cap 64, Fill, Jitter, edge falloff; `b23952d`
+Taper, Dripstone, Spike shape, Spikes %, Naturalize spikes; `3e63cbd` Segmented), after the
+GOLDEN-SPIKES capture `ceb4479`; installed as `spikes2-wip` for Raphael's test, not merged yet.
+
+- **Spike cap: 64.** Worst case measured (121 x 121, depth 80, Wall 3, 64 spikes 40 long with base
+  8, Taper 0.5, Segmented with 4 pieces and gap 1, Fill): **278 151 blocks, about 178 MB** of vertex
+  buffer, 119 ms of geometry, under the 400k-block / 260 MB limit, so the cap was kept.
+
+**Not done in this cycle, still pending:**
+
+1. **Scan speed: the scan in Y layers.** Spreading the validation scan over layers of Y (so a
+   large shape is scanned in slices instead of in one frame) was not started.
+2. **Preview investigation:** the remaining preview cost (one rebuild per generation plus one for
+   the colours) was not measured further.
+3. **world-buffer investigation:** the 12-15 ms upload seen in the spikes-wip log was not
+   investigated.
