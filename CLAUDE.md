@@ -172,7 +172,8 @@ Only the latest one matters; diff the next change against it.
 | `f7937be` | Island block A — `IslandNoise`, `IslandGeometry` (plan, body, hollow shell), `ShapeIsland` registered last; `PropertyFloat` optional -/+ step (phases `3fe71f7`..`f7937be`) | `ISLANDSTEP` |
 | `cddf0c9` | Island block A2 — controls per Outline, neutral defaults, Random section (Randomize, Naturalize, Undo), `IslandControls`, `PropertyRangeInt` optional step (phases `5a30b97`..`cddf0c9`) | `ISLANDUX` (decompiled at `07d554c`, before the tweaks of `cddf0c9`) |
 | `9269789` | Same code as `cddf0c9` (only docs after it): Island block A2 with the Base % / Body % default 15 and the "Shell (blocks)" label | `ISLANDUX2` (differs from `ISLANDUX` only in `ShapeIsland` and `en_us.json`) |
-| `d1988dc` | Live apply — fields apply by themselves (`FieldDebounce`), world update modes Live / Idle / On close (`WorldUpdateGate`, deferred render path in Fabric), timing log (phases `4b94cf4`..`d1988dc`) | `LIVEAPPLY` (current; built from `d1988dc`, SHA-256 equal to the installed `live-apply-wip` jar) |
+| `d1988dc` | Live apply — fields apply by themselves (`FieldDebounce`), world update modes Live / Idle / On close (`WorldUpdateGate`, deferred render path in Fabric), timing log (phases `4b94cf4`..`d1988dc`) | `LIVEAPPLY` (built from `d1988dc`, SHA-256 equal to the installed `live-apply-wip` jar) |
+| `a6d1c23` | Preview performance (one mesh rebuild per change, `reason=` in the timing line) and Island spikes block B (phases `27ee102`..`a6d1c23`) | `SPIKES` (current; built from `a6d1c23`, SHA-256 equal to the installed `spikes-wip` jar) |
 
 GUI redesign plan and decisions: `docs/GUI_REDESIGN.md` (stages E1–E8). Project status, final
 jars, rules going forward and backlog: `docs/STATUS.md`.

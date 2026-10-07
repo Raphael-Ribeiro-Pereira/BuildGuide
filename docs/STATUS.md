@@ -136,6 +136,25 @@ profile's `logs/latest.log` as `[Build Guide] timing: phase=... ms=... blocks=..
 
 Offline harness after live apply: 658 asserts, 0 failures; Bridge 466 / 159 / 360.
 
+### Preview performance and Island spikes (block B)
+
+Built on `wip/spikes` and fast-forwarded into `feat/cone-expanded` on 2026-10-07 after the
+`spikes-wip` in-game test passed (Raphael's mark: 9); the timing log then showed one preview
+rebuild per change.
+
+| Phase | Commit | What |
+|---|---|---|
+| 1, preview | `27ee102` | the colour refresh waits while the shape regenerates (the generation starts by invalidating the validation state, which recoloured and rebuilt the old model); `PreviewRenderer` rebuilds only when `PreviewModel.meshChange` gives a reason (generation, filter, slice, validation, view); timing line with `reason=`, cap 200 lines |
+| 2, GOLDEN | `b7b372e` | block-set hashes of 15 islands without spikes, from the untouched code |
+| 2, core | `e999988` | spikes: vertical cones, tip down, under the body; Random or Ring roots pulled inside the outline; the union is taken column by column and keeps the body's shell definition; Count 0 = the GOLDEN body |
+| 2, shape | `a6d1c23` | six controls (Spikes, Spike mode, Spike length, Spike base, Length var %, Spread %) after the 19 existing ones, in a Spikes section between Body and Random |
+
+Spikes worst case (121 x 121, depth 80, Wall 3, 12 spikes 40 long with base 8, every Outline,
+mode, Profile and spread): **142 675 blocks**, about **91 MB** of vertex buffer, **41 ms** of
+geometry.
+
+Offline harness after block B: 719 asserts, 0 failures; Bridge 466 / 159 / 360.
+
 Offline harness at the close: 406 asserts, 0 failures; Bridge reference sizes 466 / 159 / 360.
 E6 (after two fixes), E7, P4 and E8 passed their in-game checklists before being committed
 (E7 7 of 7, P4 9 of 9, E8 9 of 9). The ghost fix was committed on Raphael's go-ahead after the
@@ -148,11 +167,11 @@ Build output: `fabric1.21.11/build/libs/BuildGuide-Fabric-0.4.8.jar` (mod versio
 
 | Item | Value |
 |---|---|
-| Active jar in the mods folder | `BuildGuide-Fabric-0.4.8-live-apply-wip.jar` |
-| SHA-256 | `8DB5202C0AFEC1F4645D0E4052852B188BE4CA9CF35C9FC969DF5CC092994198` |
-| Source | commit `416b5e0` (`d1988dc` only changes `CLAUDE.md`): the build output and the mods copy have the same SHA-256, and a rebuild of the merged `d1988dc` gives the same SHA-256 again; `FieldDebounce`, `WorldUpdateGate`, `TimingLog`, `ShapeScreen`, `ScreenWrapper`, `TextFieldImpl` and `RenderHandler` are inside. It contains the two A2 tweaks of `cddf0c9` |
-| Tested | the offline harness (658 asserts); in game 9 of 9 |
-| Previous jars | `BuildGuide-Fabric-0.4.8-island-ux-wip.jar` (SHA-256 `DD5B7BD8ADF1714F0BC152A303B6ED3F2FB2EA5E9C8F79034B52BD27DAE76557`, commit `07d554c`), `BuildGuide-Fabric-0.4.8-island-wip.jar` (SHA-256 `556D80E49975B12802361D5CB8971EE632415A7E841C0EC71D8AF06826C92DE9`, commit `f7937be`), `BuildGuide-Fabric-0.4.8-area3-wip2.jar` (SHA-256 `B5AC963F068EFF59954521F29F24D994BBFE61CF9F55C2C1DE9256E055392A32`, commit `584674b`), `BuildGuide-Fabric-0.4.8-area3-wip.jar` (first Area 3 test) and `BuildGuide-Fabric-0.4.8-ghost-fix-wip.jar` (SHA-256 `1E2F5E96A659D474EF14D9CDDBF5930E6B695DF66F31C782A7C1E5654E55BDB6`, commit `9c3fbde`), kept as `.bak` |
+| Active jar in the mods folder | `BuildGuide-Fabric-0.4.8-spikes-wip.jar` |
+| SHA-256 | `C3564E26FD888E46E106724E051C27C19D74EE962365FD9BB90775E77DE03A6E` |
+| Source | commit `a6d1c23`: the build output and the mods copy have the same SHA-256, and a rebuild of the merged branch gives it again; `IslandGeometry`, `IslandControls`, `ShapeIsland`, `PreviewModel`, `PreviewController`, `TimingLog` and `PreviewRenderer` are inside |
+| Tested | the offline harness (719 asserts); in game, mark 9 |
+| Previous jars | `BuildGuide-Fabric-0.4.8-live-apply-wip.jar` (SHA-256 `8DB5202C0AFEC1F4645D0E4052852B188BE4CA9CF35C9FC969DF5CC092994198`, commit `416b5e0`), `BuildGuide-Fabric-0.4.8-island-ux-wip.jar` (SHA-256 `DD5B7BD8ADF1714F0BC152A303B6ED3F2FB2EA5E9C8F79034B52BD27DAE76557`, commit `07d554c`), `BuildGuide-Fabric-0.4.8-island-wip.jar` (SHA-256 `556D80E49975B12802361D5CB8971EE632415A7E841C0EC71D8AF06826C92DE9`, commit `f7937be`), `BuildGuide-Fabric-0.4.8-area3-wip2.jar` (SHA-256 `B5AC963F068EFF59954521F29F24D994BBFE61CF9F55C2C1DE9256E055392A32`, commit `584674b`), `BuildGuide-Fabric-0.4.8-area3-wip.jar` (first Area 3 test) and `BuildGuide-Fabric-0.4.8-ghost-fix-wip.jar` (SHA-256 `1E2F5E96A659D474EF14D9CDDBF5930E6B695DF66F31C782A7C1E5654E55BDB6`, commit `9c3fbde`), kept as `.bak` |
 
 - The file name still says `wip`: it was never renamed after the test. Renaming is a choice
   for Raphael (nothing depends on the name); a rebuild of `acf4904` gives the same classes.
