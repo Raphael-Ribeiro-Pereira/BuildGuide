@@ -29,7 +29,7 @@ Order is the order of work. Rules that apply to all of it are in `docs/STATUS.md
 
 4. **Palette per layer (its own stage, the riskiest), split in two (2026-10-05).**
    - **4C, visual only:** layers and their colours, in the world and in the preview. No
-     validation change.
+     validation change. **Done** (2026-10-07, `a981c8e`, `c8a8579`; see `docs/STATUS.md`).
    - **4D, validation per block:** each layer's block is typed as an ID in the form
      `minecraft:stone` (no autocomplete); the field turns red if the ID is invalid; the text is
      persisted encoded (it must not break the comma-separated persistence).
@@ -172,3 +172,27 @@ Reported by Raphael after the `scan-slices-wip` test, not investigated yet:
 - **The preview is not the culprit.**
 - **The timing log has shown no world-buffer line since `spikes2-wip`** (the `spikes-wip` log had
   12-15 ms at 22k-51k blocks).
+
+Investigated in the 4C stage (phase 1, `487fbe6`):
+
+- **Where the buffer is built and sent:** the vertices are written on the generation thread into a
+  native `ByteBufferBuilder`; on the render thread `ShapeBuffer.end()` sends them to the GPU (the
+  driver copies them) and, when a larger shape appears, vanilla regrows its shared QUADS index buffer
+  to twice the need, generated on the CPU.
+- **world-buffer did not disappear:** nothing in its timing path changed between `spikes-wip` and
+  `spikes2-wip`; it stayed under 8 ms. The 12-15 ms lines were the first two applies of that session
+  at new peak sizes, which fits the one-time index buffer growth.
+- **What else runs in the frame that closes the menu (On close):** the scan starts in that same
+  frame (its request is already due) and its preparation (world positions, tracked list, `SliceScan`)
+  is not budgeted; the last frame of the scan publishes the result, also unbudgeted. Offline
+  (`tools/harness/WorldCost.java`): preparation 7-9 ms at 35k blocks warm, 15-48 ms at 122k, 24-65 ms
+  at 177k; publish 4-5, 22-39 and 28-45 ms; one copy of the vertices 1.2, 4 and 6 ms.
+- **So the band upload (phase 2) was skipped.** Next candidates, not done: budget the scan's
+  preparation and its publish; the scan preparation is also rebuilt every frame while the chunks
+  under the shape are not loaded.
+- **Native memory leak** found on the way: `ShapeBuffer` never closed its `ByteBufferBuilder`, so
+  every generation (also the discarded ones), preview mesh and overlay left about 384 bytes per block
+  behind. Being fixed on `wip/leakfix`.
+- Vertex size, for the figures in `docs/STATUS.md`: 24 vertices x 16 bytes = 384 bytes per block of
+  vertex buffer; with the shared int index buffer (36 indices, allocated at twice the need) the GPU
+  peak is up to 672 bytes per block, the figure used there.
