@@ -16,15 +16,16 @@ import com.mojang.blaze3d.systems.RenderSystem;
 
 import brentmaas.buildguide.common.AbstractRenderHandler;
 import brentmaas.buildguide.common.BuildGuide;
+import brentmaas.buildguide.common.TimingLog;
 import brentmaas.buildguide.common.shape.GuidelinePicker;
 import brentmaas.buildguide.common.shape.Shape;
 import brentmaas.buildguide.common.shape.LocalPos;
 import brentmaas.buildguide.common.shape.ShapeSet;
+import brentmaas.buildguide.common.shape.SliceScan;
 import brentmaas.buildguide.common.shape.StateReconciler;
 import brentmaas.buildguide.common.shape.TargetOutline;
 import brentmaas.buildguide.common.shape.ValidationOverlay;
 import brentmaas.buildguide.common.shape.ValidationState;
-import brentmaas.buildguide.common.shape.ValidationState.NearBlock;
 import brentmaas.buildguide.fabric.place.PlacementClick;
 import brentmaas.buildguide.fabric.screen.ScreenWrapper;
 import brentmaas.buildguide.fabric.shape.ShapeBuffer;
@@ -162,28 +163,58 @@ public class RenderHandler extends AbstractRenderHandler {
 		if(shifted) RenderSystem.getModelViewStack().popMatrix();
 	}
 	
+	/**
+	 * The validation scan, in Y layers (SliceScan): each frame scans layers until the Scan speed budget is
+	 * spent (Instant: all of them, as before), and the result reaches the state in one go at the end, with
+	 * the previous totals kept meanwhile. A scan whose inputs changed (new generation, invalidation, a new
+	 * request) or that a manual Validate replaces starts over. Blocks changed meanwhile are marked by
+	 * IncrementalValidator and read again before publishing.
+	 */
 	protected void validateShape(ShapeSet shapeSet) {
 		Shape validatable = shapeSet.getShape(); // every Shape is IValidatable
 		ValidationState state = validatable.getValidationState();
-		// Manual (button) scans run now. Automatic ones, requested by the shape after it regenerated,
+		boolean manual = validatable.consumeValidateRequest();
+		SliceScan scan = state.getActiveScan();
+		if(scan != null && (manual || scan.isStale(state, validatable.getGeneration()))) {
+			scan = null;
+			state.setActiveScan(null);
+			state.setScanPercent(-1);
+		}
+		ClientLevel world = Minecraft.getInstance().level;
+		if(world == null) return;
+		if(scan == null) {
+			scan = startScan(shapeSet, validatable, state, manual, world);
+			if(scan == null) return;
+		}
+		WorldProbe probe = new WorldProbe(world);
+		if(!scan.step(probe, BuildGuide.config.scanSpeed.value.budgetMillis * 1000000L, System::nanoTime)) {
+			state.setScanPercent(scan.percent());
+			return;
+		}
+		scan.publish(probe);
+		state.setActiveScan(null);
+		state.setScanPercent(-1);
+		TimingLog.recordScan(scan.getTotalMillis(), scan.getFrames(), scan.getMaxSliceMillis(), scan.getExpectedCount());
+		logValidation(state);
+	}
+
+	// A new scan, when one is due; null when it must wait
+	private SliceScan startScan(ShapeSet shapeSet, Shape validatable, ValidationState state, boolean manual, ClientLevel world) {
+		// Manual (button) scans start now. Automatic ones, requested by the shape after it regenerated,
 		// wait until the shape has been idle for a moment (holding +/- regenerates many times per
 		// second) and until the chunks under the shape are loaded (a scan of unloaded chunks would
 		// read everything as air). Origin changes request a scan too (P4): the same idle wait makes
 		// holding + on the origin give one scan
-		boolean manual = validatable.consumeValidateRequest();
 		if(!manual) {
-			if(!state.isScanDue(System.currentTimeMillis(), autoScanIdleMillis)) return;
-			if(shapeSet.getShape().getHowLongAgoCompletedMillis() < autoScanIdleMillis) return;
+			if(!state.isScanDue(System.currentTimeMillis(), autoScanIdleMillis)) return null;
+			if(validatable.getHowLongAgoCompletedMillis() < autoScanIdleMillis) return null;
 		}
-
-		ClientLevel world = Minecraft.getInstance().level;
-		if(world == null) return;
 
 		int ox = shapeSet.getOriginX();
 		int oy = shapeSet.getOriginY();
 		int oz = shapeSet.getOriginZ();
 
-		// Expected blocks in world coordinates (mapped back to local for the state), plus their bounding box
+		// Expected blocks in world coordinates, plus their bounding box
 		Set<Long> expectedWorld = new HashSet<Long>();
 		int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
 		int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE;
@@ -205,58 +236,22 @@ public class RenderHandler extends AbstractRenderHandler {
 		}
 		if(expectedWorld.isEmpty()) {
 			state.consumeScanRequest();
-			return;
+			return null;
 		}
-		if(!manual && !world.hasChunksAt(new BlockPos(minX, minY, minZ), new BlockPos(maxX, maxY, maxZ))) return; // stays pending
+		if(!manual && !world.hasChunksAt(new BlockPos(minX, minY, minZ), new BlockPos(maxX, maxY, maxZ))) return null; // stays pending
 		state.consumeScanRequest();
-		state.beginScan(validatable.getExpectedBlocks(), ox, oy, oz);
 
-		// Classify expected positions into the state: ignored type -> ignored (counts as missing), solid ->
-		// ok, anything else (air, torch, flower, water) -> missing
+		// The tracked positions in the order the scan has always visited them (the set of world positions):
+		// the state's lists keep their order
+		List<Long> tracked = new ArrayList<Long>(expectedWorld.size());
 		for(long wl: expectedWorld) {
 			BlockPos wp = BlockPos.of(wl);
-			long local = LocalPos.pack(wp.getX() - ox, wp.getY() - oy, wp.getZ() - oz);
-			BlockState st = world.getBlockState(wp);
-			if(!st.isAir() && isIgnored(st)) state.setStatus(local, ValidationState.IGNORED, st.getBlock().getName().getString());
-			else if(!st.isAir() && st.blocksMotion()) state.setStatus(local, ValidationState.OK, null);
-			else state.setStatus(local, ValidationState.MISSING, null);
+			tracked.add(LocalPos.pack(wp.getX() - ox, wp.getY() - oy, wp.getZ() - oz));
 		}
-
-		// Structure errors: solid blocks within 2 of the shape but not part of it, outside it or inside a
-		// hollow one; they deform the geometric form
-		List<NearBlock> near = new ArrayList<NearBlock>();
-		BlockPos.MutableBlockPos mpos = new BlockPos.MutableBlockPos();
-		for(int x = minX - 2;x <= maxX + 2;++x) {
-			for(int y = minY - 2;y <= maxY + 2;++y) {
-				for(int z = minZ - 2;z <= maxZ + 2;++z) {
-					if(expectedWorld.contains(BlockPos.asLong(x, y, z))) continue;
-					if(state.isExcluded(x - ox, y - oy, z - oz)) continue; // excluded cells are not even read: this is where the ground under a bridge stops costing
-					BlockState st = world.getBlockState(mpos.set(x, y, z));
-					if(st.isAir() || !st.blocksMotion() || isIgnored(st)) continue;
-
-					double best = Double.MAX_VALUE;
-					for(int dx = -2;dx <= 2;++dx) {
-						for(int dy = -2;dy <= 2;++dy) {
-							for(int dz = -2;dz <= 2;++dz) {
-								int d2 = dx * dx + dy * dy + dz * dz;
-								if(d2 == 0 || d2 > 4) continue;
-								if(expectedWorld.contains(BlockPos.asLong(x + dx, y + dy, z + dz))) {
-									double d = Math.sqrt(d2);
-									if(d < best) best = d;
-								}
-							}
-						}
-					}
-					if(best <= 2.0) near.add(new NearBlock(LocalPos.pack(x - ox, y - oy, z - oz), st.getBlock().getName().getString(), (float) best));
-				}
-			}
-		}
-
-		state.setNearBlocks(near);
-		state.endScan();
-		logValidation(state);
+		SliceScan scan = new SliceScan(state, validatable.getExpectedBlocks(), tracked, ox, oy, oz, validatable.getGeneration());
+		state.setActiveScan(scan);
+		return scan;
 	}
-
 	// Safety net (StateReconciler): block events miss some server-side changes, so a few tracked
 	// positions are re-read from the world every 250 ms. Runs under the shape's lock, right after validateShape
 	@Override

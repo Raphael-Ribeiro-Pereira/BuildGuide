@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
+import brentmaas.buildguide.common.shape.SliceScan;
 
 public class Config {
 	private File configFile;
@@ -22,6 +23,8 @@ public class Config {
 	public StringConfigElement ignoredBlocks = new StringConfigElement("ignoredBlocks", "config.buildguide.ignoredBlocks", "minecraft:scaffolding", "config.buildguide.ignoredBlocksComment");
 	// Live apply: when a shape change reaches the world (Live, Idle, On close; see WorldUpdateGate)
 	public ModeConfigElement worldUpdateMode = new ModeConfigElement("worldUpdateMode", "config.buildguide.worldUpdateMode", WorldUpdateGate.Mode.IDLE, "config.buildguide.worldUpdateModeComment");
+	// Scan in Y layers: the time budget per frame (Instant, Fast, Normal, Slow; see SliceScan.Speed)
+	public ScanSpeedConfigElement scanSpeed = new ScanSpeedConfigElement("scanSpeed", "config.buildguide.scanSpeed", SliceScan.Speed.NORMAL, "config.buildguide.scanSpeedComment");
 	
 	public Config(File configFolder) {
 		configFile = new File(configFolder, "buildguide.cfg");
@@ -31,6 +34,7 @@ public class Config {
 		configElements.add(persistenceEnabled);
 		configElements.add(ignoredBlocks);
 		configElements.add(worldUpdateMode);
+		configElements.add(scanSpeed);
 		
 		if(!configFile.exists()) {
 			write();
@@ -149,6 +153,17 @@ public class Config {
 		
 		public void setValue(String value) {
 			this.value = WorldUpdateGate.Mode.valueOf(value.trim());
+		}
+	}
+	
+	// One of SliceScan.Speed, stored by name; an unknown name throws and load() keeps the current value
+	public class ScanSpeedConfigElement extends ConfigElement<SliceScan.Speed> {
+		public ScanSpeedConfigElement(String key, String translationKey, SliceScan.Speed defaultValue, String commentTranslationKey) {
+			super(key, translationKey, defaultValue, commentTranslationKey);
+		}
+		
+		public void setValue(String value) {
+			this.value = SliceScan.Speed.valueOf(value.trim());
 		}
 	}
 	

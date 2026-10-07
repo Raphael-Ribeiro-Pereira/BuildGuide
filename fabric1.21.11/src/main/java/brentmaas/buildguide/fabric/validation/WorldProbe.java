@@ -6,7 +6,7 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
 
-/** IBlockProbe over the client world, for StateReconciler (render thread only: one reused mutable position). */
+/** IBlockProbe over the client world, for StateReconciler and SliceScan (render thread only: one reused mutable position). */
 public class WorldProbe implements IBlockProbe {
 	private final ClientLevel world;
 	private final BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
@@ -30,6 +30,16 @@ public class WorldProbe implements IBlockProbe {
 		if(RenderHandler.isIgnored(state)) flags |= FLAG_IGNORED;
 		if(state.canBeReplaced()) flags |= FLAG_REPLACEABLE; // water, tall grass: a placed block takes their place (area 3)
 		return flags;
+	}
+	
+	// The structure-error sweep (SliceScan): air, solid, and the ignored test only for solid blocks, as the
+	// scan always short-circuited it (the registry lookup is the expensive part)
+	@Override
+	public int nearFlags(int x, int y, int z) {
+		BlockState state = world.getBlockState(pos.set(x, y, z));
+		if(state.isAir()) return FLAG_AIR;
+		if(!state.blocksMotion()) return 0;
+		return RenderHandler.isIgnored(state) ? FLAG_SOLID | FLAG_IGNORED : FLAG_SOLID;
 	}
 	
 	@Override

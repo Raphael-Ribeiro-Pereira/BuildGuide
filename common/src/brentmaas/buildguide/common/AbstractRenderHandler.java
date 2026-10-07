@@ -119,9 +119,7 @@ public abstract class AbstractRenderHandler {
 				endRenderingShapeSet();
 			}
 			if(applied && shapeSet.isVisible()) {
-				long started = System.currentTimeMillis();
-				validateShape(shapeSet);
-				TimingLog.record(TimingLog.SCAN, System.currentTimeMillis() - started, shape.getExpectedBlocks().size());
+				validateShape(shapeSet); // a scan in layers records its own timing when it ends (TimingLog.recordScan)
 				reconcileShape(shapeSet);
 				pickPlacementTarget(shapeSet);
 			}
