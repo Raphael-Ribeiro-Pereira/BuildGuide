@@ -7,6 +7,7 @@ import brentmaas.buildguide.common.TimingLog;
 import brentmaas.buildguide.common.shape.PreviewCamera;
 import brentmaas.buildguide.common.shape.PreviewFilter;
 import brentmaas.buildguide.common.shape.PreviewModel;
+import brentmaas.buildguide.common.shape.PreviewModel.ColourMode;
 import brentmaas.buildguide.common.shape.Shape;
 import brentmaas.buildguide.common.shape.ValidationState;
 
@@ -41,6 +42,8 @@ public class PreviewController {
 	// same instance until the base model or the view changes (the renderer rebuilds on a new instance)
 	private PreviewFilter filter = PreviewFilter.ALL;
 	private int sliceAxis = PreviewModel.SLICE_OFF, sliceValue = 0;
+	// Colour: Status | Layer (4C), for models with layers; a model without them is always coloured by status
+	private ColourMode colourMode = ColourMode.STATUS;
 	private PreviewModel viewed = null;
 
 	public PreviewController() {
@@ -91,9 +94,11 @@ public class PreviewController {
 	}
 
 	private PreviewModel view(PreviewModel base) {
-		if(base == null || (filter == PreviewFilter.ALL && sliceAxis == PreviewModel.SLICE_OFF)) return base;
-		if(viewed == null || viewed.positions != base.positions || viewed.stateVersion != base.stateVersion || viewed.generation != base.generation || viewed.filter != filter || viewed.sliceAxis != sliceAxis || viewed.sliceValue != sliceValue) {
-			viewed = base.withView(filter, sliceAxis, sliceValue);
+		if(base == null) return null;
+		ColourMode mode = base.layers == null ? ColourMode.STATUS : colourMode;
+		if(filter == PreviewFilter.ALL && sliceAxis == PreviewModel.SLICE_OFF && mode == ColourMode.STATUS) return base;
+		if(viewed == null || viewed.positions != base.positions || viewed.stateVersion != base.stateVersion || viewed.generation != base.generation || viewed.filter != filter || viewed.sliceAxis != sliceAxis || viewed.sliceValue != sliceValue || viewed.colourMode != mode || viewed.layers != base.layers) {
+			viewed = base.withView(filter, sliceAxis, sliceValue, mode);
 		}
 		return viewed;
 	}
@@ -109,6 +114,14 @@ public class PreviewController {
 
 	public void setFilter(PreviewFilter filter) {
 		this.filter = filter;
+	}
+
+	public ColourMode getColourMode() {
+		return colourMode;
+	}
+
+	public void setColourMode(ColourMode colourMode) {
+		this.colourMode = colourMode;
 	}
 
 	public int getSliceAxis() {

@@ -11,7 +11,9 @@ import brentmaas.buildguide.common.screen.widget.ITextField;
 import brentmaas.buildguide.common.screen.widget.IWidget;
 import brentmaas.buildguide.common.shape.PreviewColours;
 import brentmaas.buildguide.common.shape.PreviewModel;
+import brentmaas.buildguide.common.shape.PreviewModel.ColourMode;
 import brentmaas.buildguide.common.shape.Shape;
+import brentmaas.buildguide.common.shape.ShapeLayers;
 import brentmaas.buildguide.common.shape.ValidationState;
 import brentmaas.buildguide.common.shape.ShapeRegistry;
 
@@ -68,8 +70,14 @@ public class ShapeScreen extends BaseScreen{
 	// Preview controls (top row): filter (cycles on click), slice axis (Off, X, Y, Z) and, when an axis
 	// is set, a slider over the model's bounds on it. Changing filter or axis rebuilds the screen so the
 	// button texts and the slider range follow (ISlider has no callback and a fixed range)
-	private static final int controlsHeight = 16, filterWidth = 86, sliceWidth = 50;
+	private static final int controlsHeight = 16, filterWidth = 86, sliceWidth = 50, colourWidth = 80;
 	private IButton buttonFilter, buttonSliceAxis;
+	// Layers (4C): "Colour: Status | Layer" right of the filter, only while the shape's Layers is on (the slice
+	// controls move right to make room). Whether it was laid out; a change rebuilds the screen (onMouseReleased)
+	private IButton buttonColour = null;
+	private boolean layerControls = false;
+	// The model drawn this frame, for the legend (by status, or by layer with the depth ranges)
+	private PreviewModel shownModel = null;
 	private ISlider sliderSlice = null;
 	private static final String[] axisNames = {"X", "Y", "Z"};
 	// Under the preview: a 2-px validation progress line, three tabs and the error list of the selected
@@ -197,6 +205,7 @@ public class ShapeScreen extends BaseScreen{
 		if(!BuildGuide.stateManager.getState().isShapeAvailable()) return;
 		updateSlice();
 		PreviewModel model = preview.update(BuildGuide.stateManager.getState().getCurrentShape());
+		shownModel = model;
 		int midY = (y1 + y2) / 2 - 4;
 		if(model == null) drawShadowCentred(textGenerating.toString(), (x1 + x2) / 2, midY, 0xAAAAAA);
 		else if(model.isEmpty()) drawShadowCentred(textEmpty.toString(), (x1 + x2) / 2, midY, 0xAAAAAA);
@@ -220,14 +229,26 @@ public class ShapeScreen extends BaseScreen{
 			preview.setFilter(preview.getFilter().next());
 			BuildGuide.screenHandler.showScreen(this);
 		});
+		Shape shape = currentShapeOrNull();
+		layerControls = shape != null && shape.hasLayers();
+		buttonColour = null;
+		int colourSpace = 0;
+		if(layerControls) {
+			buttonColour = BuildGuide.widgetHandler.createButton(x + filterWidth + 2, y, colourWidth, controlsHeight, new Translatable(preview.getColourMode() == ColourMode.LAYER ? "screen.buildguide.colour.layer" : "screen.buildguide.colour.status"), () -> {
+				preview.setColourMode(preview.getColourMode() == ColourMode.LAYER ? ColourMode.STATUS : ColourMode.LAYER);
+				BuildGuide.screenHandler.showScreen(this);
+			});
+			colourSpace = colourWidth + 2;
+		}
 		String axisName = axis == PreviewModel.SLICE_OFF ? new Translatable("screen.buildguide.slice.off").toString() : axisNames[axis];
-		buttonSliceAxis = BuildGuide.widgetHandler.createButton(x + filterWidth + 2, y, sliceWidth, controlsHeight, new Translatable("screen.buildguide.slice", axisName), () -> cycleSliceAxis());
+		buttonSliceAxis = BuildGuide.widgetHandler.createButton(x + filterWidth + 2 + colourSpace, y, sliceWidth, controlsHeight, new Translatable("screen.buildguide.slice", axisName), () -> cycleSliceAxis());
 		addWidget(buttonFilter);
+		if(buttonColour != null) addWidget(buttonColour);
 		addWidget(buttonSliceAxis);
 		sliderSlice = null;
 		PreviewModel model = preview.getModel();
 		if(axis != PreviewModel.SLICE_OFF && model != null && !model.isEmpty()) {
-			int sliderX = x + filterWidth + sliceWidth + 4;
+			int sliderX = x + filterWidth + sliceWidth + 4 + colourSpace;
 			// A one-block-thick shape on this axis still gets a working range (the value is clamped)
 			sliderSlice = BuildGuide.widgetHandler.createSlider(sliderX, y, wrapper.getWidth() - expandSize - 4 - sliderX, controlsHeight, new Translatable(axisNames[axis]), model.min(axis), Math.max(model.max(axis), model.min(axis) + 1), preview.getSliceValue());
 			addWidget(sliderSlice);
@@ -286,17 +307,26 @@ public class ShapeScreen extends BaseScreen{
 		errorList.update(shape);
 	}
 	
-	// Colour legend of the preview (E6), right of the bottom row: four 72-px entries, a swatch and a label
+	// Colour legend of the preview (E6), right of the bottom row: four 72-px entries, a swatch and a label.
+	// Coloured by layer (4C): the four layer colours, each with the depths below the top it covers
 	private static final String[] legendKeys = {"screen.buildguide.legend.built", "screen.buildguide.legend.errors", "screen.buildguide.legend.ignored", "screen.buildguide.legend.missing"};
 	private static final int[] legendColours = {PreviewColours.OK, PreviewColours.ERROR, PreviewColours.IGNORED, PreviewColours.MISSING};
 	
 	private void renderLegend() {
+		boolean byLayer = shownModel != null && shownModel.colourMode == ColourMode.LAYER;
 		int step = (wrapper.getWidth() - rightX) / legendKeys.length;
 		for(int i = 0;i < legendKeys.length;++i) {
 			int x = rightX + i * step;
-			fillRect(x + 4, bands.legendY, x + 12, bands.legendY + 8, 0xFF000000 | legendColours[i]);
-			drawShadowLeft(new Translatable(legendKeys[i]).toString(), x + 16, bands.legendY, 0xAAAAAA);
+			fillRect(x + 4, bands.legendY, x + 12, bands.legendY + 8, 0xFF000000 | (byLayer ? ShapeLayers.colour(i + 1) : legendColours[i]));
+			drawShadowLeft(byLayer ? depthLabel(shownModel.layers.depthRange(i + 1)) : new Translatable(legendKeys[i]).toString(), x + 16, bands.legendY, 0xAAAAAA);
 		}
+	}
+	
+	// "0-5", "6" (one depth), "18+" (and everything below), "-" (no block depth falls in that layer)
+	public static String depthLabel(int[] range) {
+		if(range == null) return "-";
+		if(range[1] == -1) return range[0] + "+";
+		return range[0] == range[1] ? "" + range[0] : range[0] + "-" + range[1];
 	}
 	
 	private int tabX(int i) {
@@ -329,9 +359,13 @@ public class ShapeScreen extends BaseScreen{
 		return preview.mouseDragged(dx, dy);
 	}
 	
+	// Also where the Colour button follows the Layers box: a click on it (or Reset, or another shape) ends with
+	// this release, so the controls row is laid out again when the shape's Layers no longer matches it
 	@Override
 	public void onMouseReleased() {
 		preview.mouseReleased();
+		Shape shape = currentShapeOrNull();
+		if((shape != null && shape.hasLayers()) != layerControls) BuildGuide.screenHandler.showScreen(this);
 	}
 	
 	@Override

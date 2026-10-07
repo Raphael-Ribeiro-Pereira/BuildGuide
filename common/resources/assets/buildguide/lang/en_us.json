@@ -138,6 +138,8 @@
 	"screen.buildguide.exclusionbox": "Box %s",
 	"screen.buildguide.exclusions": "Exclusions",
 	"screen.buildguide.exclusionshint": "Enabled boxes are not validated. Coordinates are relative to the origin.",
+	"screen.buildguide.colour.layer": "Colour: Layer",
+	"screen.buildguide.colour.status": "Colour: Status",
 	"screen.buildguide.filter.all": "All",
 	"screen.buildguide.filter.built": "Built only",
 	"screen.buildguide.filter.errors": "Errors only",

@@ -34,8 +34,16 @@ public final class PreviewModel {
 	// Slice: only blocks whose local coordinate on sliceAxis (0 x, 1 y, 2 z) equals sliceValue; SLICE_OFF = all
 	public static final int SLICE_OFF = -1;
 	public final int sliceAxis, sliceValue;
+	// Layers by depth (4C): the shape's layers at the copied generation (Shape.getLayers), null without, and
+	// what the cubes are coloured by. LAYER only ever comes with layers: the controller asks for it then only
+	public enum ColourMode{
+		STATUS,
+		LAYER
+	}
+	public final ShapeLayers layers;
+	public final ColourMode colourMode;
 
-	private PreviewModel(long[] positions, int[] bounds, byte[] status, long[] errors, long stateVersion, long generation, PreviewFilter filter, int sliceAxis, int sliceValue) {
+	private PreviewModel(long[] positions, int[] bounds, byte[] status, long[] errors, long stateVersion, long generation, PreviewFilter filter, int sliceAxis, int sliceValue, ShapeLayers layers, ColourMode colourMode) {
 		this.positions = positions;
 		minX = bounds[0];
 		minY = bounds[1];
@@ -50,6 +58,8 @@ public final class PreviewModel {
 		this.filter = filter;
 		this.sliceAxis = sliceAxis;
 		this.sliceValue = sliceValue;
+		this.layers = layers;
+		this.colourMode = layers == null ? ColourMode.STATUS : colourMode;
 	}
 
 	public static PreviewModel of(Collection<Long> positions) {
@@ -57,10 +67,14 @@ public final class PreviewModel {
 	}
 
 	public static PreviewModel of(Collection<Long> positions, long generation) {
+		return of(positions, generation, null);
+	}
+
+	public static PreviewModel of(Collection<Long> positions, long generation, ShapeLayers layers) {
 		long[] copy = new long[positions.size()];
 		int i = 0;
 		for(long pos: positions) copy[i++] = pos;
-		return new PreviewModel(copy, bounds(copy), null, new long[0], -1, generation, PreviewFilter.ALL, SLICE_OFF, 0);
+		return new PreviewModel(copy, bounds(copy), null, new long[0], -1, generation, PreviewFilter.ALL, SLICE_OFF, 0, layers, ColourMode.STATUS);
 	}
 
 	/**
@@ -73,7 +87,7 @@ public final class PreviewModel {
 		if(!shape.lock.tryLock()) return null;
 		try {
 			if(!shape.ready || shape.error) return null;
-			return of(shape.getExpectedBlocks(), shape.getGeneration());
+			return of(shape.getExpectedBlocks(), shape.getGeneration(), shape.getLayers());
 		}finally {
 			shape.lock.unlock();
 		}
@@ -87,30 +101,38 @@ public final class PreviewModel {
 	 */
 	public PreviewModel withValidation(ValidationState state) {
 		long version = state.getVersion();
-		if(!state.isValidated()) return new PreviewModel(positions, boundsArray(), null, new long[0], version, generation, filter, sliceAxis, sliceValue);
+		if(!state.isValidated()) return new PreviewModel(positions, boundsArray(), null, new long[0], version, generation, filter, sliceAxis, sliceValue, layers, colourMode);
 		byte[] s = new byte[positions.length];
 		for(int i = 0;i < positions.length;++i) s[i] = state.getStatus(positions[i]);
 		List<NearBlock> near = state.getNearBlocks();
 		long[] e = new long[near.size()];
 		for(int i = 0;i < e.length;++i) e[i] = near.get(i).localPos;
-		return new PreviewModel(positions, boundsArray(), s, e, version, generation, filter, sliceAxis, sliceValue);
+		return new PreviewModel(positions, boundsArray(), s, e, version, generation, filter, sliceAxis, sliceValue, layers, colourMode);
 	}
 
 	// Same geometry and colours, another view: a new instance, so the renderer rebuilds its mesh
 	public PreviewModel withView(PreviewFilter filter, int sliceAxis, int sliceValue) {
-		return new PreviewModel(positions, boundsArray(), status, errors, stateVersion, generation, filter, sliceAxis, sliceValue);
+		return withView(filter, sliceAxis, sliceValue, colourMode);
+	}
+
+	// The same with the colour mode (4C); LAYER without layers stays STATUS
+	public PreviewModel withView(PreviewFilter filter, int sliceAxis, int sliceValue, ColourMode colourMode) {
+		return new PreviewModel(positions, boundsArray(), status, errors, stateVersion, generation, filter, sliceAxis, sliceValue, layers, colourMode);
 	}
 
 	/**
 	 * Why a mesh built for `built` must be rebuilt to show `next`, or null when it shows the same thing:
-	 * same positions (same generation), same validation version, same filter and slice. A new instance with
-	 * that same key does not rebuild. Reasons: view (no mesh yet), generation, filter, slice, validation.
+	 * same positions (same generation), same validation version, same filter and slice, same colour mode
+	 * and, coloured by layer, the same cuts. A new instance with that same key does not rebuild. Reasons:
+	 * view (no mesh yet), generation, filter, slice, colour, layers, validation.
 	 */
 	public static String meshChange(PreviewModel built, PreviewModel next) {
 		if(built == null) return "view";
 		if(built.positions != next.positions || built.generation != next.generation) return "generation";
 		if(built.filter != next.filter) return "filter";
 		if(built.sliceAxis != next.sliceAxis || built.sliceValue != next.sliceValue) return "slice";
+		if(built.colourMode != next.colourMode) return "colour";
+		if(next.colourMode == ColourMode.LAYER && !next.layers.equals(built.layers)) return "layers";
 		if(built.stateVersion != next.stateVersion) return "validation";
 		return null;
 	}
@@ -180,8 +202,9 @@ public final class PreviewModel {
 		return true;
 	}
 
-	// Colour of position i: its status when validated, white otherwise
+	// Colour of position i: its layer's colour when coloured by layer; else its status when validated, white otherwise
 	public int colourAt(int i) {
+		if(colourMode == ColourMode.LAYER) return ShapeLayers.colour(layers.layerOf(LocalPos.unpackY(positions[i])));
 		return PreviewColours.forStatus(status == null ? ValidationState.UNKNOWN : status[i]);
 	}
 
