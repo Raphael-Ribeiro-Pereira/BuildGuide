@@ -1,6 +1,7 @@
 package brentmaas.buildguide.common.screen;
 
 import brentmaas.buildguide.common.BuildGuide;
+import brentmaas.buildguide.common.WorldUpdateGate;
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
 import brentmaas.buildguide.common.screen.widget.AbstractWidgetHandler;
 import brentmaas.buildguide.common.screen.widget.IButton;
@@ -12,6 +13,8 @@ public class ConfigurationScreen extends BaseScreen {
 	private IButton buttonAsyncEnabledDefault, buttonAdvancedRandomColorsDefaultEnabledDefault, buttonPersistenceEnabledDefault, buttonDebugGenerationTimingsEnabledDefault;
 	private ITextField textFieldIgnoredBlocks;
 	private IButton buttonIgnoredBlocksSet, buttonIgnoredBlocksDefault;
+	// Live apply: cycles Live, Idle, On close (WorldUpdateGate.Mode)
+	private IButton buttonWorldUpdate;
 	
 	public void init() {
 		super.init();
@@ -65,7 +68,15 @@ public class ConfigurationScreen extends BaseScreen {
 		addWidget(buttonAdvancedRandomColorsDefaultEnabledDefault);
 		addWidget(buttonPersistenceEnabled);
 		addWidget(buttonPersistenceEnabledDefault);
+		buttonWorldUpdate = BuildGuide.widgetHandler.createButton(370, 210, 105, AbstractWidgetHandler.defaultSize, modeTitle(), () -> {
+			WorldUpdateGate.Mode[] modes = WorldUpdateGate.Mode.values();
+			BuildGuide.config.worldUpdateMode.setValue(modes[(BuildGuide.config.worldUpdateMode.value.ordinal() + 1) % modes.length]);
+			BuildGuide.config.write();
+			buttonWorldUpdate.setTitle(modeTitle());
+		});
+		
 		addWidget(textFieldIgnoredBlocks);
+		addWidget(buttonWorldUpdate);
 		addWidget(buttonIgnoredBlocksSet);
 		addWidget(buttonIgnoredBlocksDefault);
 		addWidget(buttonDebugGenerationTiminigsEnabled);
@@ -86,5 +97,11 @@ public class ConfigurationScreen extends BaseScreen {
 		
 		drawShadowLeft(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + new Translatable(BuildGuide.config.ignoredBlocks.translationKey), 10, 190, 0xFFFFFF);
 		drawShadowLeft(new Translatable(BuildGuide.config.ignoredBlocks.commentTranslationKey).toString(), 10, 234, 0xFFFFFF);
+		
+		drawShadowLeft(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + new Translatable(BuildGuide.config.worldUpdateMode.translationKey), 370, 195, 0xFFFFFF);
+	}
+	
+	private static Translatable modeTitle() {
+		return new Translatable("screen.buildguide.worldupdate." + BuildGuide.config.worldUpdateMode.value.name().toLowerCase(java.util.Locale.ROOT));
 	}
 }
