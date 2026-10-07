@@ -5,6 +5,7 @@ import org.joml.Quaternionf;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 
+import brentmaas.buildguide.common.TimingLog;
 import brentmaas.buildguide.common.shape.PreviewCamera;
 import brentmaas.buildguide.common.shape.PreviewMesh;
 import brentmaas.buildguide.common.shape.PreviewModel;
@@ -90,12 +91,14 @@ public class PreviewRenderer extends PictureInPictureRenderer<PreviewRenderState
 
 	// Geometry and colours come from common (PreviewMesh); this only uploads them
 	private void buildMesh(PreviewModel model) {
+		long started = System.currentTimeMillis();
 		if(mesh != null) mesh.close();
 		ShapeBuffer buffer = new ShapeBuffer();
 		PreviewMesh.fill(buffer, model);
 		buffer.end();
 		mesh = buffer;
 		meshModel = model;
+		TimingLog.record(TimingLog.PREVIEW_REBUILD, System.currentTimeMillis() - started, model.positions.length);
 	}
 
 	@Override

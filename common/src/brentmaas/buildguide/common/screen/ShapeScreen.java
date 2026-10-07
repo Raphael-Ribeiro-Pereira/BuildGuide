@@ -79,6 +79,7 @@ public class ShapeScreen extends BaseScreen{
 	private Translatable textGenerating = new Translatable("screen.buildguide.previewgenerating");
 	private Translatable textEmpty = new Translatable("screen.buildguide.previewempty");
 	private Translatable textNoMatch = new Translatable("screen.buildguide.previewnomatch");
+	private Translatable textWorldPending = new Translatable("screen.buildguide.worldupdatepending");
 
 	public void init() {
 		super.init();
@@ -197,6 +198,8 @@ public class ShapeScreen extends BaseScreen{
 		else if(model.isEmpty()) drawShadowCentred(textEmpty.toString(), (x1 + x2) / 2, midY, 0xAAAAAA);
 		else if(model.isViewEmpty()) drawShadowCentred(textNoMatch.toString(), (x1 + x2) / 2, midY, 0xAAAAAA);
 		else wrapper.drawShapePreview(x1 + 1, y1, x2 - 1, y2, model, preview.camera);
+		// Live apply: the world still shows an older generation (Idle or On close mode)
+		if(BuildGuide.stateManager.getState().getCurrentShape().worldGate.isPending()) drawShadowLeft(textWorldPending.toString(), x1 + 3, y2 - 10, 0xFFCC66);
 	}
 	
 	private void initPreviewControls() {

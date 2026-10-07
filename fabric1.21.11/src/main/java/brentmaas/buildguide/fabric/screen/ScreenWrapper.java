@@ -47,6 +47,16 @@ public class ScreenWrapper extends Screen implements IScreenWrapper {
 		attachedScreen.renderChecked();
 	}
 	
+	// Live apply: text fields apply after a pause in typing; checked once per client tick, outside rendering,
+	// on a copy (an applied value may rebuild the widgets)
+	@Override
+	public void tick() {
+		super.tick();
+		for(Object child: new java.util.ArrayList<Object>(children())) {
+			if(child instanceof TextFieldImpl) ((TextFieldImpl) child).pollLiveApply();
+		}
+	}
+	
 	@Override
 	public void renderTransparentBackground(GuiGraphics guiGraphics) {
 		// Disable dark background

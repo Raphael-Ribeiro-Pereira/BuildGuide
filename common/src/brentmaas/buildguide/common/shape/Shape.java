@@ -13,6 +13,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.locks.ReentrantLock;
 
 import brentmaas.buildguide.common.BuildGuide;
+import brentmaas.buildguide.common.TimingLog;
+import brentmaas.buildguide.common.WorldUpdateGate;
 import brentmaas.buildguide.common.property.Property;
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
 import brentmaas.buildguide.common.screen.BaseScreen;
@@ -42,6 +44,11 @@ public abstract class Shape implements IValidatable {
 	private Map<Property<?>, Object> defaults = new IdentityHashMap<Property<?>, Object>();
 	private Set<Property<?>> resetProtected = Collections.newSetFromMap(new IdentityHashMap<Property<?>, Boolean>());
 	public IShapeBuffer buffer;
+	// Live apply: the buffer drawn in the world, when the render handler defers world updates
+	// (AbstractRenderHandler.deferredWorldUpdates): the last generated buffer it uploaded, kept on screen while
+	// newer generations wait for the WorldUpdateGate. Render thread only; stays null for handlers that do not defer
+	public transient IShapeBuffer shownBuffer = null;
+	public final transient WorldUpdateGate worldGate = new WorldUpdateGate(System::currentTimeMillis);
 	private int nBlocks = 0;
 	public boolean ready = false;
 	public boolean vertexBufferUnpacked = false;
@@ -80,16 +87,19 @@ public abstract class Shape implements IValidatable {
 		if(BuildGuide.config.asyncEnabled.value) {
 			cancelFuture();
 		}
-		if(buffer != null) {
-			buffer.close(); // Can only be done in render thread
+		if(buffer != null && buffer != shownBuffer) {
+			buffer.close(); // Can only be done in render thread; the buffer still drawn in the world is closed when it is replaced
 		}
+		worldGate.request();
 		future = executor.submit(() -> {
 			try {
 				lock.lock();
 				ready = false; // Again in case of a second thread started before a first thread ended
 				vertexBufferUnpacked = false;
 				error = false;
+				long started = System.currentTimeMillis();
 				doUpdate();
+				TimingLog.record(TimingLog.GENERATION, System.currentTimeMillis() - started, nBlocks);
 			}catch(InterruptedException e) {
 				error = true;
 			}catch(Exception e) {

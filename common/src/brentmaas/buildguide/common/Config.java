@@ -20,6 +20,8 @@ public class Config {
 	public ConfigElement<Boolean> persistenceEnabled = new BooleanConfigElement("persistenceEnabled", "config.buildguide.persistenceEnabled", false, "config.buildguide.persistenceEnabledComment");
 	// Block ids that validation ignores (never wrong, never near; on an expected position they count as missing with an IGNORED tag)
 	public StringConfigElement ignoredBlocks = new StringConfigElement("ignoredBlocks", "config.buildguide.ignoredBlocks", "minecraft:scaffolding", "config.buildguide.ignoredBlocksComment");
+	// Live apply: when a shape change reaches the world (Live, Idle, On close; see WorldUpdateGate)
+	public ModeConfigElement worldUpdateMode = new ModeConfigElement("worldUpdateMode", "config.buildguide.worldUpdateMode", WorldUpdateGate.Mode.IDLE, "config.buildguide.worldUpdateModeComment");
 	
 	public Config(File configFolder) {
 		configFile = new File(configFolder, "buildguide.cfg");
@@ -28,6 +30,7 @@ public class Config {
 		configElements.add(shapeListRandomColorsDefaultEnabled);
 		configElements.add(persistenceEnabled);
 		configElements.add(ignoredBlocks);
+		configElements.add(worldUpdateMode);
 		
 		if(!configFile.exists()) {
 			write();
@@ -138,6 +141,17 @@ public class Config {
 			this.value = Boolean.parseBoolean(value);
 		}
 	}	
+	// One of WorldUpdateGate.Mode, stored by name; an unknown name throws and load() keeps the current value
+	public class ModeConfigElement extends ConfigElement<WorldUpdateGate.Mode> {
+		public ModeConfigElement(String key, String translationKey, WorldUpdateGate.Mode defaultValue, String commentTranslationKey) {
+			super(key, translationKey, defaultValue, commentTranslationKey);
+		}
+		
+		public void setValue(String value) {
+			this.value = WorldUpdateGate.Mode.valueOf(value.trim());
+		}
+	}
+	
 	// Free text; the value is stored as typed and also parsed into a normalised id set
 	public class StringConfigElement extends ConfigElement<String> {
 		private java.util.Set<String> ids = new java.util.HashSet<String>();

@@ -2,6 +2,8 @@ package brentmaas.buildguide.common.screen;
 
 import java.util.function.LongSupplier;
 
+import brentmaas.buildguide.common.TimingLog;
+
 import brentmaas.buildguide.common.shape.PreviewCamera;
 import brentmaas.buildguide.common.shape.PreviewFilter;
 import brentmaas.buildguide.common.shape.PreviewModel;
@@ -69,7 +71,9 @@ public class PreviewController {
 		ValidationState state = current.getValidationState();
 		boolean newGeneration = model != null && current.getGeneration() != model.generation;
 		if(model == null || (newGeneration && now - lastGeometry >= geometryRefreshMillis)) {
+			long started = System.currentTimeMillis();
 			PreviewModel snapshot = PreviewModel.snapshot(current);
+			TimingLog.record(TimingLog.PREVIEW_SNAPSHOT, System.currentTimeMillis() - started, current.getExpectedBlocks().size());
 			if(snapshot != null) {
 				model = snapshot.withValidation(state);
 				lastGeometry = now;

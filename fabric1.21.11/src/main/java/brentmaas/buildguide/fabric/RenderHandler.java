@@ -26,6 +26,7 @@ import brentmaas.buildguide.common.shape.ValidationOverlay;
 import brentmaas.buildguide.common.shape.ValidationState;
 import brentmaas.buildguide.common.shape.ValidationState.NearBlock;
 import brentmaas.buildguide.fabric.place.PlacementClick;
+import brentmaas.buildguide.fabric.screen.ScreenWrapper;
 import brentmaas.buildguide.fabric.shape.ShapeBuffer;
 import brentmaas.buildguide.fabric.validation.WorldProbe;
 import net.minecraft.client.Minecraft;
@@ -90,8 +91,20 @@ public class RenderHandler extends AbstractRenderHandler {
 		}
 	}
 
+	// Live apply (deferredWorldUpdates): the world draws the last applied buffer, not the one being generated
 	public void renderShapeBuffer(Shape shape) {
-		((ShapeBuffer) shape.buffer).render();
+		((ShapeBuffer) shape.shownBuffer).render();
+	}
+
+	@Override
+	protected boolean deferredWorldUpdates() {
+		return true;
+	}
+
+	// Any of the mod's screens (tabs, dropdowns, the expanded preview) counts as the menu being open
+	@Override
+	protected boolean isMenuOpen() {
+		return Minecraft.getInstance().screen instanceof ScreenWrapper;
 	}
 
 	protected void setupRenderingShapeSet(ShapeSet shapeSet) {

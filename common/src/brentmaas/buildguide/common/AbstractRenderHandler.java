@@ -33,6 +33,21 @@ public abstract class AbstractRenderHandler {
 	
 	protected void endPlacementFrame() {}
 	
+	// Live apply: handlers that return true draw Shape.shownBuffer and let the WorldUpdateGate decide when a new
+	// generation replaces it (renderShapeSetDeferred). Default false: the original path, unchanged
+	protected boolean deferredWorldUpdates() {
+		return false;
+	}
+	
+	// Whether one of the mod's menus is open (On close and Idle wait for it to close)
+	protected boolean isMenuOpen() {
+		return false;
+	}
+	
+	protected WorldUpdateGate.Mode worldUpdateMode() {
+		return BuildGuide.config.worldUpdateMode.value;
+	}
+	
 	public void render() {
 		pushProfiler(BuildGuide.modid);
 		
@@ -46,6 +61,10 @@ public abstract class AbstractRenderHandler {
 	}
 	
 	protected void renderShapeSet(ShapeSet shapeSet) {
+		if(deferredWorldUpdates()) {
+			renderShapeSetDeferred(shapeSet);
+			return;
+		}
 		if(shapeSet.getShape().lock.tryLock()) {
 			try {
 				if(shapeSet.isVisible() && shapeSet.getShape().ready && !shapeSet.getShape().error) {
@@ -65,6 +84,49 @@ public abstract class AbstractRenderHandler {
 			}finally {
 				shapeSet.getShape().lock.unlock();
 			}
+		}
+	}
+	
+	/**
+	 * Live apply. The buffer drawn in the world (shownBuffer) is owned by the render thread, so it is
+	 * drawn even while a newer generation holds the lock: the world keeps the last applied shape instead
+	 * of blinking. A finished generation replaces it when the gate allows (Live: at once; Idle: a second
+	 * after the last change; On close: when the menu closes). Until then the world is stale, so the
+	 * scan, the error overlay and the Area 3 target wait too: they all read the expected set, which
+	 * already is the new one.
+	 */
+	protected void renderShapeSetDeferred(ShapeSet shapeSet) {
+		Shape shape = shapeSet.getShape();
+		boolean locked = shape.lock.tryLock();
+		try {
+			boolean current = locked && shape.ready && !shape.error;
+			if(current && shape.buffer != shape.shownBuffer && shape.worldGate.shouldApply(worldUpdateMode(), isMenuOpen())) {
+				long started = System.currentTimeMillis();
+				shape.buffer.end();
+				shape.vertexBufferUnpacked = true;
+				if(shape.shownBuffer != null) shape.shownBuffer.close();
+				shape.shownBuffer = shape.buffer;
+				shape.worldGate.applied();
+				TimingLog.record(TimingLog.WORLD_BUFFER, System.currentTimeMillis() - started, shape.getNumberOfBlocks());
+			}else if(current && shape.buffer == shape.shownBuffer && shape.worldGate.isPending()) {
+				shape.worldGate.applied(); // a change that did not need a new buffer
+			}
+			boolean applied = current && !shape.worldGate.isPending();
+			if(shapeSet.isVisible() && shape.shownBuffer != null) {
+				setupRenderingShapeSet(shapeSet);
+				renderShapeBuffer(shape);
+				if(applied && BuildGuide.stateManager.getState().isHighlightErrors()) renderValidationOverlay(shapeSet);
+				endRenderingShapeSet();
+			}
+			if(applied && shapeSet.isVisible()) {
+				long started = System.currentTimeMillis();
+				validateShape(shapeSet);
+				TimingLog.record(TimingLog.SCAN, System.currentTimeMillis() - started, shape.getExpectedBlocks().size());
+				reconcileShape(shapeSet);
+				pickPlacementTarget(shapeSet);
+			}
+		}finally {
+			if(locked) shape.lock.unlock();
 		}
 	}
 }
