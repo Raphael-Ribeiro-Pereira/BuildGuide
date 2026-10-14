@@ -284,6 +284,10 @@ Process
     `Fabulously Optimized (1)` or devlaunchinjector is running (any other java, such as an IDE
     build server, is allowed; an unreadable command line blocks); rename the old jar to `.bak`; prove the deploy with the
     SHA-256 of the mods copy against the build. (E6 once tested the old jar for this reason.)
+    **Never print or log a process's full command line:** the game's holds the Minecraft session
+    (`--accessToken`). Match the markers internally and show only the process name, the PID and the first
+    60 characters, with `--accessToken`, `--uuid`, `--xuid`, `--clientId` and `--username` masked
+    (2026-10-14: a listing once printed a token into a session log; it never reached the repo or GitHub).
 11. Git scripts are fail-fast: message in a file and `git commit -F` (never `-m` with quotes in
     PowerShell 5.1), `$LASTEXITCODE` checked after every git call, hash read only after the
     commit exists. Push at the end of every session; the remote is the only backup.
