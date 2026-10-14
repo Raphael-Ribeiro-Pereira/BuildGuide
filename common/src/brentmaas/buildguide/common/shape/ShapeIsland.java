@@ -5,10 +5,12 @@ import java.util.Random;
 import brentmaas.buildguide.common.property.Property;
 import brentmaas.buildguide.common.property.PropertyBlockId;
 import brentmaas.buildguide.common.property.PropertyBoolean;
+import brentmaas.buildguide.common.property.PropertyCompactRangeInt;
 import brentmaas.buildguide.common.property.PropertyEnum;
 import brentmaas.buildguide.common.property.PropertyFloat;
 import brentmaas.buildguide.common.property.PropertyInt;
 import brentmaas.buildguide.common.property.PropertyRangeInt;
+import brentmaas.buildguide.common.property.PropertyRowLabel;
 import brentmaas.buildguide.common.property.PropertyRunnable;
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
 import brentmaas.buildguide.common.shape.IslandControls.Control;
@@ -91,9 +93,12 @@ public class ShapeIsland extends Shape {
 	// Layers (palette stage 4C, after Gap): the world and the preview coloured by depth, four layers cut at
 	// three percentages of Depth (ShapeLayers). Visual only: the blocks are the same with or without
 	private PropertyBoolean propertyLayers = new PropertyBoolean(false, new Translatable("property.buildguide.layers"), () -> onLayersChanged());
-	private PropertyRangeInt propertyCut1 = new PropertyRangeInt(ShapeLayers.defaultCut1, new Translatable("property.buildguide.cut1"), () -> onCutChanged(0), ShapeLayers.minCut, ShapeLayers.maxCut, ShapeLayers.cutStep);
-	private PropertyRangeInt propertyCut2 = new PropertyRangeInt(ShapeLayers.defaultCut2, new Translatable("property.buildguide.cut2"), () -> onCutChanged(1), ShapeLayers.minCut, ShapeLayers.maxCut, ShapeLayers.cutStep);
-	private PropertyRangeInt propertyCut3 = new PropertyRangeInt(ShapeLayers.defaultCut3, new Translatable("property.buildguide.cut3"), () -> onCutChanged(2), ShapeLayers.minCut, ShapeLayers.maxCut, ShapeLayers.cutStep);
+	// The three cuts share one row since the palette (4D): label "Cuts %" and three compact columns (- field +);
+	// same range, step and persistence as the full rows they were in 4C
+	private PropertyCompactRangeInt propertyCut1 = new PropertyCompactRangeInt(ShapeLayers.defaultCut1, new Translatable("property.buildguide.cut1"), () -> onCutChanged(0), ShapeLayers.minCut, ShapeLayers.maxCut, ShapeLayers.cutStep, 0);
+	private PropertyCompactRangeInt propertyCut2 = new PropertyCompactRangeInt(ShapeLayers.defaultCut2, new Translatable("property.buildguide.cut2"), () -> onCutChanged(1), ShapeLayers.minCut, ShapeLayers.maxCut, ShapeLayers.cutStep, 1);
+	private PropertyCompactRangeInt propertyCut3 = new PropertyCompactRangeInt(ShapeLayers.defaultCut3, new Translatable("property.buildguide.cut3"), () -> onCutChanged(2), ShapeLayers.minCut, ShapeLayers.maxCut, ShapeLayers.cutStep, 2);
+	private PropertyRowLabel cutsLabel = new PropertyRowLabel(new Translatable("property.buildguide.cuts"));
 	// The layers the last generation coloured the world with (null: Layers off), for the preview
 	private volatile ShapeLayers generatedLayers = null;
 	// Palette per layer (4D, after Cut 3 %): the block each layer must be built with, by id; empty = any solid
@@ -116,7 +121,7 @@ public class ShapeIsland extends Shape {
 	// Spikes section: Count alone while it is 0, then the five others
 	private Property<?>[] spikeRows = {propertySpikeMode, propertySpikeLength, propertySpikeBase, propertyLengthVar, propertySpread, propertyJitter};
 	// Layers section: the box alone while it is off, then the three cuts
-	private PropertyRangeInt[] cutRows = {propertyCut1, propertyCut2, propertyCut3};
+	private PropertyCompactRangeInt[] cutRows = {propertyCut1, propertyCut2, propertyCut3};
 
 	// Randomize / Naturalize source; one-step Undo, in memory only
 	Random random = new Random();
@@ -183,6 +188,8 @@ public class ShapeIsland extends Shape {
 		assignSection(sectionLayers, propertyLayers);
 		assignSection(sectionLayers, cutRows);
 		assignSection(sectionLayers, blockRows);
+		addGuiOnly(cutsLabel);
+		assignSection(sectionLayers, cutsLabel);
 		assignSection(sectionRandom, propertyBasePercent, propertyBodyPercent, propertySpikesPercent, propertyRandomize, propertyNaturalize, propertyNaturalizeSpikes, propertyUndo, propertySeed);
 		// Random has 8 rows with Seed; at the minimum GUI height (270) the sections leave room for 7 (six of
 		// them since Layers, with 11-px headers), so the Seed row is not shown (still saved, still in presets,
@@ -218,11 +225,13 @@ public class ShapeIsland extends Shape {
 		}
 		if(isShown(propertyLayers)) row = placeRow(row, propertyLayers);
 		else hideRow(propertyLayers);
-		for(Property<?> p: cutRows) {
+		// With Layers on: the three cuts on one row, then one row per layer's block (6 rows in all, 7 fit at 270)
+		if(isShown(cutsLabel) && propertyLayers.value) row = placeRow(row, cutsLabel, propertyCut1, propertyCut2, propertyCut3);
+		else hideRow(cutsLabel, propertyCut1, propertyCut2, propertyCut3);
+		for(Property<?> p: blockRows) {
 			if(isShown(p) && propertyLayers.value) row = placeRow(row, p);
 			else hideRow(p);
 		}
-		for(Property<?> p: blockRows) hideRow(p); // laid out with the compact Layers rows (4D GUI)
 	}
 
 	private void onLayersChanged() {

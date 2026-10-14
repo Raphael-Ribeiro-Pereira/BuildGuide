@@ -10,7 +10,9 @@ public enum PreviewFilter {
 	ERRORS("screen.buildguide.filter.errors"),
 	MISSING("screen.buildguide.filter.missing"),
 	BUILT("screen.buildguide.filter.built"),
-	UNVALIDATED("screen.buildguide.filter.unvalidated");
+	UNVALIDATED("screen.buildguide.filter.unvalidated"),
+	// Palette per layer (4D): the blocks of another layer; offered only while the shape has a palette
+	WRONG_LAYER("screen.buildguide.filter.wronglayer");
 
 	public final String translationKey;
 
@@ -25,6 +27,8 @@ public enum PreviewFilter {
 		case MISSING: return status == ValidationState.MISSING;
 		case BUILT: return status == ValidationState.OK;
 		case UNVALIDATED: return status == ValidationState.UNKNOWN;
+		case ERRORS: return status == ValidationState.WRONG_BLOCK; // a wrong block on the shape is an error too (4D)
+		case WRONG_LAYER: return status == ValidationState.WRONG_LAYER;
 		default: return false;
 		}
 	}
@@ -35,5 +39,11 @@ public enum PreviewFilter {
 
 	public PreviewFilter next() {
 		return values()[(ordinal() + 1) % values().length];
+	}
+	
+	// The next filter of the button; Wrong layer only with a palette (without one it would always show nothing)
+	public PreviewFilter next(boolean withWrongLayer) {
+		PreviewFilter f = next();
+		return f == WRONG_LAYER && !withWrongLayer ? f.next() : f;
 	}
 }

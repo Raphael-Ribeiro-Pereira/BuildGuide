@@ -9,6 +9,7 @@ import java.util.function.LongSupplier;
 import brentmaas.buildguide.common.BuildGuide;
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
 import brentmaas.buildguide.common.screen.widget.ISelectorList;
+import brentmaas.buildguide.common.shape.LayerPalette;
 import brentmaas.buildguide.common.shape.LocalPos;
 import brentmaas.buildguide.common.shape.Shape;
 import brentmaas.buildguide.common.shape.ValidationState;
@@ -32,12 +33,17 @@ public class ValidationListComponent {
 	
 	// Tabs of the Shape screen's list (GUI redesign E6): one category at a time, no headers
 	public static enum Category {
-		ERRORS("screen.buildguide.tab.errors"), MISSING("screen.buildguide.tab.missing"), IGNORED("screen.buildguide.tab.ignored");
+		ERRORS("screen.buildguide.tab.errors", "screen.buildguide.tab4.errors"), MISSING("screen.buildguide.tab.missing", "screen.buildguide.tab4.missing"), IGNORED("screen.buildguide.tab.ignored", "screen.buildguide.tab4.ignored"),
+		// Palette per layer (4D): a fourth tab, shown only while the shape has a palette
+		WRONG_LAYER("screen.buildguide.tab.wronglayer", "screen.buildguide.tab4.wronglayer");
 		
 		public final String translationKey;
+		// The shorter label when the four tabs share the width
+		public final String shortKey;
 		
-		private Category(String translationKey) {
+		private Category(String translationKey, String shortKey) {
 			this.translationKey = translationKey;
+			this.shortKey = shortKey;
 		}
 	}
 
@@ -135,13 +141,20 @@ public class ValidationListComponent {
 	}
 
 	/**
-	 * Tab counts {errors, missing, ignored}, or null when there is no shape or it is not validated.
-	 * Missing excludes the ignored positions, like the combined list's header.
+	 * Tab counts {errors, missing, ignored, wrong layer}, or null when there is no shape or it is not validated.
+	 * Missing excludes the ignored positions, like the combined list's header. Errors are the structure errors
+	 * around the shape plus the wrong blocks on it (4D)
 	 */
 	public static int[] counts(Shape shape) {
 		if(shape == null || !shape.getValidationState().isValidated()) return null;
 		ValidationState state = shape.getValidationState();
-		return new int[] {state.getNearCount(), state.getMissing() - state.getIgnored(), state.getIgnored()};
+		return new int[] {state.getErrorCount(), state.getMissing() - state.getIgnored(), state.getIgnored(), state.getWrongLayer()};
+	}
+	
+	// The tabs shown for a shape: the fourth (wrong layer) only while its state has a palette
+	public static Category[] tabs(Shape shape) {
+		boolean palette = shape != null && shape.getValidationState().getPalette() != null;
+		return palette ? Category.values() : new Category[] {Category.ERRORS, Category.MISSING, Category.IGNORED};
 	}
 	
 	/**
@@ -169,6 +182,10 @@ public class ValidationListComponent {
 			List<NearBlock> errors = state.getNearBlocks();
 			errors.sort(Comparator.comparingInt((NearBlock nb) -> LocalPos.unpackX(nb.localPos)).thenComparingInt(nb -> LocalPos.unpackY(nb.localPos)).thenComparingInt(nb -> LocalPos.unpackZ(nb.localPos)));
 			for(NearBlock nb: errors) row(titles, positions, nb.localPos, ox, oy, oz, nb.blockName, String.format(Locale.ROOT, "%.1f", nb.distance));
+			// Wrong blocks on the shape (4D): after the structure errors, with their layer
+			for(long pos: sortedByPosition(state.getPositions(ValidationState.WRONG_BLOCK))) layerRow(titles, positions, state, pos, ox, oy, oz);
+		}else if(category == Category.WRONG_LAYER) {
+			for(long pos: sortedByPosition(state.getPositions(ValidationState.WRONG_LAYER))) layerRow(titles, positions, state, pos, ox, oy, oz);
 		}else if(category == Category.IGNORED) {
 			for(long pos: sortedByPosition(state.getPositions(ValidationState.IGNORED))) row(titles, positions, pos, ox, oy, oz, state.getIgnoredBlockName(pos), null);
 		}else {
@@ -189,6 +206,15 @@ public class ValidationListComponent {
 		String text = "[" + (ox + LocalPos.unpackX(pos)) + ", " + (oy + LocalPos.unpackY(pos)) + ", " + (oz + LocalPos.unpackZ(pos)) + "] " + (blockName != null ? blockName : "?");
 		if(distance != null) text += " (d=" + distance + ")";
 		titles.add(new Translatable(text));
+		positions.add(pos);
+	}
+
+	// "[x, y, z] Dirt (layer 2)": a position on the shape whose block is not its layer's
+	private static void layerRow(List<Translatable> titles, List<Long> positions, ValidationState state, long pos, int ox, int oy, int oz) {
+		LayerPalette palette = state.getPalette();
+		String layer = palette == null ? "" : " (layer " + palette.layers.layerOf(LocalPos.unpackY(pos)) + ")";
+		String name = state.getBlockName(pos);
+		titles.add(new Translatable("[" + (ox + LocalPos.unpackX(pos)) + ", " + (oy + LocalPos.unpackY(pos)) + ", " + (oz + LocalPos.unpackZ(pos)) + "] " + (name != null ? name : "?") + layer));
 		positions.add(pos);
 	}
 

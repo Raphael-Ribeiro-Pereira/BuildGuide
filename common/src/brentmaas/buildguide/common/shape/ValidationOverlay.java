@@ -35,6 +35,10 @@ public class ValidationOverlay {
 		List<long[]> entries = new ArrayList<long[]>(); // {pos, colourIndex}
 		for(long pos: state.getPositions(ValidationState.IGNORED)) entries.add(new long[] {pos, 1});
 		for(NearBlock nb: state.getNearBlocks()) entries.add(new long[] {nb.localPos, 2});
+		// Palette per layer (4D): wrong blocks on the shape are red like structure errors, another layer's block
+		// orange; both are solid blocks, so they get a shell
+		for(long pos: state.getPositions(ValidationState.WRONG_BLOCK)) entries.add(new long[] {pos, 2});
+		for(long pos: state.getPositions(ValidationState.WRONG_LAYER)) entries.add(new long[] {pos, 3});
 
 		if(entries.size() > maxCubes && playerLocal != null) {
 			// Only when over the cap: keep the errors closest to the player (deterministic tie-break by position)
@@ -50,6 +54,9 @@ public class ValidationOverlay {
 			if(e[1] == 1) {
 				buffer.setColour(255, 220, 40, 160);
 				pushCube(buffer, pos);
+			}else if(e[1] == 3) {
+				buffer.setColour(255, 140, 26, 160);
+				pushShell(buffer, pos);
 			}else {
 				buffer.setColour(255, 60, 60, 160);
 				pushShell(buffer, pos);
@@ -58,7 +65,8 @@ public class ValidationOverlay {
 		if(highlighted != -1) {
 			buffer.setColour(highlightR, highlightG, highlightB, highlightA);
 			// Untracked position = structure error (solid): shell. Tracked ones are the shape's own positions
-			if(state.getStatus(highlighted) == ValidationState.UNKNOWN) pushShell(buffer, highlighted);
+			byte s = state.getStatus(highlighted);
+			if(s == ValidationState.UNKNOWN || s == ValidationState.WRONG_LAYER || s == ValidationState.WRONG_BLOCK) pushShell(buffer, highlighted);
 			else pushCube(buffer, highlighted);
 		}
 	}
@@ -81,6 +89,6 @@ public class ValidationOverlay {
 
 	// True when there is anything to draw
 	public static boolean hasContent(ValidationState state) {
-		return state.isValidated() && (state.getIgnored() > 0 || state.getNearCount() > 0 || state.getHighlightedPos() != -1);
+		return state.isValidated() && (state.getIgnored() > 0 || state.getNearCount() > 0 || state.getWrongLayer() > 0 || state.getWrongBlock() > 0 || state.getHighlightedPos() != -1);
 	}
 }

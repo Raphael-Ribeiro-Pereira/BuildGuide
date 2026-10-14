@@ -226,7 +226,7 @@ public class ShapeScreen extends BaseScreen{
 	private void initPreviewControls() {
 		int x = rightX + 2, y = previewTop + 2, axis = preview.getSliceAxis();
 		buttonFilter = BuildGuide.widgetHandler.createButton(x, y, filterWidth, controlsHeight, new Translatable(preview.getFilter().translationKey), () -> {
-			preview.setFilter(preview.getFilter().next());
+			preview.setFilter(preview.getFilter().next(hasPalette()));
 			BuildGuide.screenHandler.showScreen(this);
 		});
 		Shape shape = currentShapeOrNull();
@@ -296,12 +296,15 @@ public class ShapeScreen extends BaseScreen{
 			if(fill > x1) fillRect(x1, bands.progressTop, fill, bands.tabsTop, state.getOk() == state.getTotal() ? 0xFF40C040 : 0xFF40A0FF);
 		}
 		int[] counts = ValidationListComponent.counts(shape);
-		ValidationListComponent.Category[] tabs = ValidationListComponent.Category.values();
+		ValidationListComponent.Category[] tabs = ValidationListComponent.tabs(shape);
+		// The wrong-layer tab went with the palette: back to the errors
+		if(!java.util.Arrays.asList(tabs).contains(errorList.getCategory())) errorList.setCategory(ValidationListComponent.Category.ERRORS);
 		for(int i = 0;i < tabs.length;++i) {
-			int tx1 = tabX(i), tx2 = tabX(i + 1);
+			int tx1 = tabX(i, tabs.length), tx2 = tabX(i + 1, tabs.length);
 			boolean selected = tabs[i] == errorList.getCategory();
 			fillRect(tx1, bands.tabsTop, tx2 - 1, bands.tabsBottom, selected ? 0xC0505050 : 0xC0202020);
-			String label = new Translatable(tabs[i].translationKey, counts == null ? "-" : "" + counts[i]).toString();
+			// Four tabs share the width with shorter labels (4D): "Err 3", "Miss 120", "Ign 0", "Layer 5"
+			String label = new Translatable(tabs.length > 3 ? tabs[i].shortKey : tabs[i].translationKey, counts == null ? "-" : "" + counts[tabs[i].ordinal()]).toString();
 			drawShadowCentred(label, (tx1 + tx2) / 2, bands.tabsTop + 4, selected ? 0xFFFFFF : 0xAAAAAA);
 		}
 		errorList.update(shape);
@@ -314,12 +317,22 @@ public class ShapeScreen extends BaseScreen{
 	
 	private void renderLegend() {
 		boolean byLayer = shownModel != null && shownModel.colourMode == ColourMode.LAYER;
-		int step = (wrapper.getWidth() - rightX) / legendKeys.length;
-		for(int i = 0;i < legendKeys.length;++i) {
+		// By status with a palette (4D): a fifth entry, the orange of the wrong-layer blocks
+		int entries = !byLayer && hasPalette() ? legendKeys.length + 1 : legendKeys.length;
+		int step = (wrapper.getWidth() - rightX) / entries;
+		for(int i = 0;i < entries;++i) {
 			int x = rightX + i * step;
-			fillRect(x + 4, bands.legendY, x + 12, bands.legendY + 8, 0xFF000000 | (byLayer ? ShapeLayers.colour(i + 1) : legendColours[i]));
-			drawShadowLeft(byLayer ? depthLabel(shownModel.layers.depthRange(i + 1)) : new Translatable(legendKeys[i]).toString(), x + 16, bands.legendY, 0xAAAAAA);
+			boolean wrongLayer = i == legendKeys.length;
+			fillRect(x + 4, bands.legendY, x + 12, bands.legendY + 8, 0xFF000000 | (byLayer ? ShapeLayers.colour(i + 1) : wrongLayer ? PreviewColours.WRONG_LAYER : legendColours[i]));
+			String text = byLayer ? depthLabel(shownModel.layers.depthRange(i + 1)) : new Translatable(wrongLayer ? "screen.buildguide.legend.wronglayer" : legendKeys[i]).toString();
+			drawShadowLeft(text, x + 16, bands.legendY, 0xAAAAAA);
 		}
+	}
+	
+	// The current shape's last scan used a palette per layer (4D)
+	private boolean hasPalette() {
+		Shape shape = currentShapeOrNull();
+		return shape != null && shape.getValidationState().getPalette() != null;
 	}
 	
 	// "0-5", "6" (one depth), "18+" (and everything below), "-" (no block depth falls in that layer)
@@ -329,8 +342,8 @@ public class ShapeScreen extends BaseScreen{
 		return range[0] == range[1] ? "" + range[0] : range[0] + "-" + range[1];
 	}
 	
-	private int tabX(int i) {
-		return rightX + i * (wrapper.getWidth() - rightX) / ValidationListComponent.Category.values().length;
+	private int tabX(int i, int count) {
+		return rightX + i * (wrapper.getWidth() - rightX) / count;
 	}
 	
 	private Shape currentShapeOrNull() {
@@ -473,9 +486,9 @@ public class ShapeScreen extends BaseScreen{
 			return true;
 		}
 		if(button == MOUSE_LEFT && x >= rightX && y >= bands.tabsTop && y < bands.tabsBottom) {
-			ValidationListComponent.Category[] tabs = ValidationListComponent.Category.values();
+			ValidationListComponent.Category[] tabs = ValidationListComponent.tabs(currentShapeOrNull());
 			for(int i = 0;i < tabs.length;++i) {
-				if(x >= tabX(i) && x < tabX(i + 1)) {
+				if(x >= tabX(i, tabs.length) && x < tabX(i + 1, tabs.length)) {
 					BuildGuide.stateManager.getState().listTab = tabs[i];
 					errorList.setCategory(tabs[i]);
 					return true;

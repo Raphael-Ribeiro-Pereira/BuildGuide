@@ -153,13 +153,15 @@ public abstract class BaseScreen {
 			drawShadowLeft("- / " + shape.getExpectedBlocks().size(), barX1, barTextY, 0xAAAAAA);
 			return;
 		}
-		int ok = state.getOk(), total = state.getTotal(), errors = state.getNearCount();
+		int ok = state.getOk(), total = state.getTotal(), errors = state.getErrorCount();
 		double progress = state.getProgress();
 		int fillX2 = barX1 + (int) Math.round((barX2 - barX1) * progress);
 		if(fillX2 > barX1) fillRect(barX1, barY1, fillX2, barY2, ok == total ? 0xFF40C040 : 0xFF40A0FF);
 		String text = ok + " / " + total + " (" + String.format(java.util.Locale.ROOT, "%.1f", 100.0 * progress) + "%)";
 		// Structure errors: solid blocks deforming the shape (Etapa 2.5)
 		if(errors > 0) text += "  errors " + errors;
+		// Palette per layer (4D): the blocks of another layer
+		if(state.getWrongLayer() > 0) text += "  wrong layer " + state.getWrongLayer();
 		drawShadowLeft(text, barX1, barTextY, errors > 0 ? 0xFF8080 : 0xFFFFFF);
 	}
 	

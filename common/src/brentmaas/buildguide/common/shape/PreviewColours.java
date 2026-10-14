@@ -9,7 +9,9 @@ public class PreviewColours {
 	public static final int OK = 0x3CC850;
 	public static final int MISSING = 0xAAB4C8; // 170, 180, 200
 	public static final int IGNORED = 0xE6C832;
-	public static final int ERROR = 0xFF3C3C; // structure errors (NearBlock)
+	public static final int ERROR = 0xFF3C3C; // structure errors (NearBlock), and wrong blocks on the shape (4D)
+	// Palette per layer (4D): the block of another layer. Orange, away from IGNORED's yellow and the layer colours
+	public static final int WRONG_LAYER = 0xFF8C1A;
 
 	public static int forStatus(byte status) {
 		switch(status) {
@@ -19,6 +21,10 @@ public class PreviewColours {
 			return MISSING;
 		case ValidationState.IGNORED:
 			return IGNORED;
+		case ValidationState.WRONG_LAYER:
+			return WRONG_LAYER;
+		case ValidationState.WRONG_BLOCK:
+			return ERROR;
 		default:
 			return WHITE;
 		}

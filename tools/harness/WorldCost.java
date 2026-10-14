@@ -41,6 +41,17 @@ public class WorldCost {
 				while(!scan.step(air, 0, System::nanoTime));
 				long t7 = System.nanoTime(); scan.publish(air); long t8 = System.nanoTime();
 				System.out.printf("         publish (all missing) %5.1f ms; layer steps %d ms in total%n", (t8 - t7) / 1e6, scan.getTotalMillis());
+				// Palette per layer (4D): the same scan over a built island (every block solid, ids by depth), without and with a palette
+				int depthOf = 0; for(long l: expected) depthOf = Math.min(depthOf, LocalPos.unpackY(l));
+				final int depth = -depthOf;
+				IBlockProbe built = new IBlockProbe(){ public boolean isLoaded(int x, int y, int z){ return true; } public int flags(int x, int y, int z){ return expected.contains(LocalPos.pack(x - 100, y - 64, z + 200)) ? FLAG_SOLID : FLAG_AIR; } public int blockId(int x, int y, int z){ return 10 + (64 - y) * 4 / Math.max(1, depth + 1); } public String name(int x, int y, int z){ return "Stone"; } };
+				long[] took = new long[2];
+				for(int k = 0; k < 2; k++){
+					ValidationState ps = new ValidationState(); if(k == 1) ps.setPalette(new LayerPalette(new ShapeLayers(0, depth, 25, 50, 75), new int[]{10, 11, 12, 13}));
+					SliceScan job = new SliceScan(ps, expected, tracked, ox, oy, oz, 1); long s0 = System.nanoTime(); while(!job.step(built, 0, System::nanoTime)); job.publish(built); took[k] = System.nanoTime() - s0;
+					if(k == 1 && ps.getWrongLayer() + ps.getWrongBlock() > ps.getTotal() / 2) System.out.println("         (palette case misbuilt)");
+				}
+				System.out.printf("         scan of the built island: no palette %5.1f ms, palette of 4 blocks %5.1f ms%n", took[0] / 1e6, took[1] / 1e6);
 			}
 		}
 	}
