@@ -30,6 +30,7 @@ Order is the order of work. Rules that apply to all of it are in `docs/STATUS.md
 4. **Palette per layer (its own stage, the riskiest), split in two (2026-10-05).**
    - **4C, visual only:** layers and their colours, in the world and in the preview. No
      validation change. **Done** (2026-10-07, `a981c8e`, `c8a8579`; see `docs/STATUS.md`).
+   - **4D done** (2026-10-14, `1e3ef9c`..`e35fad3`; see `docs/STATUS.md`).
    - **4D, validation per block:** each layer's block is typed as an ID in the form
      `minecraft:stone` (no autocomplete); the field turns red if the ID is invalid; the text is
      persisted encoded (it must not break the comma-separated persistence).
@@ -221,3 +222,10 @@ Open decisions:
 - **Take the scan's preparation and its publish out of a single frame**, after the numbers of the
   full test.
 - **A possible pull request of the leak fix to the original repository** (brentmaas/BuildGuide).
+
+## Pending after 4D (2026-10-14)
+
+- **The scan's preparation and publish out of a single frame:** waiting for the log of Raphael's full
+  test (the world-buffer lines and the scan's `start=` / `publish=`).
+- **Raphael's full test:** the checklist is in his own document (the list above, "Pending: Raphael's
+  full test", is what it covers so far).

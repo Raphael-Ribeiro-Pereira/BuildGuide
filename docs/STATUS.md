@@ -228,6 +228,33 @@ ones), preview mesh, overlay and Area 3 outline left about 384 bytes per block b
 
 Offline harness after the leak fix: 946 asserts, 0 failures; Bridge 466 / 159 / 360.
 
+### Palette per layer (4D)
+
+Built on `wip/palette` and fast-forwarded into `feat/cone-expanded` on 2026-10-14 after the
+`palette-wip` in-game test passed.
+
+| Phase | Commit | What |
+|---|---|---|
+| Core | `1e3ef9c` | `LayerPalette` (pure): one block id per layer of the 4C `ShapeLayers` and `classify`, the one rule every path uses (scan, `SliceScan`, block events, safety net); `WRONG_LAYER = 5` and `WRONG_BLOCK = 6` in `ValidationState` (3 stays reserved; statuses are not persisted) |
+| Integration | `a63a95d` | Island Block 1 to Block 4 (`PropertyBlockId`, URL-encoded, empty = any solid) after Cut 3 %; ids resolved once per scan to raw registry ids, read as ints (no string per block); `IShapeHandler.normalizeBlockId` / `heldBlockId` (defaults) |
+| GUI | `e35fad3` | Layers section in 6 compact rows (the three cuts on one row, then an id field and Hand per layer); orange `FF8C1A`; Wrong layer filter, tab and legend entry only with a palette |
+| Rule 10 | `f2fc46a` | the deploy guard never prints a full command line (docs) |
+
+The rule for an expected position: air is MISSING; the layer's chosen block is OK (a block chosen for
+two layers is right on both); the block of another layer is WRONG_LAYER (orange); an ignored type
+is IGNORED; another non-solid block is MISSING; a solid block in no palette where the layer has
+one is WRONG_BLOCK (red); a layer with no block accepts any solid block. Only the block id is
+compared, not its state. Layers off, or no block chosen: the validation of before.
+
+**Errors now add up two things:** the solid blocks near the shape but outside it (structure
+errors, as before), and the wrong blocks on the shape's own positions. Both are red. The list shows
+the first with their distance and the second with their layer.
+
+Ids are typed (`stone` becomes `minecraft:stone`; an id that is not a block, or air, turns the
+field red and is not applied) or taken from the main hand with Hand ("Hold a block" otherwise).
+
+Offline harness after 4D: 1028 asserts, 0 failures; Bridge 466 / 159 / 360.
+
 Offline harness at the close: 406 asserts, 0 failures; Bridge reference sizes 466 / 159 / 360.
 E6 (after two fixes), E7, P4 and E8 passed their in-game checklists before being committed
 (E7 7 of 7, P4 9 of 9, E8 9 of 9). The ghost fix was committed on Raphael's go-ahead after the
@@ -240,11 +267,11 @@ Build output: `fabric1.21.11/build/libs/BuildGuide-Fabric-0.4.8.jar` (mod versio
 
 | Item | Value |
 |---|---|
-| Active jar in the mods folder | `BuildGuide-Fabric-0.4.8-leakfix-wip.jar` |
-| SHA-256 | `D0089DE876C5855AFF509974DFA2400037F1B5DCAD05E63B45A0E6C4095EDABF` |
-| Source | commit `481d42a`: the build output and the mods copy have the same SHA-256, and a build of the merged branch gives it again; `VertexMemory`, `IShapeBuffer`, `Shape`, `ShapeSet`, `State`, `TimingLog` and `ShapeBuffer` are inside |
-| Tested | the offline harness (946 asserts); in game, approved in normal use (2026-10-14); the full test is pending |
-| Previous jars | `BuildGuide-Fabric-0.4.8-layers-wip.jar` (SHA-256 `14B66C4E9A572D5224C01F5217BBB087BB48BB8BE908909CF67408824AE2F7CC`, commit `c8a8579`), `BuildGuide-Fabric-0.4.8-scan-slices-wip.jar` (SHA-256 `A280A6440BB423878D6AAFA316709E852D63EF2EEBB3FF3F643E826C4724A067`, commit `7762309`), `BuildGuide-Fabric-0.4.8-spikes2-wip.jar` (SHA-256 `89F6B80A37150060E598EF0988446699E8B43F5E050267E83A9398909BE5D87B`, commit `3e63cbd`), `BuildGuide-Fabric-0.4.8-spikes-wip.jar` (SHA-256 `C3564E26FD888E46E106724E051C27C19D74EE962365FD9BB90775E77DE03A6E`, commit `a6d1c23`), `BuildGuide-Fabric-0.4.8-live-apply-wip.jar` (SHA-256 `8DB5202C0AFEC1F4645D0E4052852B188BE4CA9CF35C9FC969DF5CC092994198`, commit `416b5e0`), `BuildGuide-Fabric-0.4.8-island-ux-wip.jar` (SHA-256 `DD5B7BD8ADF1714F0BC152A303B6ED3F2FB2EA5E9C8F79034B52BD27DAE76557`, commit `07d554c`), `BuildGuide-Fabric-0.4.8-island-wip.jar` (SHA-256 `556D80E49975B12802361D5CB8971EE632415A7E841C0EC71D8AF06826C92DE9`, commit `f7937be`), `BuildGuide-Fabric-0.4.8-area3-wip2.jar` (SHA-256 `B5AC963F068EFF59954521F29F24D994BBFE61CF9F55C2C1DE9256E055392A32`, commit `584674b`), `BuildGuide-Fabric-0.4.8-area3-wip.jar` (first Area 3 test) and `BuildGuide-Fabric-0.4.8-ghost-fix-wip.jar` (SHA-256 `1E2F5E96A659D474EF14D9CDDBF5930E6B695DF66F31C782A7C1E5654E55BDB6`, commit `9c3fbde`), kept as `.bak` |
+| Active jar in the mods folder | `BuildGuide-Fabric-0.4.8-palette-wip.jar` |
+| SHA-256 | `F0C0A242D361BB0E73BC4EF477EE274AA905C7ED8681154FF004227B438B26B0` |
+| Source | commit `e35fad3` (code identical at `f2fc46a`): the build output and the mods copy have the same SHA-256, and a build of the merged branch gives it again; `LayerPalette`, `PropertyBlockId`, `ShapeIsland`, `ShapeScreen` and `PreviewColours` are inside |
+| Tested | the offline harness (1028 asserts); in game, approved (2026-10-14); Raphael's full test is pending |
+| Previous jars | `BuildGuide-Fabric-0.4.8-leakfix-wip.jar` (SHA-256 `D0089DE876C5855AFF509974DFA2400037F1B5DCAD05E63B45A0E6C4095EDABF`, commit `481d42a`), `BuildGuide-Fabric-0.4.8-layers-wip.jar` (SHA-256 `14B66C4E9A572D5224C01F5217BBB087BB48BB8BE908909CF67408824AE2F7CC`, commit `c8a8579`), `BuildGuide-Fabric-0.4.8-scan-slices-wip.jar` (SHA-256 `A280A6440BB423878D6AAFA316709E852D63EF2EEBB3FF3F643E826C4724A067`, commit `7762309`), `BuildGuide-Fabric-0.4.8-spikes2-wip.jar` (SHA-256 `89F6B80A37150060E598EF0988446699E8B43F5E050267E83A9398909BE5D87B`, commit `3e63cbd`), `BuildGuide-Fabric-0.4.8-spikes-wip.jar` (SHA-256 `C3564E26FD888E46E106724E051C27C19D74EE962365FD9BB90775E77DE03A6E`, commit `a6d1c23`), `BuildGuide-Fabric-0.4.8-live-apply-wip.jar` (SHA-256 `8DB5202C0AFEC1F4645D0E4052852B188BE4CA9CF35C9FC969DF5CC092994198`, commit `416b5e0`), `BuildGuide-Fabric-0.4.8-island-ux-wip.jar` (SHA-256 `DD5B7BD8ADF1714F0BC152A303B6ED3F2FB2EA5E9C8F79034B52BD27DAE76557`, commit `07d554c`), `BuildGuide-Fabric-0.4.8-island-wip.jar` (SHA-256 `556D80E49975B12802361D5CB8971EE632415A7E841C0EC71D8AF06826C92DE9`, commit `f7937be`), `BuildGuide-Fabric-0.4.8-area3-wip2.jar` (SHA-256 `B5AC963F068EFF59954521F29F24D994BBFE61CF9F55C2C1DE9256E055392A32`, commit `584674b`), `BuildGuide-Fabric-0.4.8-area3-wip.jar` (first Area 3 test) and `BuildGuide-Fabric-0.4.8-ghost-fix-wip.jar` (SHA-256 `1E2F5E96A659D474EF14D9CDDBF5930E6B695DF66F31C782A7C1E5654E55BDB6`, commit `9c3fbde`), kept as `.bak` |
 
 - The file name still says `wip`: it was never renamed after the test. Renaming is a choice
   for Raphael (nothing depends on the name); a rebuild of `acf4904` gives the same classes.
@@ -278,7 +305,7 @@ Process
    user has confirmed the stage in-game; the user runs the in-game tests.
 9. Before every in-game test: build green, harness green. Declare the expected decompile diff
    *before* running it, then diff the new jar against the previous baseline
-   (`BuildGuide-tools\decompiled\<NAME>`, Vineflower, CRLF normalised). The baseline is now `LEAKFIX`.
+   (`BuildGuide-tools\decompiled\<NAME>`, Vineflower, CRLF normalised). The baseline is now `PALETTE`.
 10. Deploy only with the game and the Modrinth App closed; abort if javaw, the Modrinth App, or a
     java whose command line contains fabric, knot, net.minecraft, .minecraft, ModrinthApp,
     `Fabulously Optimized (1)` or devlaunchinjector is running (any other java, such as an IDE
