@@ -3,6 +3,7 @@ package brentmaas.buildguide.common.shape;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.LongPredicate;
 
 import brentmaas.buildguide.common.shape.ValidationState.NearBlock;
 
@@ -32,13 +33,22 @@ public class ValidationOverlay {
 	private static final double shellInset = 0.01;
 
 	public static void build(IShapeBuffer buffer, ValidationState state, ShapeSet.Origin playerLocal) {
+		build(buffer, state, playerLocal, null);
+	}
+
+	/**
+	 * Build focus: inFocus (null = every position) limits the states that belong to the shape (wrong layer,
+	 * wrong block) to the blocks the world shows. Structure errors near the shape and ignored positions are
+	 * always drawn, and so is the highlighted position.
+	 */
+	public static void build(IShapeBuffer buffer, ValidationState state, ShapeSet.Origin playerLocal, LongPredicate inFocus) {
 		List<long[]> entries = new ArrayList<long[]>(); // {pos, colourIndex}
 		for(long pos: state.getPositions(ValidationState.IGNORED)) entries.add(new long[] {pos, 1});
 		for(NearBlock nb: state.getNearBlocks()) entries.add(new long[] {nb.localPos, 2});
 		// Palette per layer (4D): wrong blocks on the shape are red like structure errors, another layer's block
 		// orange; both are solid blocks, so they get a shell
-		for(long pos: state.getPositions(ValidationState.WRONG_BLOCK)) entries.add(new long[] {pos, 2});
-		for(long pos: state.getPositions(ValidationState.WRONG_LAYER)) entries.add(new long[] {pos, 3});
+		for(long pos: state.getPositions(ValidationState.WRONG_BLOCK)) if(inFocus == null || inFocus.test(pos)) entries.add(new long[] {pos, 2});
+		for(long pos: state.getPositions(ValidationState.WRONG_LAYER)) if(inFocus == null || inFocus.test(pos)) entries.add(new long[] {pos, 3});
 
 		if(entries.size() > maxCubes && playerLocal != null) {
 			// Only when over the cap: keep the errors closest to the player (deterministic tie-break by position)

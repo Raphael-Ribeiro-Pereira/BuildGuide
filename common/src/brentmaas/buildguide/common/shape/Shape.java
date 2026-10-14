@@ -76,6 +76,15 @@ public abstract class Shape implements IValidatable, IFocusParts {
 	public transient IShapeBuffer overlayBuffer = null;
 	public transient long overlayVersion = -1;
 	public transient long overlayBuiltAt = 0;
+	// Build focus (FocusFilter): the focus the generation running emits with (generation thread), the one the
+	// latest buffer was made with (null: every block) and how many cubes it holds; set under the lock
+	private transient FocusFilter emitFocus = null;
+	private transient FocusFilter bufferFocus = null;
+	private transient int worldBlocks = 0;
+	// A focus change makes only the world buffer again (setFocus). Tickets: the last focus change asked for and
+	// the last one done, so the render thread waits for its buffer (isRefocusing) instead of taking the old one
+	private Future<?> refocusFuture = null;
+	private volatile long refocusAsked = 0, refocusDone = 0;
 	
 	protected abstract void updateShape(IShapeBuffer builder) throws Exception;
 	
@@ -156,6 +165,7 @@ public abstract class Shape implements IValidatable, IFocusParts {
 	 */
 	public void dispose() {
 		cancelFuture();
+		if(refocusFuture != null && !refocusFuture.isDone()) refocusFuture.cancel(true);
 		if(buffer != null && buffer != shownBuffer) buffer.close();
 		if(shownBuffer != null) shownBuffer.close();
 		shownBuffer = null;
@@ -190,8 +200,22 @@ public abstract class Shape implements IValidatable, IFocusParts {
 		// nothing). Under the lock: no generation still writes to it and the render thread cannot be sending it
 		if(buffer != null && buffer != shownBuffer) buffer.releaseVertexData();
 		buffer = BuildGuide.shapeHandler.newBuffer();
-		buffer.setColour((int) (255 * shapeSet.getShapeColourR()), (int) (255 * shapeSet.getShapeColourG()), (int) (255 * shapeSet.getShapeColourB()), (int) (255 * shapeSet.getShapeColourA()));
+		setShapeColour(buffer);
+		// Build focus: only the selected blocks reach the buffer while it is generated (the threshold needs the
+		// total, known only at the end). Every block is still expected
+		worldBlocks = 0;
+		emitFocus = selectedFocus();
 		updateShape(buffer);
+		FocusFilter focus = focusFor(nBlocks);
+		if(emitFocus != null && focus == null) {
+			// Selected, but the shape is below the threshold (or the selection selects everything): every block
+			buffer.releaseVertexData();
+			buffer = BuildGuide.shapeHandler.newBuffer();
+			setShapeColour(buffer);
+			worldBlocks = fillWorldBuffer(buffer, null);
+		}
+		emitFocus = null;
+		bufferFocus = focus;
 		// Generation finished: ask the render handler for a fresh full scan (it reads the world, so it
 		// cannot run here). A cancelled or failed generation throws before this line
 		validationState.requestScan();
@@ -206,10 +230,126 @@ public abstract class Shape implements IValidatable, IFocusParts {
 	}
 	
 	protected void addShapeCube(IShapeBuffer buffer, int x, int y, int z) throws InterruptedException {
-		addCube(buffer, x + 0.5 - shapeSet.getShapeCubeSize() / 2, y + 0.5 - shapeSet.getShapeCubeSize() / 2, z + 0.5 - shapeSet.getShapeCubeSize() / 2, shapeSet.getShapeCubeSize());
+		if(emitFocus == null || isInFocus(emitFocus, x, y, z)) {
+			addCube(buffer, x + 0.5 - shapeSet.getShapeCubeSize() / 2, y + 0.5 - shapeSet.getShapeCubeSize() / 2, z + 0.5 - shapeSet.getShapeCubeSize() / 2, shapeSet.getShapeCubeSize());
+			++worldBlocks;
+		}else if(Thread.currentThread().isInterrupted()) {
+			throw new InterruptedException();
+		}
 		expectedBlocks.add(LocalPos.pack(x, y, z));
-		
+
 		++nBlocks;
+	}
+
+	private void setShapeColour(IShapeBuffer buffer) {
+		buffer.setColour((int) (255 * shapeSet.getShapeColourR()), (int) (255 * shapeSet.getShapeColourG()), (int) (255 * shapeSet.getShapeColourB()), (int) (255 * shapeSet.getShapeColourA()));
+	}
+
+	// The colour of one cube when the world buffer is filled again from the expected set (fillWorldBuffer): the
+	// shape's colour, already set, by default; shapes that colour cubes one by one set it here
+	protected void colourCube(IShapeBuffer buffer, int x, int y, int z) {}
+
+	/**
+	 * Build focus: the world buffer from the last generation's expected set, only the blocks in focus f (null:
+	 * all), without generating anything again. Returns how many cubes it holds (the origin cube not counted,
+	 * the caller adds it). Under the lock; an interrupt stops it with InterruptedException.
+	 */
+	private int fillWorldBuffer(IShapeBuffer buffer, FocusFilter f) throws InterruptedException {
+		int count = 0;
+		double s = shapeSet.getShapeCubeSize(), o = 0.5 - s / 2;
+		for(long pos: expectedBlocks) {
+			int x = LocalPos.unpackX(pos), y = LocalPos.unpackY(pos), z = LocalPos.unpackZ(pos);
+			if(!isInFocus(f, x, y, z)) continue;
+			colourCube(buffer, x, y, z);
+			addCube(buffer, x + o, y + o, z + o, s);
+			++count;
+		}
+		return count;
+	}
+
+	/**
+	 * Build focus: the selectors changed. Only the world buffer is made again, from the expected set the last
+	 * generation left (and only when the focus it shows changes); the generation, the expected set, the
+	 * validation and its scan stay as they are. The new buffer reaches the world through the WorldUpdateGate,
+	 * like a shape change, and the error overlay is built again for it. Render thread (the preview's buttons).
+	 */
+	public void setFocus(FocusFilter.Part part, int layer) {
+		storeFocus(part, layer);
+		BaseScreen.shouldUpdatePersistence = true;
+		overlayVersion = -1;
+		worldGate.request();
+		if(refocusFuture != null && !refocusFuture.isDone()) refocusFuture.cancel(true);
+		final long ticket = ++refocusAsked;
+		refocusFuture = executor.submit(() -> {
+			lock.lock();
+			try {
+				refocus();
+			}catch(InterruptedException e) {
+				// a newer focus replaced this one: it runs next
+			}finally {
+				if(ticket == refocusAsked) refocusDone = ticket;
+				lock.unlock();
+			}
+		});
+		if(!BuildGuide.config.asyncEnabled.value) {
+			try {
+				refocusFuture.get();
+			}catch(Exception e) {
+				e.printStackTrace();
+			}
+		}
+	}
+
+	// Under the lock. A generation that failed or is still due leaves nothing to refocus (the next one uses the
+	// new selectors anyway); a new buffer that is interrupted is freed and the old one stays
+	private void refocus() throws InterruptedException {
+		if(!ready || error || buffer == null || shapeSet == null) return;
+		FocusFilter focus = focusFor(nBlocks);
+		if(sameFocus(focus, bufferFocus)) return;
+		IShapeBuffer next = BuildGuide.shapeHandler.newBuffer();
+		int count;
+		try {
+			setShapeColour(next);
+			count = fillWorldBuffer(next, focus);
+			next.setColour((int) (255 * shapeSet.getOriginColourR()), (int) (255 * shapeSet.getOriginColourG()), (int) (255 * shapeSet.getOriginColourB()), (int) (255 * shapeSet.getOriginColourA()));
+			addOriginCube(next);
+		}catch(InterruptedException e) {
+			next.releaseVertexData();
+			throw e;
+		}
+		// The buffer it replaces: freed now unless the world shows it (then when the new one is sent)
+		if(buffer != shownBuffer) buffer.releaseVertexData();
+		buffer = next;
+		vertexBufferUnpacked = false;
+		worldBlocks = count;
+		bufferFocus = focus;
+	}
+
+	// A focus change whose world buffer is not made yet: the world keeps what it shows until it is
+	public boolean isRefocusing() {
+		return refocusDone != refocusAsked;
+	}
+
+	private static boolean sameFocus(FocusFilter a, FocusFilter b) {
+		return a == null ? b == null : b != null && a.part == b.part && a.layer == b.layer;
+	}
+
+	// The focus the latest world buffer was made with (null: every block)
+	public FocusFilter getWorldFocus() {
+		return bufferFocus;
+	}
+
+	// Cubes in the latest world buffer (the origin cube not counted): getNumberOfBlocks() without a focus
+	public int getWorldBlocks() {
+		return ready ? worldBlocks : 0;
+	}
+
+	// For what the world draws from the expected set (the error overlay, the Area 3 target): whether a local
+	// position is in the latest buffer's focus; null when every position is. Under the lock
+	public java.util.function.LongPredicate worldFocusTest() {
+		final FocusFilter f = bufferFocus;
+		if(f == null) return null;
+		return pos -> isInFocus(f, LocalPos.unpackX(pos), LocalPos.unpackY(pos), LocalPos.unpackZ(pos));
 	}
 	
 	// Emit only if this position has not been emitted in this generation; returns whether it was new
@@ -447,25 +587,28 @@ public abstract class Shape implements IValidatable, IFocusParts {
 	}
 
 	// What the selectors ask for, without the threshold: null when they select everything. Without parts only
-	// Hidden counts (any other part is All); the layer selector only with the generation's layers
+	// Hidden counts (any other part is All). The layer selector only matters with layers (isInFocus)
 	FocusFilter selectedFocus() {
 		FocusFilter.Part part = getFocusPart();
 		if(part == null || (!hasParts() && part != FocusFilter.Part.HIDDEN)) part = FocusFilter.Part.ALL;
-		int layer = getLayers() == null ? FocusFilter.LAYER_ALL : getFocusLayer();
+		int layer = getFocusLayer();
 		return part == FocusFilter.Part.ALL && layer == FocusFilter.LAYER_ALL ? null : new FocusFilter(part, layer);
 	}
 
-	// The focus the world uses for a generation of `blocks` blocks: null below the threshold or with nothing selected
+	// The focus the world uses for the last generation, of `blocks` blocks: null below the threshold or when the
+	// selection is everything (a layer alone without the generation's layers)
 	FocusFilter focusFor(int blocks) {
 		FocusFilter f = selectedFocus();
+		if(f != null && f.part == FocusFilter.Part.ALL && getLayers() == null) return null;
 		return f != null && FocusFilter.isActive(f.part, f.layer, focusThreshold(), blocks) ? f : null;
 	}
 
-	// Whether the last generation's block at this local position is drawn with focus f (null: every block)
+	// Whether the last generation's block at this local position is drawn with focus f (null: every block).
+	// Without the generation's layers the layer selector selects every layer
 	public boolean isInFocus(FocusFilter f, int x, int y, int z) {
 		if(f == null) return true;
 		ShapeLayers layers = getLayers();
-		return f.accepts(partOf(x, y, z), layers == null ? FocusFilter.LAYER_ALL : layers.layerOf(y));
+		return f.accepts(partOf(x, y, z), layers == null ? f.layer : layers.layerOf(y));
 	}
 
 	public long getHowLongAgoCompletedMillis() {

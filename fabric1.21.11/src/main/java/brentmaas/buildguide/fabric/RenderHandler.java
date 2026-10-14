@@ -149,7 +149,8 @@ public class RenderHandler extends AbstractRenderHandler {
 			if(shape.overlayBuffer != null) shape.overlayBuffer.close();
 			ShapeBuffer buffer = new ShapeBuffer();
 			ShapeSet.Origin player = BuildGuide.shapeHandler.getPlayerPosition();
-			ValidationOverlay.build(buffer, state, new ShapeSet.Origin(player.x - state.getScanOriginX(), player.y - state.getScanOriginY(), player.z - state.getScanOriginZ()));
+			// Build focus: the shape's own states only on the blocks the world shows (Shape.setFocus forces this rebuild)
+			ValidationOverlay.build(buffer, state, new ShapeSet.Origin(player.x - state.getScanOriginX(), player.y - state.getScanOriginY(), player.z - state.getScanOriginZ()), shape.worldFocusTest());
 			buffer.end();
 			shape.overlayBuffer = buffer;
 			shape.overlayVersion = version;
@@ -338,7 +339,8 @@ public class RenderHandler extends AbstractRenderHandler {
 	protected void pickPlacementTarget(ShapeSet shapeSet) {
 		if(!placeFrame) return;
 		Shape shape = shapeSet.getShape();
-		GuidelinePicker.Cells cells = GuidelinePicker.shapeCells(shape.getExpectedBlocks(), shapeSet.getOriginX(), shapeSet.getOriginY(), shapeSet.getOriginZ(), shapeSet.getActiveExclusionBoxes());
+		// Build focus: only the cells the world shows can be targeted
+		GuidelinePicker.Cells cells = GuidelinePicker.shapeCells(shape.getExpectedBlocks(), shapeSet.getOriginX(), shapeSet.getOriginY(), shapeSet.getOriginZ(), shapeSet.getActiveExclusionBoxes(), shape.worldFocusTest());
 		GuidelinePicker.Target target = GuidelinePicker.pick(eyeX, eyeY, eyeZ, lookX, lookY, lookZ, placeReach, realHit, playerBox, cells, placeProbe);
 		// The set's cube size travels with the target, for the outline only: the choice is unchanged
 		if(target != null && (placeBest == null || target.distance < placeBest.distance)) placeBest = new GuidelinePicker.Target(target.x, target.y, target.z, target.distance, shapeSet.getShapeCubeSize());

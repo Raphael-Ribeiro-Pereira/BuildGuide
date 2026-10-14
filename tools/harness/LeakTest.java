@@ -136,6 +136,18 @@ public class LeakTest {
 		check(buffers.size() == 2 && freedOnce(buffers.get(0)) && freedOnce(buffers.get(1)), "ShapeSet.dispose (State.removeShapeSet): every shape instance of the set frees its buffers");
 		check(VertexMemory.liveBytes() == 0 && VertexMemory.openAccounts() == 0, "at the end: native 0, no account open");
 
+		System.out.println("-- build focus: changing the focus again and again");
+		BuildGuide.config.focusFrom.value = 0; buffers.clear();
+		TestShape f = shape(); f.update(); settle(f); apply(f);
+		FocusFilter.Part[] cycle = {FocusFilter.Part.HIDDEN, FocusFilter.Part.ALL};
+		for(int i = 0; i < 20; i++){ f.setFocus(cycle[i % 2], 0); if(i % 3 == 0){ settle(f); apply(f); } }
+		for(int i = 0; i < 1000 && (f.isRefocusing() || f.lock.isLocked()); i++) Thread.sleep(5);
+		settle(f); apply(f);
+		boolean once = true; int shownNow = 0; synchronized(buffers){ for(FakeBuffer b: buffers) once &= b.frees == 1 && b.extraReleases == 0; }
+		check(buffers.size() > 3 && once && misuse() == 0, "20 focus changes (" + buffers.size() + " world buffers, some sent, some replaced before): each freed exactly once, never written after");
+		check(VertexMemory.liveBytes() == 0 && VertexMemory.openAccounts() == 0, "native= stays 0: nothing grows with focus changes");
+		f.dispose(); BuildGuide.config.focusFrom.value = FocusFilter.defaultThreshold;
+
 		System.out.println("-- the native= field");
 		List<String> lines = new ArrayList<>(); TimingLog.sink = lines::add;
 		VertexMemory.Account held = VertexMemory.open(3 * 1048576);

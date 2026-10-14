@@ -100,6 +100,15 @@ public class GuidelinePickerTest {
 		double us = (System.nanoTime() - t0) / 1e3 / 1000;
 		check(tbig == null && bw.reads / 1000 <= 12, "500,000-cell structure, all built: " + (bw.reads / 1000) + " cells read per pick, " + String.format(Locale.ROOT, "%.2f", us) + " us per pick");
 		check(us < 200, "a pick stays far below a frame");
+
+		System.out.println("-- build focus: only cells the world shows");
+		Set<Long> guide = new HashSet<>(); for(int x = 1; x <= 4; x++) guide.add(LocalPos.pack(x, 1, 0));
+		World open = new World();
+		Cells unfocused = GuidelinePicker.shapeCells(guide, 0, 0, 0, Collections.emptyList(), null);
+		Cells focused = GuidelinePicker.shapeCells(guide, 0, 0, 0, Collections.emptyList(), p -> LocalPos.unpackX(p) >= 3);
+		check(is(pick(1, 0, 0, 4.5, INF, unfocused, open), 1, 1, 0), "no focus (null): the first guideline cell along the ray, " + at(pick(1, 0, 0, 4.5, INF, unfocused, open)));
+		check(is(pick(1, 0, 0, 4.5, INF, focused, open), 3, 1, 0), "with a focus: cells out of it are skipped, the first one in focus is the target, " + at(pick(1, 0, 0, 4.5, INF, focused, open)));
+		check(pick(1, 0, 0, 4.5, INF, GuidelinePicker.shapeCells(guide, 0, 0, 0, Collections.emptyList(), p -> false), open) == null, "Hidden (nothing in focus): no target, so no outline either");
 		System.out.println(fails == 0 ? "ALL OK" : fails + " FAILED");
 	}
 }

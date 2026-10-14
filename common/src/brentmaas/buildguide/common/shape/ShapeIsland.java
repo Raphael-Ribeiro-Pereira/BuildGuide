@@ -289,6 +289,15 @@ public class ShapeIsland extends Shape {
 		return parts == null ? FocusFilter.Part.BODY : parts.partOf(x, y, z);
 	}
 
+	// A world buffer made again for the focus has the generation's colours: by layer with Layers on
+	@Override
+	protected void colourCube(IShapeBuffer buffer, int x, int y, int z) {
+		ShapeLayers layers = generatedLayers;
+		if(layers == null) return;
+		int rgb = ShapeLayers.colour(layers.layerOf(y));
+		buffer.setColour((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF, (int) (255 * shapeSet.getShapeColourA()));
+	}
+
 	@Override
 	public FocusFilter.Part getFocusPart() {
 		return propertyFocusPart.value;

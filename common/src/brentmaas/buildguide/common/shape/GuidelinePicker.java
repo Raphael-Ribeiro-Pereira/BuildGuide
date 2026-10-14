@@ -2,11 +2,12 @@ package brentmaas.buildguide.common.shape;
 
 import java.util.List;
 import java.util.Set;
+import java.util.function.LongPredicate;
 
 /**
  * Area 3: which guideline cell a right click should fill. A voxel walk (Amanatides-Woo DDA) along
  * the view ray visits the cells in the order the ray enters them; the target is the first one that
- *  - belongs to the guideline (an expected position, outside every exclusion box),
+ *  - belongs to the guideline (an expected position, outside every exclusion box, in the build focus),
  *  - is empty in the world: air or a replaceable block (water, tall grass), in a loaded chunk,
  *  - does not intersect the player's box (the placement would be obstructed and eat the click),
  *  - is entered strictly before the real hit (block or entity) and before the reach.
@@ -49,9 +50,15 @@ public final class GuidelinePicker {
 	// Expected positions (local) of a shape at the set's current origin, minus the exclusion boxes
 	// (local, inclusive, corners sorted: ShapeSet.getActiveExclusionBoxes)
 	public static Cells shapeCells(final Set<Long> expected, final int ox, final int oy, final int oz, final List<int[]> exclusionBoxes) {
+		return shapeCells(expected, ox, oy, oz, exclusionBoxes, null);
+	}
+
+	// Build focus: only the expected positions the world shows (inFocus, local; null = all of them)
+	public static Cells shapeCells(final Set<Long> expected, final int ox, final int oy, final int oz, final List<int[]> exclusionBoxes, final LongPredicate inFocus) {
 		return (x, y, z) -> {
 			int lx = x - ox, ly = y - oy, lz = z - oz;
-			if(!expected.contains(LocalPos.pack(lx, ly, lz))) return false;
+			long local = LocalPos.pack(lx, ly, lz);
+			if(!expected.contains(local) || (inFocus != null && !inFocus.test(local))) return false;
 			for(int[] b: exclusionBoxes) {
 				if(lx >= b[0] && lx <= b[3] && ly >= b[1] && ly <= b[4] && lz >= b[2] && lz <= b[5]) return false;
 			}

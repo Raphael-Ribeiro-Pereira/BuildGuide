@@ -65,11 +65,17 @@ public final class TimingLog {
 	 * ms is the sum. reason: what let the update through (WorldUpdateGate.reason). Threshold: 4 ms.
 	 */
 	public static synchronized void recordWorld(String reason, long endNanos, long closeNanos, long otherNanos, int blocks) {
+		recordWorld(reason, endNanos, closeNanos, otherNanos, blocks, -1);
+	}
+
+	// With the build focus: focused = the cubes the buffer holds, as " focus=<focused>/<blocks>" (-1: not shown)
+	public static synchronized void recordWorld(String reason, long endNanos, long closeNanos, long otherNanos, int blocks, int focused) {
 		long totalNanos = endNanos + closeNanos + otherNanos;
 		if(totalNanos <= worldThresholdMillis * 1000000 || written >= maxLines) return;
 		++written;
 		String line = "[Build Guide] timing: phase=" + WORLD_BUFFER + " ms=" + Math.round(totalNanos / 1e6) + " blocks=" + blocks + " reason=" + reason
-				+ " world-end=" + tenths(endNanos) + " world-close=" + tenths(closeNanos) + " world-other=" + tenths(otherNanos) + " native=" + VertexMemory.liveMegabytes();
+				+ " world-end=" + tenths(endNanos) + " world-close=" + tenths(closeNanos) + " world-other=" + tenths(otherNanos) + " native=" + VertexMemory.liveMegabytes()
+				+ (focused < 0 ? "" : " focus=" + focused + "/" + blocks);
 		if(written == maxLines) line += " (limit of " + maxLines + " timing lines reached, no more this session)";
 		sink.accept(line);
 	}

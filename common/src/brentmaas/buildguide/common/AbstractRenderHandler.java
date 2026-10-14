@@ -101,12 +101,14 @@ public abstract class AbstractRenderHandler {
 		// Timing of the frame that applies a new buffer (TimingLog.recordWorld); reason stays null in any other frame
 		String reason = null;
 		long endNanos = 0, closeNanos = 0, otherStarted = 0;
-		int blocks = 0;
+		int blocks = 0, focused = 0;
 		try {
-			boolean current = locked && shape.ready && !shape.error;
+			// A focus change (Shape.setFocus) still making its buffer counts as a generation still running
+			boolean current = locked && shape.ready && !shape.error && !shape.isRefocusing();
 			if(current && shape.buffer != shape.shownBuffer && shape.worldGate.shouldApply(worldUpdateMode(), isMenuOpen())) {
 				reason = WorldUpdateGate.reason(worldUpdateMode(), isMenuOpen());
 				blocks = shape.getNumberOfBlocks();
+				focused = shape.getWorldBlocks();
 				long started = System.nanoTime();
 				shape.buffer.end();
 				shape.vertexBufferUnpacked = true;
@@ -135,6 +137,6 @@ public abstract class AbstractRenderHandler {
 		}finally {
 			if(locked) shape.lock.unlock();
 		}
-		if(reason != null) TimingLog.recordWorld(reason, endNanos, closeNanos, System.nanoTime() - otherStarted, blocks);
+		if(reason != null) TimingLog.recordWorld(reason, endNanos, closeNanos, System.nanoTime() - otherStarted, blocks, focused);
 	}
 }
