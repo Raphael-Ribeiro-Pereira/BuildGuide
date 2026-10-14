@@ -44,6 +44,8 @@ public class SliceScan {
 	}
 
 	private final ValidationState state;
+	// The state's palette when the scan started (4D); a new palette comes with a new generation, so a new scan
+	private final LayerPalette palette;
 	private final long epoch, generation;
 	private final int ox, oy, oz;
 	// The shape's expected positions in its own order (beginScan), and the tracked ones (not excluded) in the
@@ -70,6 +72,7 @@ public class SliceScan {
 	public SliceScan(ValidationState state, Collection<Long> shapeExpected, List<Long> tracked, int ox, int oy, int oz, long generation) {
 		this.state = state;
 		this.epoch = state.getScanEpoch();
+		this.palette = state.getPalette();
 		this.generation = generation;
 		this.ox = ox;
 		this.oy = oy;
@@ -140,18 +143,17 @@ public class SliceScan {
 		}
 	}
 
-	// An expected position: ignored type -> IGNORED (with its name), solid -> OK, anything else -> MISSING
+	// An expected position, by LayerPalette.classify (the rule every path shares; without a palette: ignored
+	// type -> IGNORED, solid -> OK, anything else -> MISSING). The block's id is read only where the layer has a
+	// chosen block, its name only for the statuses that list it
 	private void classify(IBlockProbe probe, long pos) {
 		int wx = LocalPos.unpackX(pos) + ox, wy = LocalPos.unpackY(pos) + oy, wz = LocalPos.unpackZ(pos) + oz;
 		int f = probe.flags(wx, wy, wz);
-		boolean air = (f & IBlockProbe.FLAG_AIR) != 0;
-		if(!air && (f & IBlockProbe.FLAG_IGNORED) != 0) {
-			statuses.put(pos, ValidationState.IGNORED);
-			names.put(pos, probe.name(wx, wy, wz));
-		}else {
-			statuses.put(pos, !air && (f & IBlockProbe.FLAG_SOLID) != 0 ? ValidationState.OK : ValidationState.MISSING);
-			names.remove(pos);
-		}
+		int id = palette != null && palette.needsId(LocalPos.unpackY(pos)) ? probe.blockId(wx, wy, wz) : LayerPalette.NONE;
+		byte s = LayerPalette.classify(palette, LocalPos.unpackY(pos), f, id);
+		statuses.put(pos, s);
+		if(ValidationState.namesBlock(s)) names.put(pos, probe.name(wx, wy, wz));
+		else names.remove(pos);
 	}
 
 	// A cell that is not expected: a solid, non-ignored block within nearRadius of an expected one is a

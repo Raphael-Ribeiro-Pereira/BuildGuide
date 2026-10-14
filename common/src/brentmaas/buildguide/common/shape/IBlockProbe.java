@@ -24,6 +24,12 @@ public interface IBlockProbe {
 		return flags(x, y, z);
 	}
 
+	// The block's stable integer id (the loader's raw registry id, compared with LayerPalette ids; never a
+	// string, so the scan allocates nothing per block), LayerPalette.NONE when unknown. Default: unknown
+	public default int blockId(int x, int y, int z) {
+		return LayerPalette.NONE;
+	}
+
 	// Display name of the block, only asked for when a status is set to IGNORED
 	public String name(int x, int y, int z);
 }

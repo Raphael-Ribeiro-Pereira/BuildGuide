@@ -27,6 +27,10 @@ public class ValidationState {
 	// 3 is reserved: it was WRONG (non-solid on an expected position) until Etapa 2.5, now MISSING. Not reused
 	// An ignored block type sits on an expected position: counted as missing, listed separately (yellow tag)
 	public static final byte IGNORED = 4;
+	// Palette per layer (4D, LayerPalette): the block chosen for another layer (orange), and a solid block in
+	// no layer's palette where the layer has one (a structure error, red). Neither ok nor missing
+	public static final byte WRONG_LAYER = 5;
+	public static final byte WRONG_BLOCK = 6;
 
 	// Structure error: a solid block within nearRadius of the shape that is not part of it. It deforms the
 	// geometric form, outside the shape or inside a hollow one (Etapa 2.5; before, "near block", a hint)
@@ -43,11 +47,12 @@ public class ValidationState {
 	}
 
 	private final Map<Long, Byte> status = new HashMap<Long, Byte>();
-	// Name of the ignored block type on IGNORED positions (shown in the error list)
+	// Name of the block on IGNORED, WRONG_LAYER and WRONG_BLOCK positions (shown in the error list)
 	private final Map<Long, String> ignoredBlockNames = new HashMap<Long, String>();
 	// Index of IGNORED positions so lists and overlays are O(k), not a scan of the whole map. Insertion
 	// order: deterministic and stable between rebuilds
 	private final Set<Long> ignoredPositions = new LinkedHashSet<Long>();
+	private final Set<Long> wrongLayerPositions = new LinkedHashSet<Long>(), wrongBlockPositions = new LinkedHashSet<Long>();
 	// Bumped on every mutation; readers (GUI list, world overlay) rebuild only when it changed
 	private long version = 0;
 	// Position picked in the error list, drawn distinctly in the overlay; -1 = none
@@ -57,7 +62,10 @@ public class ValidationState {
 	// Local bounding box of the expected positions, expanded by nearRadius; cheap pre-filter for block events
 	private int minX, minY, minZ, maxX, maxY, maxZ;
 	public static final int nearRadius = 2;
-	private int ok = 0, missing = 0, ignored = 0;
+	private int ok = 0, missing = 0, ignored = 0, wrongLayer = 0, wrongBlock = 0;
+	// Palette per layer of the last scan (4D), null = none; kept through invalidations (set by the loader when a
+	// scan starts), so the block events and the safety net classify with the same rule as that scan
+	private LayerPalette palette = null;
 	// Exclusion boxes in local coordinates {minX, minY, minZ, maxX, maxY, maxZ}, inclusive. Positions
 	// inside them are never tracked: not ok, not missing, not near, and out of the total
 	private List<int[]> exclusionBoxes = new ArrayList<int[]>();
@@ -93,10 +101,12 @@ public class ValidationState {
 		status.clear();
 		ignoredBlockNames.clear();
 		ignoredPositions.clear();
+		wrongLayerPositions.clear();
+		wrongBlockPositions.clear();
 		highlightedPos = -1;
 		++version;
 		nearBlocks.clear();
-		ok = missing = ignored = 0;
+		ok = missing = ignored = wrongLayer = wrongBlock = 0;
 		validated = false;
 		++scanEpoch;
 		minX = minY = minZ = Integer.MAX_VALUE;
@@ -168,6 +178,24 @@ public class ValidationState {
 	// A request is pending and no new one came in the last idleMillis
 	public synchronized boolean isScanDue(long nowMillis, long idleMillis) {
 		return scanRequested && nowMillis - lastScanRequestAt >= idleMillis;
+	}
+
+	public synchronized LayerPalette getPalette() {
+		return palette;
+	}
+	
+	public synchronized void setPalette(LayerPalette palette) {
+		this.palette = palette;
+	}
+	
+	// The status of an expected position for the probe's flags and the block's id, under this state's palette
+	public synchronized byte classifyExpected(long pos, int flags, int blockId) {
+		return LayerPalette.classify(palette, LocalPos.unpackY(pos), flags, blockId);
+	}
+	
+	// Statuses that keep the name of the block that caused them
+	public static boolean namesBlock(byte status) {
+		return status == IGNORED || status == WRONG_LAYER || status == WRONG_BLOCK;
 	}
 
 	public synchronized int getScanOriginX() {
@@ -263,13 +291,20 @@ public class ValidationState {
 		adjust(old, -1);
 		adjust(newStatus, 1);
 		status.put(pos, newStatus);
-		if(newStatus == IGNORED && blockName != null) ignoredBlockNames.put(pos, blockName);
+		String oldName = ignoredBlockNames.get(pos);
+		if(namesBlock(newStatus) && blockName != null) ignoredBlockNames.put(pos, blockName);
 		else ignoredBlockNames.remove(pos);
 		if(old != newStatus) {
-			if(old == IGNORED) ignoredPositions.remove(pos);
-			if(newStatus == IGNORED) ignoredPositions.add(pos);
+			Set<Long> was = index(old), now = index(newStatus);
+			if(was != null) was.remove(pos);
+			if(now != null) now.add(pos);
 			++version;
-		}
+		}else if(namesBlock(newStatus) && !java.util.Objects.equals(oldName, ignoredBlockNames.get(pos))) ++version; // another wrong block, same status
+	}
+	
+	// The positions of a status kept as a set (O(k) lists and overlays), or null
+	private Set<Long> index(byte s) {
+		return s == IGNORED ? ignoredPositions : s == WRONG_LAYER ? wrongLayerPositions : s == WRONG_BLOCK ? wrongBlockPositions : null;
 	}
 
 	// Remove a position from the expected set (exclusion rules): it leaves the total, it does not become missing
@@ -278,7 +313,8 @@ public class ValidationState {
 		if(old == null) return;
 		adjust(old, -1);
 		ignoredBlockNames.remove(pos);
-		ignoredPositions.remove(pos);
+		Set<Long> was = index(old);
+		if(was != null) was.remove(pos);
 		++version;
 	}
 
@@ -293,6 +329,12 @@ public class ValidationState {
 		case IGNORED:
 			missing += delta; // an ignored block is not the structure: the position is still missing
 			ignored += delta;
+			break;
+		case WRONG_LAYER:
+			wrongLayer += delta;
+			break;
+		case WRONG_BLOCK:
+			wrongBlock += delta;
 			break;
 		default:
 			break;
@@ -338,11 +380,16 @@ public class ValidationState {
 	 * entirely.
 	 */
 	public synchronized void updateBlock(long local, boolean air, boolean solid, boolean ignoredType, String blockName) {
+		updateBlock(local, air, solid, ignoredType, LayerPalette.NONE, blockName);
+	}
+	
+	// The same with the block's id (4D): an expected position follows LayerPalette.classify under this state's palette
+	public synchronized void updateBlock(long local, boolean air, boolean solid, boolean ignoredType, int blockId, String blockName) {
 		if(!validated) return;
 		if(status.containsKey(local)) {
-			if(!air && ignoredType) setStatus(local, IGNORED, blockName);
-			else if(solid) setStatus(local, OK, null);
-			else setStatus(local, MISSING, null);
+			int flags = air ? IBlockProbe.FLAG_AIR : (solid ? IBlockProbe.FLAG_SOLID : 0) | (ignoredType ? IBlockProbe.FLAG_IGNORED : 0);
+			byte s = classifyExpected(local, flags, blockId);
+			setStatus(local, s, namesBlock(s) ? blockName : null);
 			return;
 		}
 		if(isExcluded(LocalPos.unpackX(local), LocalPos.unpackY(local), LocalPos.unpackZ(local))) return;
@@ -410,7 +457,8 @@ public class ValidationState {
 	// Snapshot of the positions with the given status. IGNORED comes from its index (O(k), insertion
 	// order); other statuses scan the map
 	public synchronized List<Long> getPositions(byte wanted) {
-		if(wanted == IGNORED) return new ArrayList<Long>(ignoredPositions);
+		Set<Long> indexed = index(wanted);
+		if(indexed != null) return new ArrayList<Long>(indexed);
 		List<Long> result = new ArrayList<Long>();
 		for(Map.Entry<Long, Byte> e: status.entrySet()) if(e.getValue() == wanted) result.add(e.getKey());
 		return result;
@@ -439,8 +487,28 @@ public class ValidationState {
 		return new ArrayList<NearBlock>(nearBlocks.values());
 	}
 	
-	// Number of structure errors
+	// Number of structure errors around the shape (NearBlock)
 	public synchronized int getNearCount() {
 		return nearBlocks.size();
+	}
+	
+	// Expected positions holding the block of another layer (4D)
+	public synchronized int getWrongLayer() {
+		return wrongLayer;
+	}
+	
+	// Expected positions holding a solid block in no layer's palette (4D)
+	public synchronized int getWrongBlock() {
+		return wrongBlock;
+	}
+	
+	// Everything red: the structure errors around the shape plus the wrong blocks on it
+	public synchronized int getErrorCount() {
+		return nearBlocks.size() + wrongBlock;
+	}
+	
+	// Name of the block on an IGNORED, WRONG_LAYER or WRONG_BLOCK position; null otherwise
+	public synchronized String getBlockName(long pos) {
+		return ignoredBlockNames.get(pos);
 	}
 }

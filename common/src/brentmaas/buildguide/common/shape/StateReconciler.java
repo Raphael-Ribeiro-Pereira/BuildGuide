@@ -53,12 +53,13 @@ public final class StateReconciler {
 				int x = ox + LocalPos.unpackX(pos), y = oy + LocalPos.unpackY(pos), z = oz + LocalPos.unpackZ(pos);
 				if(!probe.isLoaded(x, y, z)) continue;
 				int f = probe.flags(x, y, z);
-				boolean air = (f & IBlockProbe.FLAG_AIR) != 0;
-				// The scan's rule: ignored type -> IGNORED, solid -> OK, anything else -> MISSING
-				byte real = !air && (f & IBlockProbe.FLAG_IGNORED) != 0 ? ValidationState.IGNORED : (f & IBlockProbe.FLAG_SOLID) != 0 ? ValidationState.OK : ValidationState.MISSING;
+				// The scan's rule (LayerPalette.classify, with the state's palette)
+				LayerPalette palette = vs.getPalette();
+				int id = palette != null && palette.needsId(LocalPos.unpackY(pos)) ? probe.blockId(x, y, z) : LayerPalette.NONE;
+				byte real = vs.classifyExpected(pos, f, id);
 				byte old = vs.getStatus(pos);
 				if(real != old) {
-					vs.setStatus(pos, real, real == ValidationState.IGNORED ? probe.name(x, y, z) : null);
+					vs.setStatus(pos, real, ValidationState.namesBlock(real) ? probe.name(x, y, z) : null);
 					++fixed;
 					report(vs, log, x, y, z, statusName(old), statusName(real));
 				}
@@ -85,6 +86,10 @@ public final class StateReconciler {
 			return "MISSING";
 		case ValidationState.IGNORED:
 			return "IGNORED";
+		case ValidationState.WRONG_LAYER:
+			return "WRONG_LAYER";
+		case ValidationState.WRONG_BLOCK:
+			return "WRONG_BLOCK";
 		default:
 			return "UNKNOWN";
 		}
