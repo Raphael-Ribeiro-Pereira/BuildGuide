@@ -299,7 +299,7 @@ public class ShapeScreen extends BaseScreen{
 
 	/**
 	 * The preview's corner note: "Focus: Cap, Layer 2: 2626 of 8097 blocks" while the world shows a focus,
-	 * "Focus off: < 30000 blocks" while one is selected but the shape is below the threshold, else null.
+	 * "Focus off: < 400 blocks" while one is selected but the shape is below the threshold, else null.
 	 */
 	public static String focusNotice(Shape shape) {
 		if(shape == null || !shape.ready || shape.error) return null;

@@ -88,9 +88,9 @@ public class FocusTest {
 		check(FocusFilter.nextLayer(0) == 1 && FocusFilter.nextLayer(4) == 0, "Layer button: All, 1, 2, 3, 4, All");
 
 		System.out.println("-- the threshold");
-		check(!FocusFilter.isActive(Part.CAP, 0, 30000, 29999) && FocusFilter.isActive(Part.CAP, 0, 30000, 30000) && FocusFilter.isActive(Part.CAP, 0, 30000, 107000), "below N no focus, at N and above it applies (N = 30000, the default)");
+		check(!FocusFilter.isActive(Part.CAP, 0, 400, 399) && FocusFilter.isActive(Part.CAP, 0, 400, 400) && FocusFilter.isActive(Part.CAP, 0, 400, 107000), "below N no focus, at N and above it applies (N = 400, the default)");
 		check(FocusFilter.isActive(Part.BODY, 0, 0, 1) && FocusFilter.isActive(Part.HIDDEN, 0, 0, 0), "N = 0: always");
-		check(FocusFilter.defaultThreshold == 30000 && Shape.focusThreshold() == 30000, "default 30000 (and without a config)");
+		check(FocusFilter.defaultThreshold == 400 && Shape.focusThreshold() == 400, "default 400 (and without a config): with Part and Layer on All the focus does nothing anyway");
 
 		System.out.println("-- the Island's selectors");
 		ShapeIsland island = new ShapeIsland();
@@ -111,16 +111,16 @@ public class FocusTest {
 		System.out.println("-- Focus from in buildguide.cfg");
 		File dir = Files.createTempDirectory("bgfocus").toFile(); File cfg = new File(dir, "buildguide.cfg");
 		Config fresh = new Config(dir);
-		check(fresh.focusFrom.value == 30000 && Files.readAllLines(cfg.toPath()).contains("focusFrom = 30000"), "a new buildguide.cfg: focusFrom = 30000, written last");
+		check(fresh.focusFrom.value == 400 && Files.readAllLines(cfg.toPath()).contains("focusFrom = 400"), "a new buildguide.cfg: focusFrom = 400, written last");
 		List<String> lines = new ArrayList<>(Files.readAllLines(cfg.toPath())); lines.replaceAll(l -> l.startsWith("focusFrom") ? "focusFrom = 5000" : l); Files.write(cfg.toPath(), lines);
 		check(new Config(dir).focusFrom.value == 5000, "a saved value is read back");
 		lines.replaceAll(l -> l.startsWith("focusFrom") ? "focusFrom = lots" : l); Files.write(cfg.toPath(), lines);
-		check(new Config(dir).focusFrom.value == 30000, "an unreadable value keeps the default");
+		check(new Config(dir).focusFrom.value == 400, "an unreadable value keeps the default");
 		lines.replaceAll(l -> l.startsWith("focusFrom") ? "focusFrom = -5" : l); Files.write(cfg.toPath(), lines);
 		check(new Config(dir).focusFrom.value == 0, "a negative one counts as 0 (always)");
 		lines.removeIf(l -> l.startsWith("focusFrom")); Files.write(cfg.toPath(), lines);
 		Config older = new Config(dir);
-		check(older.focusFrom.value == 30000 && Files.readAllLines(cfg.toPath()).contains("focusFrom = 30000"), "a buildguide.cfg from before the focus: the default, and the key is added");
+		check(older.focusFrom.value == 400 && Files.readAllLines(cfg.toPath()).contains("focusFrom = 400"), "a buildguide.cfg from before the focus: the default, and the key is added");
 		System.out.println(fails == 0 ? "ALL OK" : fails + " FAILED");
 	}
 }

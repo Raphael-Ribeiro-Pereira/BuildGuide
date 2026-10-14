@@ -29,8 +29,9 @@ public final class FocusFilter {
 	public static final int LAYER_ALL = 0;
 	// The part of every block of a shape without parts (IFocusParts default): only All and Hidden select it
 	public static final Part WHOLE = Part.ALL;
-	// Configuration "Focus from": the default threshold in blocks
-	public static final int defaultThreshold = 30000;
+	// Configuration "Focus from": the default threshold in blocks. Low on purpose: with Part and Layer on All the
+	// focus does nothing, so it only decides from what size a chosen focus applies
+	public static final int defaultThreshold = 400;
 
 	public final Part part;
 	public final int layer;
