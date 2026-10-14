@@ -2,6 +2,7 @@ package brentmaas.buildguide.common.screen;
 
 import brentmaas.buildguide.common.BuildGuide;
 import brentmaas.buildguide.common.WorldUpdateGate;
+import brentmaas.buildguide.common.shape.ShapeSet;
 import brentmaas.buildguide.common.shape.SliceScan;
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
 import brentmaas.buildguide.common.screen.widget.AbstractWidgetHandler;
@@ -18,6 +19,9 @@ public class ConfigurationScreen extends BaseScreen {
 	private IButton buttonWorldUpdate;
 	// Scan in Y layers: cycles Instant, Fast, Normal, Slow (SliceScan.Speed); top right, where no comment runs
 	private IButton buttonScanSpeed;
+	// Build focus: the threshold in blocks (0 = always), right column under Scan speed, applied on Set or Enter
+	private ITextField textFieldFocusFrom;
+	private IButton buttonFocusFromSet;
 	
 	public void init() {
 		super.init();
@@ -85,8 +89,15 @@ public class ConfigurationScreen extends BaseScreen {
 			buttonScanSpeed.setTitle(speedTitle());
 		});
 		
+		textFieldFocusFrom = BuildGuide.widgetHandler.createTextField(370, 92, 60, AbstractWidgetHandler.defaultSize, "");
+		textFieldFocusFrom.setTextValue("" + BuildGuide.config.focusFrom.value);
+		textFieldFocusFrom.setOnEnter(() -> applyFocusFrom());
+		buttonFocusFromSet = BuildGuide.widgetHandler.createButton(432, 92, 40, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.set"), () -> applyFocusFrom());
+
 		addWidget(textFieldIgnoredBlocks);
 		addWidget(buttonScanSpeed);
+		addWidget(textFieldFocusFrom);
+		addWidget(buttonFocusFromSet);
 		addWidget(buttonWorldUpdate);
 		addWidget(buttonIgnoredBlocksSet);
 		addWidget(buttonIgnoredBlocksDefault);
@@ -111,6 +122,30 @@ public class ConfigurationScreen extends BaseScreen {
 		
 		drawShadowLeft(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + new Translatable(BuildGuide.config.worldUpdateMode.translationKey), 370, 195, 0xFFFFFF);
 		drawShadowLeft(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + new Translatable(BuildGuide.config.scanSpeed.translationKey), 370, 45, 0xFFFFFF);
+		drawShadowLeft(BuildGuide.screenHandler.TEXT_MODIFIER_UNDERLINE + new Translatable(BuildGuide.config.focusFrom.translationKey), 370, 80, 0xFFFFFF);
+	}
+
+	// A whole number of blocks, 0 or more: saved, and every shape set's world buffer follows (no generation, no
+	// scan: Shape.refreshFocus). Anything else turns the field red and changes nothing
+	void applyFocusFrom() {
+		int value;
+		try {
+			value = Integer.parseInt(textFieldFocusFrom.getTextValue().trim());
+		}catch(NumberFormatException e) {
+			value = -1;
+		}
+		if(value < 0) {
+			textFieldFocusFrom.setTextColour(0xFF0000);
+			return;
+		}
+		textFieldFocusFrom.setTextColour(0xFFFFFF);
+		textFieldFocusFrom.setTextValue("" + value);
+		if(value == BuildGuide.config.focusFrom.value) return;
+		BuildGuide.config.focusFrom.setValue(value);
+		BuildGuide.config.write();
+		for(ShapeSet set: BuildGuide.stateManager.getState().shapeSets) {
+			if(set.getShape() != null) set.getShape().refreshFocus();
+		}
 	}
 	
 	private static Translatable speedTitle() {

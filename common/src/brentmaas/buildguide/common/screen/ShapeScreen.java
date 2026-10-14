@@ -9,6 +9,7 @@ import brentmaas.buildguide.common.screen.widget.IButton;
 import brentmaas.buildguide.common.screen.widget.ISlider;
 import brentmaas.buildguide.common.screen.widget.ITextField;
 import brentmaas.buildguide.common.screen.widget.IWidget;
+import brentmaas.buildguide.common.shape.FocusFilter;
 import brentmaas.buildguide.common.shape.PreviewColours;
 import brentmaas.buildguide.common.shape.PreviewModel;
 import brentmaas.buildguide.common.shape.PreviewModel.ColourMode;
@@ -80,6 +81,10 @@ public class ShapeScreen extends BaseScreen{
 	private PreviewModel shownModel = null;
 	private ISlider sliderSlice = null;
 	private static final String[] axisNames = {"X", "Y", "Z"};
+	// Build focus: a second row under the controls, "Part: ..." and, while the shape's Layers is on, "Layer: ...";
+	// they choose what the world shows (the preview always shows everything). The 3D area starts below it
+	public static final int focusRowY = previewTop + previewControlsHeight, focusRowHeight = 18, partWidth = 80, layerWidth = 64;
+	private IButton buttonFocusPart, buttonFocusLayer = null;
 	// Under the preview: a 2-px validation progress line, three tabs and the error list of the selected
 	// tab (at the minimum height 175..177, 177..193, 193..250). Replaces the bottom bar's progress on this
 	// screen. Vertical bands from the GUI height (E7): computed in init, 270 until then
@@ -211,6 +216,9 @@ public class ShapeScreen extends BaseScreen{
 		else if(model.isEmpty()) drawShadowCentred(textEmpty.toString(), (x1 + x2) / 2, midY, 0xAAAAAA);
 		else if(model.isViewEmpty()) drawShadowCentred(textNoMatch.toString(), (x1 + x2) / 2, midY, 0xAAAAAA);
 		else wrapper.drawShapePreview(x1 + 1, y1, x2 - 1, y2, model, preview.camera);
+		// Build focus: what the world shows (the preview above is always all of it)
+		String focus = focusNotice(BuildGuide.stateManager.getState().getCurrentShape());
+		if(focus != null) drawShadowLeft(focus, x1 + 3, y1 + 3, 0x66CCFF);
 		// Live apply: the world still shows an older generation (Idle or On close mode)
 		if(BuildGuide.stateManager.getState().getCurrentShape().worldGate.isPending()) drawShadowLeft(textWorldPending.toString(), x1 + 3, y2 - 10, 0xFFCC66);
 		else {
@@ -256,6 +264,58 @@ public class ShapeScreen extends BaseScreen{
 		boolean available = BuildGuide.stateManager.getState().isShapeAvailable();
 		buttonFilter.setActive(available);
 		buttonSliceAxis.setActive(available);
+		buttonFocusPart = BuildGuide.widgetHandler.createButton(x, focusRowY, partWidth, controlsHeight, partTitle(shape), () -> {
+			Shape s = currentShapeOrNull();
+			if(s == null) return;
+			s.setFocus(FocusFilter.nextPart(s.getFocusPart(), s.hasParts()), s.getFocusLayer());
+			buttonFocusPart.setTitle(partTitle(s));
+		});
+		buttonFocusPart.setActive(available);
+		addWidget(buttonFocusPart);
+		buttonFocusLayer = null;
+		if(layerControls) {
+			buttonFocusLayer = BuildGuide.widgetHandler.createButton(x + partWidth + 2, focusRowY, layerWidth, controlsHeight, layerTitle(shape), () -> {
+				Shape s = currentShapeOrNull();
+				if(s == null) return;
+				s.setFocus(s.getFocusPart(), FocusFilter.nextLayer(s.getFocusLayer()));
+				buttonFocusLayer.setTitle(layerTitle(s));
+			});
+			addWidget(buttonFocusLayer);
+		}
+	}
+
+	// "Part: Cap"; a part the shape does not have reads All (Shape.selectedFocus)
+	private static Translatable partTitle(Shape shape) {
+		FocusFilter.Part part = shape == null || shape.getFocusPart() == null ? FocusFilter.Part.ALL : shape.getFocusPart();
+		if(shape != null && !shape.hasParts() && part != FocusFilter.Part.HIDDEN) part = FocusFilter.Part.ALL;
+		return new Translatable("screen.buildguide.focus.part", new Translatable(part.translationKey).toString());
+	}
+
+	// "Layer: All", "Layer: 2"
+	private static Translatable layerTitle(Shape shape) {
+		int layer = shape == null ? FocusFilter.LAYER_ALL : shape.getFocusLayer();
+		return new Translatable("screen.buildguide.focus.layer", layer == FocusFilter.LAYER_ALL ? new Translatable("screen.buildguide.focus.layer.all").toString() : "" + layer);
+	}
+
+	/**
+	 * The preview's corner note: "Focus: Cap, Layer 2: 2626 of 8097 blocks" while the world shows a focus,
+	 * "Focus off: < 30000 blocks" while one is selected but the shape is below the threshold, else null.
+	 */
+	public static String focusNotice(Shape shape) {
+		if(shape == null || !shape.ready || shape.error) return null;
+		FocusFilter focus = shape.getWorldFocus();
+		int total = shape.getNumberOfBlocks();
+		if(focus != null) {
+			String what = focus.part == FocusFilter.Part.ALL ? "" : new Translatable(focus.part.translationKey).toString();
+			if(focus.layer != FocusFilter.LAYER_ALL && focus.part != FocusFilter.Part.HIDDEN) {
+				String layer = new Translatable("screen.buildguide.focus.layern", "" + focus.layer).toString();
+				what = what.isEmpty() ? layer : what + ", " + layer;
+			}
+			return new Translatable("screen.buildguide.focus.on", what, "" + shape.getWorldBlocks(), "" + total).toString();
+		}
+		int threshold = Shape.focusThreshold();
+		if(shape.isFocusSelected() && total < threshold) return new Translatable("screen.buildguide.focus.off", "" + threshold).toString();
+		return null;
 	}
 	
 	// Off -> X -> Y -> Z -> Off; a new axis starts in the middle of the model on it
@@ -356,7 +416,7 @@ public class ShapeScreen extends BaseScreen{
 	}
 	
 	private int previewAreaTop() {
-		return previewTop + previewControlsHeight;
+		return previewTop + previewControlsHeight + focusRowHeight;
 	}
 	
 	private int previewAreaBottom() {

@@ -276,6 +276,11 @@ public abstract class Shape implements IValidatable, IFocusParts {
 	public void setFocus(FocusFilter.Part part, int layer) {
 		storeFocus(part, layer);
 		BaseScreen.shouldUpdatePersistence = true;
+		refreshFocus();
+	}
+
+	// The same for the selectors as they are: the threshold changed (Configuration, Focus from)
+	public void refreshFocus() {
 		overlayVersion = -1;
 		worldGate.request();
 		if(refocusFuture != null && !refocusFuture.isDone()) refocusFuture.cancel(true);
@@ -601,6 +606,13 @@ public abstract class Shape implements IValidatable, IFocusParts {
 		FocusFilter f = selectedFocus();
 		if(f != null && f.part == FocusFilter.Part.ALL && getLayers() == null) return null;
 		return f != null && FocusFilter.isActive(f.part, f.layer, focusThreshold(), blocks) ? f : null;
+	}
+
+	// Whether the selectors select less than everything for the last generation (the threshold aside): the
+	// preview says "Focus off" when they do but the shape is below the threshold
+	public boolean isFocusSelected() {
+		FocusFilter f = selectedFocus();
+		return f != null && !(f.part == FocusFilter.Part.ALL && getLayers() == null);
 	}
 
 	// Whether the last generation's block at this local position is drawn with focus f (null: every block).
