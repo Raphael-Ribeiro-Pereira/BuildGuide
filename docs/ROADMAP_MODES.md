@@ -44,8 +44,14 @@ Order is the order of work. Rules that apply to all of it are in `docs/STATUS.md
      reserved.
    - Generic infrastructure: the shape reports the layer.
 
+   - **Build focus done** (2026-10-14, `8dd88d0`..`428c206`; see `docs/STATUS.md`): the world
+     shows only a part (Cap, Body, Spikes, Hidden) and / or a layer; Part and Layer in the preview
+     panel, Focus from (default 400) in Configuration.
+
 5. **Terrain: a new shape, relief (mountains)** with its own outline and seed, positioned by the
-   origin. One column per position.
+   origin. One column per position. **In progress** (2026-10-14, `wip/terrain`): a skin of 1 to 3
+   blocks over a plan (the Island's four Outlines, copied, never shared), Hills, Mountains or
+   Dunes; then layers and the palette by height.
 
 6. **Tree: an experiment with a deadline** (round canopy and bonsai before the willow).
 
@@ -229,3 +235,11 @@ Open decisions:
   test (the world-buffer lines and the scan's `start=` / `publish=`).
 - **Raphael's full test:** the checklist is in his own document (the list above, "Pending: Raphael's
   full test", is what it covers so far).
+
+## Pending after the build focus (2026-10-14)
+
+- **The scan's preparation and publish out of a single frame** (as above, waiting for the full
+  test's log).
+- **Raphael's full test.**
+- **Idea: scan only the focus.** Today the scan, the totals and Validate always cover the whole
+  shape; scanning only the blocks in focus would cut the scan's cost too. Not decided.
