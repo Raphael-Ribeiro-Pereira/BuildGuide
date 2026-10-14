@@ -22,6 +22,7 @@ import brentmaas.buildguide.common.shape.ShapePolygonalPyramid;
 import brentmaas.buildguide.common.shape.ShapeRegistry;
 import brentmaas.buildguide.common.shape.ShapeSphere;
 import brentmaas.buildguide.common.shape.ShapeSpline;
+import brentmaas.buildguide.common.shape.ShapeTerrain;
 import brentmaas.buildguide.common.shape.ShapeTorus;
 
 public class BuildGuide {
@@ -66,6 +67,7 @@ public class BuildGuide {
 		ShapeRegistry.registerShape(ShapeSpline.class, "shape.buildguide.spline");
 		ShapeRegistry.registerShape(ShapeBridge.class, "shape.buildguide.bridge");
 		ShapeRegistry.registerShape(ShapeIsland.class, "shape.buildguide.island");
+		ShapeRegistry.registerShape(ShapeTerrain.class, "shape.buildguide.terrain");
 		
 		renderHandler.register();
 	}
