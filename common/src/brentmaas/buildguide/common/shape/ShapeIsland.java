@@ -3,6 +3,7 @@ package brentmaas.buildguide.common.shape;
 import java.util.Random;
 
 import brentmaas.buildguide.common.property.Property;
+import brentmaas.buildguide.common.property.PropertyBlockId;
 import brentmaas.buildguide.common.property.PropertyBoolean;
 import brentmaas.buildguide.common.property.PropertyEnum;
 import brentmaas.buildguide.common.property.PropertyFloat;
@@ -36,7 +37,8 @@ public class ShapeIsland extends Shape {
 	// scale, wall, depth, profile, sharpness, roughness, seed, randomize (was New seed), then base %,
 	// body %, naturalize, undo, then (block B) spikes, spike mode, spike length, spike base, length var %,
 	// spread %, then (spikes 2, phase 1) jitter %, (phase 2) dripstone, taper, edge falloff %, spikes %,
-	// naturalize spikes, (phase 3) break, pieces, gap, then (layers, 4C) layers, cut 1 %, cut 2 %, cut 3 %.
+	// naturalize spikes, (phase 3) break, pieces, gap, then (layers, 4C) layers, cut 1 %, cut 2 %, cut 3 %, then
+	// (palette, 4D) block 1 to block 4.
 	// New properties go at the end. Labels: roundness reads "Corner round",
 	// edge amplitude "Wobble", edge scale "Wobble size", wall "Thickness"
 	private PropertyEnum<Outline> propertyOutline = new PropertyEnum<Outline>(Outline.CIRCLE, new Translatable("property.buildguide.outline"), () -> onOutlineChanged(), outlineNames);
@@ -94,6 +96,16 @@ public class ShapeIsland extends Shape {
 	private PropertyRangeInt propertyCut3 = new PropertyRangeInt(ShapeLayers.defaultCut3, new Translatable("property.buildguide.cut3"), () -> onCutChanged(2), ShapeLayers.minCut, ShapeLayers.maxCut, ShapeLayers.cutStep);
 	// The layers the last generation coloured the world with (null: Layers off), for the preview
 	private volatile ShapeLayers generatedLayers = null;
+	// Palette per layer (4D, after Cut 3 %): the block each layer must be built with, by id; empty = any solid
+	// block. Validation only (the geometry and the colours do not depend on it); a change regenerates, which
+	// rescans with the new palette
+	private PropertyBlockId propertyBlock1 = new PropertyBlockId("", new Translatable("property.buildguide.block1"), () -> update());
+	private PropertyBlockId propertyBlock2 = new PropertyBlockId("", new Translatable("property.buildguide.block2"), () -> update());
+	private PropertyBlockId propertyBlock3 = new PropertyBlockId("", new Translatable("property.buildguide.block3"), () -> update());
+	private PropertyBlockId propertyBlock4 = new PropertyBlockId("", new Translatable("property.buildguide.block4"), () -> update());
+	private PropertyBlockId[] blockRows = {propertyBlock1, propertyBlock2, propertyBlock3, propertyBlock4};
+	// The palette of the last generation (null: Layers off), for the scan: generation and palette stay together
+	private volatile String[] generatedPalette = null;
 
 	// Panel order per section (persistence order is the `properties` list)
 	private Property<?>[] baseRows = {propertyOutline, propertyWidthX, propertyWidthZ, propertySides, propertyRoundness, propertyRotation, propertyEdgeAmplitude, propertyEdgeScale};
@@ -151,6 +163,10 @@ public class ShapeIsland extends Shape {
 		properties.add(propertyCut1);
 		properties.add(propertyCut2);
 		properties.add(propertyCut3);
+		properties.add(propertyBlock1);
+		properties.add(propertyBlock2);
+		properties.add(propertyBlock3);
+		properties.add(propertyBlock4);
 
 		int sectionBase = declareSection(new Translatable("property.buildguide.section.base"));
 		int sectionBody = declareSection(new Translatable("property.buildguide.section.body"));
@@ -166,6 +182,7 @@ public class ShapeIsland extends Shape {
 		assignSection(sectionSpikeShape, spikeShapeRows);
 		assignSection(sectionLayers, propertyLayers);
 		assignSection(sectionLayers, cutRows);
+		assignSection(sectionLayers, blockRows);
 		assignSection(sectionRandom, propertyBasePercent, propertyBodyPercent, propertySpikesPercent, propertyRandomize, propertyNaturalize, propertyNaturalizeSpikes, propertyUndo, propertySeed);
 		// Random has 8 rows with Seed; at the minimum GUI height (270) the sections leave room for 7 (six of
 		// them since Layers, with 11-px headers), so the Seed row is not shown (still saved, still in presets,
@@ -205,6 +222,7 @@ public class ShapeIsland extends Shape {
 			if(isShown(p) && propertyLayers.value) row = placeRow(row, p);
 			else hideRow(p);
 		}
+		for(Property<?> p: blockRows) hideRow(p); // laid out with the compact Layers rows (4D GUI)
 	}
 
 	private void onLayersChanged() {
@@ -230,6 +248,12 @@ public class ShapeIsland extends Shape {
 	@Override
 	public ShapeLayers getLayers() {
 		return generatedLayers;
+	}
+
+	@Override
+	public String[] getPalette() {
+		String[] p = generatedPalette;
+		return p == null ? null : p.clone();
 	}
 
 	private void onTaperChanged() {
@@ -392,6 +416,7 @@ public class ShapeIsland extends Shape {
 		setOriginOffset(0, 0, 0);
 		ShapeLayers layers = layers();
 		generatedLayers = layers;
+		generatedPalette = layers == null ? null : new String[] {propertyBlock1.value, propertyBlock2.value, propertyBlock3.value, propertyBlock4.value};
 		if(layers == null) {
 			IslandGeometry.enumerate(params(), (x, y, z) -> addShapeCube(buffer, x, y, z));
 			return;

@@ -5,6 +5,7 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import com.mojang.blaze3d.pipeline.BlendFunction;
@@ -18,8 +19,10 @@ import brentmaas.buildguide.common.AbstractRenderHandler;
 import brentmaas.buildguide.common.BuildGuide;
 import brentmaas.buildguide.common.TimingLog;
 import brentmaas.buildguide.common.shape.GuidelinePicker;
+import brentmaas.buildguide.common.shape.LayerPalette;
 import brentmaas.buildguide.common.shape.Shape;
 import brentmaas.buildguide.common.shape.LocalPos;
+import brentmaas.buildguide.common.shape.ShapeLayers;
 import brentmaas.buildguide.common.shape.ShapeSet;
 import brentmaas.buildguide.common.shape.SliceScan;
 import brentmaas.buildguide.common.shape.StateReconciler;
@@ -38,6 +41,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.profiling.Profiler;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.HitResult;
@@ -252,9 +256,30 @@ public class RenderHandler extends AbstractRenderHandler {
 			BlockPos wp = BlockPos.of(wl);
 			tracked.add(LocalPos.pack(wp.getX() - ox, wp.getY() - oy, wp.getZ() - oz));
 		}
+		state.setPalette(paletteOf(validatable)); // before the SliceScan, which takes it
 		SliceScan scan = new SliceScan(state, validatable.getExpectedBlocks(), tracked, ox, oy, oz, validatable.getGeneration());
 		state.setActiveScan(scan);
 		return scan;
+	}
+
+	// Palette per layer (4D): the generation's layers and block ids, each id resolved once to the block's raw
+	// registry id (an id that is not a block, or air, counts as no block: any solid). Null without a palette
+	private static LayerPalette paletteOf(Shape shape) {
+		ShapeLayers layers = shape.getLayers();
+		String[] ids = shape.getPalette();
+		if(layers == null || ids == null) return null;
+		int[] raw = new int[ShapeLayers.COUNT];
+		for(int i = 0;i < raw.length;++i) raw[i] = i < ids.length ? rawBlockId(ids[i]) : LayerPalette.NONE;
+		LayerPalette palette = new LayerPalette(layers, raw);
+		return palette.isEmpty() ? null : palette;
+	}
+
+	private static int rawBlockId(String id) {
+		if(id == null || id.isEmpty()) return LayerPalette.NONE;
+		Identifier key = Identifier.tryParse(id);
+		if(key == null) return LayerPalette.NONE;
+		Optional<Block> block = BuiltInRegistries.BLOCK.getOptional(key);
+		return block.isPresent() && !block.get().defaultBlockState().isAir() ? BuiltInRegistries.BLOCK.getId(block.get()) : LayerPalette.NONE;
 	}
 	// Safety net (StateReconciler): block events miss some server-side changes, so a few tracked
 	// positions are re-read from the world every 250 ms. Runs under the shape's lock, right after validateShape
@@ -347,7 +372,9 @@ public class RenderHandler extends AbstractRenderHandler {
 	
 	// One-line chat summary read from the state; positions will be shown in the GUI (2.4), not logged
 	private void logValidation(ValidationState state) {
-		BuildGuide.logHandler.sendChatMessage("[Build Guide] Validate - ok " + state.getOk() + ", missing " + state.getMissing() + ", errors " + state.getNearCount());
+		// Errors: structure errors plus, with a palette (4D), wrong blocks on the shape; wrong layer only with a palette
+		String wrongLayer = state.getPalette() != null ? ", wrong layer " + state.getWrongLayer() : "";
+		BuildGuide.logHandler.sendChatMessage("[Build Guide] Validate - ok " + state.getOk() + ", missing " + state.getMissing() + ", errors " + state.getErrorCount() + wrongLayer);
 	}
 
 	public static RenderPipeline getRenderPipeline() {

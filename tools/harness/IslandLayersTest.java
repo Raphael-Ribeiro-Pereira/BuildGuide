@@ -137,12 +137,12 @@ public class IslandLayersTest {
 
 		System.out.println("-- persistence");
 		ShapeIsland fresh = new TestIsland();
-		check(fresh.properties.size() == 38 && fresh.toPersistence().endsWith(",false,25,50,75"), "38 persisted properties: Layers, Cut 1 %, Cut 2 %, Cut 3 % appended after Gap (default off, 25/50/75)");
-		String old = fresh.toPersistence(); old = old.substring(0, old.length() - ",false,25,50,75".length());
+		check(fresh.properties.size() >= 38 && fresh.toPersistence().contains(",Runnable,ATTACHED,2,2,false,25,50,75"), "Layers, Cut 1 %, Cut 2 %, Cut 3 % appended after Gap, later values follow (default off, 25/50/75)");
+		String old = fresh.toPersistence(); old = old.substring(0, old.indexOf(",false,25,50,75"));
 		check(old.split(",").length == 34, "an island saved before the layers: 34 values");
 		ShapeIsland loaded = new TestIsland(); loaded.restorePersistence(old); set(loaded); generate(loaded);
 		ShapeIsland ref = new TestIsland(); set(ref); generate(ref);
-		check(!loaded.error && loaded.toPersistence().equals(old + ",false,25,50,75") && !loaded.hasLayers() && loaded.getLayers() == null && blocks(loaded).equals(blocks(ref)), "it loads with Layers off and the default cuts, and generates the same island");
+		check(!loaded.error && loaded.toPersistence().startsWith(old + ",false,25,50,75") && !loaded.hasLayers() && loaded.getLayers() == null && blocks(loaded).equals(blocks(ref)), "it loads with Layers off and the default cuts, and generates the same island");
 		ShapeIsland saved = new TestIsland(); setProp(saved, "propertyLayers", true); setProp(saved, "propertyCut1", 10); setProp(saved, "propertyCut2", 40); setProp(saved, "propertyCut3", 90);
 		ShapeIsland back = new TestIsland(); back.restorePersistence(saved.toPersistence());
 		check(!back.error && back.hasLayers() && prop(back, "propertyCut1").equals(10) && prop(back, "propertyCut2").equals(40) && prop(back, "propertyCut3").equals(90), "Layers on with cuts 10/40/90: saved and loaded");

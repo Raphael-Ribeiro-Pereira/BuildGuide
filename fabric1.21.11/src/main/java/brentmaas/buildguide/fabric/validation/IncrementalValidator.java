@@ -2,12 +2,14 @@ package brentmaas.buildguide.fabric.validation;
 
 import brentmaas.buildguide.common.BuildGuide;
 import brentmaas.buildguide.common.State;
+import brentmaas.buildguide.common.shape.LayerPalette;
 import brentmaas.buildguide.common.shape.LocalPos;
 import brentmaas.buildguide.common.shape.ShapeSet;
 import brentmaas.buildguide.common.shape.SliceScan;
 import brentmaas.buildguide.common.shape.ValidationState;
 import brentmaas.buildguide.fabric.RenderHandler;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
@@ -25,6 +27,8 @@ public class IncrementalValidator {
 		boolean air = blockState.isAir();
 		boolean solid = !air && blockState.blocksMotion();
 		boolean ignored = !air && RenderHandler.isIgnored(blockState);
+		// Palette per layer (4D): the block's raw registry id, compared with the palette's (an int, no string)
+		int id = air ? LayerPalette.NONE : BuiltInRegistries.BLOCK.getId(blockState.getBlock());
 		String name = null;
 		for(ShapeSet set: state.shapeSets) {
 			if(!set.isShapeAvailable(set.getIndex())) continue; // never instantiate a shape from a block event
@@ -37,7 +41,7 @@ public class IncrementalValidator {
 			if(!vs.isInRange(lx, ly, lz)) continue;
 			// Every non-air block needs its name: near blocks are listed too (resolved once, only when in range)
 			if(name == null && !air) name = blockState.getBlock().getName().getString();
-			vs.updateBlock(LocalPos.pack(lx, ly, lz), air, solid, ignored, name);
+			vs.updateBlock(LocalPos.pack(lx, ly, lz), air, solid, ignored, id, name);
 		}
 	}
 }

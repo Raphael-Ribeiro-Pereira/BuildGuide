@@ -417,6 +417,12 @@ public abstract class Shape implements IValidatable {
 		return null;
 	}
 	
+	// Palette per layer (4D): the block ids its last generation was made with, one per layer ("" = any
+	// solid block), or null without layers or palette. Shapes without layers keep the default
+	public String[] getPalette() {
+		return null;
+	}
+	
 	public long getHowLongAgoCompletedMillis() {
 		return System.currentTimeMillis() - completedAt;
 	}
