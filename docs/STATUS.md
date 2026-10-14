@@ -206,6 +206,28 @@ at 11 px Origin and six sections leave room for 7 (77 + 126 of 206 px).
 
 Offline harness after 4C: 922 asserts, 0 failures; Bridge 466 / 159 / 360.
 
+### Native memory leak fix
+
+Built on `wip/leakfix` (`481d42a`) and fast-forwarded into `feat/cone-expanded` on 2026-10-14
+after Raphael approved `leakfix-wip` in normal use (the full test is pending, see
+`docs/ROADMAP_MODES.md`).
+
+`ShapeBuffer` never closed its native `ByteBufferBuilder`: every generation (also the discarded
+ones), preview mesh, overlay and Area 3 outline left about 384 bytes per block behind.
+
+- **`VertexMemory` (pure):** one account per builder, following vanilla's growth rule; it is released
+  exactly once, and a write after the release throws instead of touching freed memory.
+- **`ShapeBuffer`:** `end()` frees the native copy right after `createBuffer` copies it to the GPU
+  (as vanilla's SkyRenderer and CubeMap do); `close()` frees the GPU buffer only.
+- **Ownership in `Shape`, under its lock:** a cancelled or failed generation frees its own buffer when
+  its task ends; a finished generation replaced before it was shown is freed when the next one starts.
+- **`dispose` on removing a shape set** (`State.removeShapeSet` -> `ShapeSet.dispose` ->
+  `Shape.dispose`): GPU buffers closed, the last generation's data freed after a running one stops.
+- **Counter:** the world-buffer and preview-rebuild timing lines end with `native=<MiB>`, the vertex
+  memory still held; it must stay level while editing.
+
+Offline harness after the leak fix: 946 asserts, 0 failures; Bridge 466 / 159 / 360.
+
 Offline harness at the close: 406 asserts, 0 failures; Bridge reference sizes 466 / 159 / 360.
 E6 (after two fixes), E7, P4 and E8 passed their in-game checklists before being committed
 (E7 7 of 7, P4 9 of 9, E8 9 of 9). The ghost fix was committed on Raphael's go-ahead after the
@@ -218,11 +240,11 @@ Build output: `fabric1.21.11/build/libs/BuildGuide-Fabric-0.4.8.jar` (mod versio
 
 | Item | Value |
 |---|---|
-| Active jar in the mods folder | `BuildGuide-Fabric-0.4.8-layers-wip.jar` |
-| SHA-256 | `14B66C4E9A572D5224C01F5217BBB087BB48BB8BE908909CF67408824AE2F7CC` |
-| Source | commit `c8a8579`: the build output and the mods copy have the same SHA-256, and a build of the merged branch gives it again; `ShapeLayers`, `ShapeIsland`, `Shape`, `PreviewModel`, `PreviewController`, `ShapeScreen`, `TimingLog`, `WorldUpdateGate`, `AbstractRenderHandler`, `SliceScan` and `RenderHandler` are inside |
-| Tested | the offline harness (922 asserts); in game, approved for the merge (2026-10-07) |
-| Previous jars | `BuildGuide-Fabric-0.4.8-scan-slices-wip.jar` (SHA-256 `A280A6440BB423878D6AAFA316709E852D63EF2EEBB3FF3F643E826C4724A067`, commit `7762309`), `BuildGuide-Fabric-0.4.8-spikes2-wip.jar` (SHA-256 `89F6B80A37150060E598EF0988446699E8B43F5E050267E83A9398909BE5D87B`, commit `3e63cbd`), `BuildGuide-Fabric-0.4.8-spikes-wip.jar` (SHA-256 `C3564E26FD888E46E106724E051C27C19D74EE962365FD9BB90775E77DE03A6E`, commit `a6d1c23`), `BuildGuide-Fabric-0.4.8-live-apply-wip.jar` (SHA-256 `8DB5202C0AFEC1F4645D0E4052852B188BE4CA9CF35C9FC969DF5CC092994198`, commit `416b5e0`), `BuildGuide-Fabric-0.4.8-island-ux-wip.jar` (SHA-256 `DD5B7BD8ADF1714F0BC152A303B6ED3F2FB2EA5E9C8F79034B52BD27DAE76557`, commit `07d554c`), `BuildGuide-Fabric-0.4.8-island-wip.jar` (SHA-256 `556D80E49975B12802361D5CB8971EE632415A7E841C0EC71D8AF06826C92DE9`, commit `f7937be`), `BuildGuide-Fabric-0.4.8-area3-wip2.jar` (SHA-256 `B5AC963F068EFF59954521F29F24D994BBFE61CF9F55C2C1DE9256E055392A32`, commit `584674b`), `BuildGuide-Fabric-0.4.8-area3-wip.jar` (first Area 3 test) and `BuildGuide-Fabric-0.4.8-ghost-fix-wip.jar` (SHA-256 `1E2F5E96A659D474EF14D9CDDBF5930E6B695DF66F31C782A7C1E5654E55BDB6`, commit `9c3fbde`), kept as `.bak` |
+| Active jar in the mods folder | `BuildGuide-Fabric-0.4.8-leakfix-wip.jar` |
+| SHA-256 | `D0089DE876C5855AFF509974DFA2400037F1B5DCAD05E63B45A0E6C4095EDABF` |
+| Source | commit `481d42a`: the build output and the mods copy have the same SHA-256, and a build of the merged branch gives it again; `VertexMemory`, `IShapeBuffer`, `Shape`, `ShapeSet`, `State`, `TimingLog` and `ShapeBuffer` are inside |
+| Tested | the offline harness (946 asserts); in game, approved in normal use (2026-10-14); the full test is pending |
+| Previous jars | `BuildGuide-Fabric-0.4.8-layers-wip.jar` (SHA-256 `14B66C4E9A572D5224C01F5217BBB087BB48BB8BE908909CF67408824AE2F7CC`, commit `c8a8579`), `BuildGuide-Fabric-0.4.8-scan-slices-wip.jar` (SHA-256 `A280A6440BB423878D6AAFA316709E852D63EF2EEBB3FF3F643E826C4724A067`, commit `7762309`), `BuildGuide-Fabric-0.4.8-spikes2-wip.jar` (SHA-256 `89F6B80A37150060E598EF0988446699E8B43F5E050267E83A9398909BE5D87B`, commit `3e63cbd`), `BuildGuide-Fabric-0.4.8-spikes-wip.jar` (SHA-256 `C3564E26FD888E46E106724E051C27C19D74EE962365FD9BB90775E77DE03A6E`, commit `a6d1c23`), `BuildGuide-Fabric-0.4.8-live-apply-wip.jar` (SHA-256 `8DB5202C0AFEC1F4645D0E4052852B188BE4CA9CF35C9FC969DF5CC092994198`, commit `416b5e0`), `BuildGuide-Fabric-0.4.8-island-ux-wip.jar` (SHA-256 `DD5B7BD8ADF1714F0BC152A303B6ED3F2FB2EA5E9C8F79034B52BD27DAE76557`, commit `07d554c`), `BuildGuide-Fabric-0.4.8-island-wip.jar` (SHA-256 `556D80E49975B12802361D5CB8971EE632415A7E841C0EC71D8AF06826C92DE9`, commit `f7937be`), `BuildGuide-Fabric-0.4.8-area3-wip2.jar` (SHA-256 `B5AC963F068EFF59954521F29F24D994BBFE61CF9F55C2C1DE9256E055392A32`, commit `584674b`), `BuildGuide-Fabric-0.4.8-area3-wip.jar` (first Area 3 test) and `BuildGuide-Fabric-0.4.8-ghost-fix-wip.jar` (SHA-256 `1E2F5E96A659D474EF14D9CDDBF5930E6B695DF66F31C782A7C1E5654E55BDB6`, commit `9c3fbde`), kept as `.bak` |
 
 - The file name still says `wip`: it was never renamed after the test. Renaming is a choice
   for Raphael (nothing depends on the name); a rebuild of `acf4904` gives the same classes.
@@ -256,7 +278,7 @@ Process
    user has confirmed the stage in-game; the user runs the in-game tests.
 9. Before every in-game test: build green, harness green. Declare the expected decompile diff
    *before* running it, then diff the new jar against the previous baseline
-   (`BuildGuide-tools\decompiled\<NAME>`, Vineflower, CRLF normalised). The baseline is now `LAYERS`.
+   (`BuildGuide-tools\decompiled\<NAME>`, Vineflower, CRLF normalised). The baseline is now `LEAKFIX`.
 10. Deploy only with the game and the Modrinth App closed; abort if javaw, the Modrinth App, or a
     java whose command line contains fabric, knot, net.minecraft, .minecraft, ModrinthApp,
     `Fabulously Optimized (1)` or devlaunchinjector is running (any other java, such as an IDE

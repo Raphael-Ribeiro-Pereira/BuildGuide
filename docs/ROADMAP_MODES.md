@@ -192,7 +192,32 @@ Investigated in the 4C stage (phase 1, `487fbe6`):
   under the shape are not loaded.
 - **Native memory leak** found on the way: `ShapeBuffer` never closed its `ByteBufferBuilder`, so
   every generation (also the discarded ones), preview mesh and overlay left about 384 bytes per block
-  behind. Being fixed on `wip/leakfix`.
+  behind. Fixed in `481d42a` (see `docs/STATUS.md`).
 - Vertex size, for the figures in `docs/STATUS.md`: 24 vertices x 16 bytes = 384 bytes per block of
   vertex buffer; with the shared int index buffer (36 indices, allocated at twice the need) the GPU
   peak is up to 672 bytes per block, the figure used there.
+
+## Pending: Raphael's full test (after `leakfix-wip`, 2026-10-14)
+
+`leakfix-wip` was approved in normal use; the deep test is left for the end:
+
+1. **Memory:** the javaw memory before and after 20 to 30 edits.
+2. **native= stays level** in the timing log.
+3. **Stress test:** Randomize / Undo, opening and closing the menu, switching World update mode,
+   removing a shape set, resizing the window, the G key.
+4. **Test 10:** the worst case with 64 spikes.
+5. **11-px accordion headers** in Cone and Bridge, at heights 270 and 360.
+6. **The stutter when closing the menu** in the 3 modes, with the world-buffer lines and the scan's
+   `start=` / `publish=`.
+
+Open decisions:
+- Spike cap: 64 or 40.
+- The empty Spike shape header (Count 0).
+- The hidden Seed row.
+- The meaning of Pieces 2.
+
+## Backlog (2026-10-14)
+
+- **Take the scan's preparation and its publish out of a single frame**, after the numbers of the
+  full test.
+- **A possible pull request of the leak fix to the original repository** (brentmaas/BuildGuide).

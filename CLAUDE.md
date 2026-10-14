@@ -176,7 +176,8 @@ Only the latest one matters; diff the next change against it.
 | `a6d1c23` | Preview performance (one mesh rebuild per change, `reason=` in the timing line) and Island spikes block B (phases `27ee102`..`a6d1c23`) | `SPIKES` (built from `a6d1c23`, SHA-256 equal to the installed `spikes-wip` jar) |
 | `db5d2b1` | Island spikes 2 — cap 64, Fill and Jitter %, Taper, Dripstone, Edge falloff %, Spikes %, Natural spikes, Segmented (phases `ceb4479`..`3e63cbd`, then docs) | `SPIKES2` (built from `db5d2b1`, SHA-256 equal to the installed `spikes2-wip` jar) |
 | `7762309` | Scan in Y layers — `SliceScan`, scan epoch, Scan speed in Configuration (phases `6802ac9`..`7762309`) | `SCANSLICES` (built from `7762309`, SHA-256 equal to the installed `scan-slices-wip` jar) |
-| `c8a8579` | Layers by depth (4C) — `ShapeLayers`, Island Layers and cuts, world and preview coloured by layer, accordion headers 11 px; world update timing split in world-end / world-close / world-other (phases `487fbe6`..`c8a8579`) | `LAYERS` (current; built from `c8a8579`, SHA-256 equal to the installed `layers-wip` jar) |
+| `c8a8579` | Layers by depth (4C) — `ShapeLayers`, Island Layers and cuts, world and preview coloured by layer, accordion headers 11 px; world update timing split in world-end / world-close / world-other (phases `487fbe6`..`c8a8579`) | `LAYERS` (built from `c8a8579`, SHA-256 equal to the installed `layers-wip` jar) |
+| `481d42a` | Native memory leak fix — `VertexMemory`, buffer ownership in `Shape`, `ShapeBuffer` frees its native copy after the upload, `dispose` on removing a shape set, `native=` in the timing log | `LEAKFIX` (current; built from `481d42a`, SHA-256 equal to the installed `leakfix-wip` jar) |
 
 GUI redesign plan and decisions: `docs/GUI_REDESIGN.md` (stages E1–E8). Project status, final
 jars, rules going forward and backlog: `docs/STATUS.md`.
