@@ -51,9 +51,19 @@ public final class LayerPalette {
 	 * palette null = no palette (the rule of before); blockId is only read when the layer has a block.
 	 */
 	public static byte classify(LayerPalette palette, int y, int flags, int blockId) {
+		return byWanted(palette, palette == null ? NONE : palette.idOf(palette.layers.layerOf(y)), flags, blockId);
+	}
+
+	// The same at a local position: the layer is the layers' layerAt (by y for the Island, by column for the
+	// Terrain). Every validation path calls this one
+	public static byte classify(LayerPalette palette, int x, int y, int z, int flags, int blockId) {
+		return byWanted(palette, palette == null ? NONE : palette.idOf(palette.layers.layerAt(x, y, z)), flags, blockId);
+	}
+
+	// wanted: the chosen block of the position's layer, NONE for any
+	private static byte byWanted(LayerPalette palette, int wanted, int flags, int blockId) {
 		boolean air = (flags & IBlockProbe.FLAG_AIR) != 0;
 		if(air) return ValidationState.MISSING;
-		int wanted = palette == null ? NONE : palette.idOf(palette.layers.layerOf(y));
 		if(wanted != NONE) {
 			if(blockId == wanted) return ValidationState.OK;
 			if(palette.contains(blockId)) return ValidationState.WRONG_LAYER;
@@ -66,5 +76,9 @@ public final class LayerPalette {
 	// Whether classify needs the block's id at this y (the layer has a chosen block): the loader reads it only then
 	public boolean needsId(int y) {
 		return idOf(layers.layerOf(y)) != NONE;
+	}
+
+	public boolean needsId(int x, int y, int z) {
+		return idOf(layers.layerAt(x, y, z)) != NONE;
 	}
 }

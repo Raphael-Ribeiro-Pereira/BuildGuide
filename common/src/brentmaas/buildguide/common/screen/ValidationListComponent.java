@@ -212,7 +212,7 @@ public class ValidationListComponent {
 	// "[x, y, z] Dirt (layer 2)": a position on the shape whose block is not its layer's
 	private static void layerRow(List<Translatable> titles, List<Long> positions, ValidationState state, long pos, int ox, int oy, int oz) {
 		LayerPalette palette = state.getPalette();
-		String layer = palette == null ? "" : " (layer " + palette.layers.layerOf(LocalPos.unpackY(pos)) + ")";
+		String layer = palette == null ? "" : " (layer " + palette.layers.layerAt(LocalPos.unpackX(pos), LocalPos.unpackY(pos), LocalPos.unpackZ(pos)) + ")";
 		String name = state.getBlockName(pos);
 		titles.add(new Translatable("[" + (ox + LocalPos.unpackX(pos)) + ", " + (oy + LocalPos.unpackY(pos)) + ", " + (oz + LocalPos.unpackZ(pos)) + "] " + (name != null ? name : "?") + layer));
 		positions.add(pos);

@@ -10,8 +10,11 @@ package brentmaas.buildguide.common.shape;
  *
  * Immutable: a shape reports the layers of its last generation (Shape.getLayers), so the preview colours
  * the same blocks the world shows. Only primitives: no net.minecraft.
+ *
+ * The layer of a position is layerAt(x, y, z): by y for these layers (the Island's); a subclass may take it
+ * from the position's column instead (TerrainLayers: by the height of the column's surface).
  */
-public final class ShapeLayers {
+public class ShapeLayers {
 	public static final int COUNT = 4;
 	// Cut limits in percent of the depth, the -/+ step, and the least distance between two cuts
 	public static final int minCut = 5, maxCut = 95, cutStep = 5, minCutGap = 5;
@@ -48,6 +51,11 @@ public final class ShapeLayers {
 		if(below < (long) cut2 * depth) return 2;
 		if(below < (long) cut3 * depth) return 3;
 		return 4;
+	}
+
+	// 1 to 4 for the block at this local position: layerOf(y) here
+	public int layerAt(int x, int y, int z) {
+		return layerOf(y);
 	}
 
 	public static int colour(int layer) {
@@ -87,7 +95,8 @@ public final class ShapeLayers {
 
 	@Override
 	public boolean equals(Object o) {
-		if(!(o instanceof ShapeLayers)) return false;
+		// The same kind of layers only (TerrainLayers compares its columns too)
+		if(o == null || o.getClass() != getClass()) return false;
 		ShapeLayers l = (ShapeLayers) o;
 		return top == l.top && depth == l.depth && cut1 == l.cut1 && cut2 == l.cut2 && cut3 == l.cut3;
 	}

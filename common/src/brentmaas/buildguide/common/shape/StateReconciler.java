@@ -55,7 +55,7 @@ public final class StateReconciler {
 				int f = probe.flags(x, y, z);
 				// The scan's rule (LayerPalette.classify, with the state's palette)
 				LayerPalette palette = vs.getPalette();
-				int id = palette != null && palette.needsId(LocalPos.unpackY(pos)) ? probe.blockId(x, y, z) : LayerPalette.NONE;
+				int id = palette != null && palette.needsId(LocalPos.unpackX(pos), LocalPos.unpackY(pos), LocalPos.unpackZ(pos)) ? probe.blockId(x, y, z) : LayerPalette.NONE;
 				byte real = vs.classifyExpected(pos, f, id);
 				byte old = vs.getStatus(pos);
 				if(real != old) {

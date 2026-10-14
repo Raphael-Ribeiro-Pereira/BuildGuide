@@ -149,8 +149,9 @@ public class SliceScan {
 	private void classify(IBlockProbe probe, long pos) {
 		int wx = LocalPos.unpackX(pos) + ox, wy = LocalPos.unpackY(pos) + oy, wz = LocalPos.unpackZ(pos) + oz;
 		int f = probe.flags(wx, wy, wz);
-		int id = palette != null && palette.needsId(LocalPos.unpackY(pos)) ? probe.blockId(wx, wy, wz) : LayerPalette.NONE;
-		byte s = LayerPalette.classify(palette, LocalPos.unpackY(pos), f, id);
+		int lx = LocalPos.unpackX(pos), ly = LocalPos.unpackY(pos), lz = LocalPos.unpackZ(pos);
+		int id = palette != null && palette.needsId(lx, ly, lz) ? probe.blockId(wx, wy, wz) : LayerPalette.NONE;
+		byte s = LayerPalette.classify(palette, lx, ly, lz, f, id);
 		statuses.put(pos, s);
 		if(ValidationState.namesBlock(s)) names.put(pos, probe.name(wx, wy, wz));
 		else names.remove(pos);

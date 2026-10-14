@@ -285,11 +285,22 @@ public final class TerrainGeometry {
 		return bottom;
 	}
 
+	// Half side of the grid tops() and bottoms() index (halfBox + 1: a ring of outside around the plan)
+	public static int gridHalf(Params params) {
+		return halfBox(params) + 1;
+	}
+
 	// The skin, in order x, z, then y from the top down; each cell once
 	public static void enumerate(Params params, IBlockConsumer out) throws InterruptedException {
+		enumerate(params, null, out);
+	}
+
+	// The same, handing the generation's tops (never written afterwards) to `tops` (when given) before the first block
+	public static void enumerate(Params params, java.util.function.Consumer<int[]> tops, IBlockConsumer out) throws InterruptedException {
 		Params p = params.clamped();
 		int h = halfBox(p) + 1, n = 2 * h + 1;
 		int[] top = tops(p), bottom = bottoms(p, top);
+		if(tops != null) tops.accept(top);
 		for(int x = -h;x <= h;++x) {
 			for(int z = -h;z <= h;++z) {
 				int i = (x + h) * n + (z + h);

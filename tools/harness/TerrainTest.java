@@ -126,7 +126,7 @@ public class TerrainTest {
 
 		System.out.println("-- persistence, labels, accordion, registry");
 		ShapeTerrain fresh = new ShapeTerrain(); String fs = fresh.toPersistence();
-		check(fresh.properties.size() == 22 && fs.equals("CIRCLE,41,41,6,0.7,0.0,0.0,6.0,HILLS,12,20,0.0,0,2,15,15,Runnable,Runnable,Runnable,1,ALL,0"), "22 values, neutral defaults: " + fs);
+		check(fresh.properties.size() == 30 && fs.equals("CIRCLE,41,41,6,0.7,0.0,0.0,6.0,HILLS,12,20,0.0,0,2,15,15,Runnable,Runnable,Runnable,1,ALL,0,false,25,50,75,,,,"), "30 values (22 of phase 1, then Layers, the cuts and 4 block ids), neutral defaults: " + fs);
 		ShapeTerrain back = new ShapeTerrain(); prop(back, "propertyType").value = Type.MOUNTAINS; prop(back, "propertySeed").value = 4242; prop(back, "propertyOutline").value = Outline.POLYGON; String bs = back.toPersistence();
 		ShapeTerrain back2 = new ShapeTerrain(); back2.restorePersistence(bs);
 		check(!back2.error && back2.toPersistence().equals(bs), "saved and restored exactly");
@@ -138,10 +138,10 @@ public class TerrainTest {
 			int acc = ShapeLayout.accordionHeight(h); int worst = 0;
 			for(Outline o: Outline.values()){ ShapeTerrain s = new ShapeTerrain(); prop(s, "propertyOutline").value = o; for(int sec = 0; sec < s.getSectionCount(); sec++) worst = Math.max(worst, s.countRows(sec)); }
 			int capacity = (acc - (1 + new ShapeTerrain().getSectionCount()) * 11) / Property.rowHeight;
-			check(worst <= capacity, "height " + h + ": sections Base, Relief, Random; the largest open section (every Outline) " + worst + " rows, capacity " + capacity + "; Seed is a visible row");
+			check(worst <= capacity, "height " + h + ": sections Base, Relief, Layers, Random; the largest open section (every Outline) " + worst + " rows, capacity " + capacity + "; Seed is a visible row");
 		}
 		ShapeTerrain sec = new ShapeTerrain();
-		check(sec.getSectionCount() == 3 && sec.getSectionName(0).getTranslationKey().equals("property.buildguide.section.base") && sec.getSectionName(1).getTranslationKey().equals("property.buildguide.section.relief") && sec.getSectionName(2).getTranslationKey().equals("property.buildguide.section.seed") && sec.countRows(2) == 6, "Base, Relief, Random (6 rows, Seed included)");
+		check(sec.getSectionCount() == 4 && sec.getSectionName(0).getTranslationKey().equals("property.buildguide.section.base") && sec.getSectionName(1).getTranslationKey().equals("property.buildguide.section.relief") && sec.getSectionName(2).getTranslationKey().equals("property.buildguide.section.layers") && sec.getSectionName(3).getTranslationKey().equals("property.buildguide.section.seed") && sec.countRows(3) == 6 && sec.countRows(2) == 1, "Base, Relief, Layers (the box alone while off), Random (6 rows, Seed included)");
 		List<String> reg = new ArrayList<>(); for(String l: Files.readAllLines(Paths.get("common/src/brentmaas/buildguide/common/BuildGuide.java"))) if(l.contains("registerShape(")) reg.add(l.trim());
 		check(reg.get(reg.size() - 1).startsWith("ShapeRegistry.registerShape(ShapeTerrain.class") && reg.get(reg.size() - 2).startsWith("ShapeRegistry.registerShape(ShapeIsland.class"), "registered last, right after the Island");
 
@@ -157,7 +157,7 @@ public class TerrainTest {
 		g.setFocus(Part.HIDDEN, 0); FocusWorldTest.settle(g);
 		check(((FocusWorldTest.RecBuffer) g.buffer).cubes.size() == 1 && g.getExpectedBlocks().equals(geo), "Hidden: nothing of the terrain in the world, every block still expected");
 		String hs = g.toPersistence(); ShapeTerrain hb = new ShapeTerrain(); hb.restorePersistence(hs);
-		check(hs.endsWith(",HIDDEN,0") && hb.getFocusPart() == Part.HIDDEN, "the selectors are saved (Hidden, All)");
+		check(hs.split(",", -1)[20].equals("HIDDEN") && hs.split(",", -1)[21].equals("0") && hb.getFocusPart() == Part.HIDDEN, "the selectors are saved, values 21 and 22 (Hidden, All)");
 		g.setFocus(Part.ALL, 0); FocusWorldTest.settle(g);
 		check(((FocusWorldTest.RecBuffer) g.buffer).shape().equals(geo) && g.getWorldFocus() == null, "All: no filter");
 		BuildGuide.config.focusFrom.value = geo.size() + 1; g.setFocus(Part.HIDDEN, 0); FocusWorldTest.settle(g);

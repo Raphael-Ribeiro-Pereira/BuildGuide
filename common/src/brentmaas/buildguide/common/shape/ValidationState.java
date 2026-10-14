@@ -190,7 +190,7 @@ public class ValidationState {
 	
 	// The status of an expected position for the probe's flags and the block's id, under this state's palette
 	public synchronized byte classifyExpected(long pos, int flags, int blockId) {
-		return LayerPalette.classify(palette, LocalPos.unpackY(pos), flags, blockId);
+		return LayerPalette.classify(palette, LocalPos.unpackX(pos), LocalPos.unpackY(pos), LocalPos.unpackZ(pos), flags, blockId);
 	}
 	
 	// Statuses that keep the name of the block that caused them

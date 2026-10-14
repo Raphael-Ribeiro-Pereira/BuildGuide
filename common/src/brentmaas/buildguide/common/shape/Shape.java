@@ -620,7 +620,7 @@ public abstract class Shape implements IValidatable, IFocusParts {
 	public boolean isInFocus(FocusFilter f, int x, int y, int z) {
 		if(f == null) return true;
 		ShapeLayers layers = getLayers();
-		return f.accepts(partOf(x, y, z), layers == null ? f.layer : layers.layerOf(y));
+		return f.accepts(partOf(x, y, z), layers == null ? f.layer : layers.layerAt(x, y, z));
 	}
 
 	public long getHowLongAgoCompletedMillis() {

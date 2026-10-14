@@ -204,7 +204,7 @@ public final class PreviewModel {
 
 	// Colour of position i: its layer's colour when coloured by layer; else its status when validated, white otherwise
 	public int colourAt(int i) {
-		if(colourMode == ColourMode.LAYER) return ShapeLayers.colour(layers.layerOf(LocalPos.unpackY(positions[i])));
+		if(colourMode == ColourMode.LAYER) return ShapeLayers.colour(layers.layerAt(LocalPos.unpackX(positions[i]), LocalPos.unpackY(positions[i]), LocalPos.unpackZ(positions[i])));
 		return PreviewColours.forStatus(status == null ? ValidationState.UNKNOWN : status[i]);
 	}
 
