@@ -34,13 +34,14 @@ public class ShapeIsland extends Shape {
 	private String[] profileNames = {"Bowl", "Cone", "Terraced"};
 	private String[] spikeModeNames = {"Random", "Ring", "Fill"};
 	private String[] breakNames = {"Attached", "Segmented"};
+	private static final String[] focusPartNames = {"All", "Cap", "Body", "Spikes", "Hidden"};
 
 	// Persistence order: outline, width X, width Z, sides, roundness, rotation, edge amplitude, edge
 	// scale, wall, depth, profile, sharpness, roughness, seed, randomize (was New seed), then base %,
 	// body %, naturalize, undo, then (block B) spikes, spike mode, spike length, spike base, length var %,
 	// spread %, then (spikes 2, phase 1) jitter %, (phase 2) dripstone, taper, edge falloff %, spikes %,
 	// naturalize spikes, (phase 3) break, pieces, gap, then (layers, 4C) layers, cut 1 %, cut 2 %, cut 3 %, then
-	// (palette, 4D) block 1 to block 4.
+	// (palette, 4D) block 1 to block 4, then (build focus) focus part, focus layer.
 	// New properties go at the end. Labels: roundness reads "Corner round",
 	// edge amplitude "Wobble", edge scale "Wobble size", wall "Thickness"
 	private PropertyEnum<Outline> propertyOutline = new PropertyEnum<Outline>(Outline.CIRCLE, new Translatable("property.buildguide.outline"), () -> onOutlineChanged(), outlineNames);
@@ -111,6 +112,13 @@ public class ShapeIsland extends Shape {
 	private PropertyBlockId[] blockRows = {propertyBlock1, propertyBlock2, propertyBlock3, propertyBlock4};
 	// The palette of the last generation (null: Layers off), for the scan: generation and palette stay together
 	private volatile String[] generatedPalette = null;
+	// Build focus (after Block 4): the part and the layer the world shows (FocusFilter). Not panel rows (the
+	// preview's Part and Layer buttons set them), so hidden from the panel; saved, so a restart keeps the focus.
+	// Islands saved before it load with All, All
+	private PropertyEnum<FocusFilter.Part> propertyFocusPart = new PropertyEnum<FocusFilter.Part>(FocusFilter.Part.ALL, new Translatable("screen.buildguide.focus.part"), null, focusPartNames);
+	private PropertyInt propertyFocusLayer = new PropertyInt(FocusFilter.LAYER_ALL, new Translatable("screen.buildguide.focus.layer"), null);
+	// What the last generation's parts are computed from (IslandGeometry.Parts), set before its first block
+	private volatile IslandGeometry.Parts generatedParts = null;
 
 	// Panel order per section (persistence order is the `properties` list)
 	private Property<?>[] baseRows = {propertyOutline, propertyWidthX, propertyWidthZ, propertySides, propertyRoundness, propertyRotation, propertyEdgeAmplitude, propertyEdgeScale};
@@ -172,6 +180,10 @@ public class ShapeIsland extends Shape {
 		properties.add(propertyBlock2);
 		properties.add(propertyBlock3);
 		properties.add(propertyBlock4);
+		properties.add(propertyFocusPart);
+		properties.add(propertyFocusLayer);
+		hideFromGui(propertyFocusPart);
+		hideFromGui(propertyFocusLayer);
 
 		int sectionBase = declareSection(new Translatable("property.buildguide.section.base"));
 		int sectionBody = declareSection(new Translatable("property.buildguide.section.body"));
@@ -263,6 +275,36 @@ public class ShapeIsland extends Shape {
 	public String[] getPalette() {
 		String[] p = generatedPalette;
 		return p == null ? null : p.clone();
+	}
+
+	// Build focus: Cap, Body and Spikes (IslandGeometry.Parts); before a first generation every block is Body
+	@Override
+	public boolean hasParts() {
+		return true;
+	}
+
+	@Override
+	public FocusFilter.Part partOf(int x, int y, int z) {
+		IslandGeometry.Parts parts = generatedParts;
+		return parts == null ? FocusFilter.Part.BODY : parts.partOf(x, y, z);
+	}
+
+	@Override
+	public FocusFilter.Part getFocusPart() {
+		return propertyFocusPart.value;
+	}
+
+	// A saved layer out of 0..4 counts as All
+	@Override
+	public int getFocusLayer() {
+		int layer = propertyFocusLayer.value;
+		return layer < 0 || layer > ShapeLayers.COUNT ? FocusFilter.LAYER_ALL : layer;
+	}
+
+	@Override
+	protected void storeFocus(FocusFilter.Part part, int layer) {
+		propertyFocusPart.setValue(part);
+		propertyFocusLayer.setValue(layer);
 	}
 
 	private void onTaperChanged() {
@@ -426,12 +468,13 @@ public class ShapeIsland extends Shape {
 		ShapeLayers layers = layers();
 		generatedLayers = layers;
 		generatedPalette = layers == null ? null : new String[] {propertyBlock1.value, propertyBlock2.value, propertyBlock3.value, propertyBlock4.value};
+		generatedParts = null;
 		if(layers == null) {
-			IslandGeometry.enumerate(params(), (x, y, z) -> addShapeCube(buffer, x, y, z));
+			IslandGeometry.enumerate(params(), parts -> generatedParts = parts, (x, y, z) -> addShapeCube(buffer, x, y, z));
 			return;
 		}
 		int alpha = (int) (255 * shapeSet.getShapeColourA());
-		IslandGeometry.enumerate(params(), (x, y, z) -> {
+		IslandGeometry.enumerate(params(), parts -> generatedParts = parts, (x, y, z) -> {
 			int rgb = ShapeLayers.colour(layers.layerOf(y));
 			buffer.setColour((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF, alpha);
 			addShapeCube(buffer, x, y, z);

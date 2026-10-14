@@ -21,7 +21,7 @@ import brentmaas.buildguide.common.screen.BaseScreen;
 import brentmaas.buildguide.common.screen.ShapeScreen;
 import brentmaas.buildguide.common.screen.widget.AbstractWidgetHandler;
 
-public abstract class Shape implements IValidatable {
+public abstract class Shape implements IValidatable, IFocusParts {
 	public ArrayList<Property<?>> properties = new ArrayList<Property<?>>();
 	// Panel sections (see declareSection), shown as accordion headers by ShapeScreen. UI state only:
 	// never persisted. A shape that declares none has one implicit section, "Properties"
@@ -423,6 +423,51 @@ public abstract class Shape implements IValidatable {
 		return null;
 	}
 	
+	// Build focus (FocusFilter): the two selectors. Per instance and transient here (other shapes: All or
+	// Hidden until a restart); the Island keeps them in its properties, so they are saved
+	private transient FocusFilter.Part focusPart = FocusFilter.Part.ALL;
+	private transient int focusLayer = FocusFilter.LAYER_ALL;
+
+	public FocusFilter.Part getFocusPart() {
+		return focusPart;
+	}
+
+	public int getFocusLayer() {
+		return focusLayer;
+	}
+
+	protected void storeFocus(FocusFilter.Part part, int layer) {
+		focusPart = part;
+		focusLayer = layer;
+	}
+
+	// Configuration "Focus from" (the default without a config, as in the harness)
+	public static int focusThreshold() {
+		return BuildGuide.config == null ? FocusFilter.defaultThreshold : BuildGuide.config.focusFrom.value;
+	}
+
+	// What the selectors ask for, without the threshold: null when they select everything. Without parts only
+	// Hidden counts (any other part is All); the layer selector only with the generation's layers
+	FocusFilter selectedFocus() {
+		FocusFilter.Part part = getFocusPart();
+		if(part == null || (!hasParts() && part != FocusFilter.Part.HIDDEN)) part = FocusFilter.Part.ALL;
+		int layer = getLayers() == null ? FocusFilter.LAYER_ALL : getFocusLayer();
+		return part == FocusFilter.Part.ALL && layer == FocusFilter.LAYER_ALL ? null : new FocusFilter(part, layer);
+	}
+
+	// The focus the world uses for a generation of `blocks` blocks: null below the threshold or with nothing selected
+	FocusFilter focusFor(int blocks) {
+		FocusFilter f = selectedFocus();
+		return f != null && FocusFilter.isActive(f.part, f.layer, focusThreshold(), blocks) ? f : null;
+	}
+
+	// Whether the last generation's block at this local position is drawn with focus f (null: every block)
+	public boolean isInFocus(FocusFilter f, int x, int y, int z) {
+		if(f == null) return true;
+		ShapeLayers layers = getLayers();
+		return f.accepts(partOf(x, y, z), layers == null ? FocusFilter.LAYER_ALL : layers.layerOf(y));
+	}
+
 	public long getHowLongAgoCompletedMillis() {
 		return System.currentTimeMillis() - completedAt;
 	}

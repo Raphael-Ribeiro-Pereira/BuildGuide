@@ -191,11 +191,12 @@ public final class IslandGeometry {
 	 * (x + h) * (2h + 1) + (z + h).
 	 */
 	public static int[] columns(Params params, int margin) {
-		return columns(params, margin, null);
+		return columns(params, margin, null, null);
 	}
 
-	// The same, collecting the loose spike pieces (Segmented) in `loose` when it is given
-	private static int[] columns(Params params, int margin, Loose loose) {
+	// The same, collecting the loose spike pieces (Segmented) in `loose` when it is given, and the body's own
+	// bottoms (before the spikes) in bodyOut[0] when it is given: the same array without spikes
+	private static int[] columns(Params params, int margin, Loose loose, int[][] bodyOut) {
 		Params p = params.clamped();
 		int h = halfBox(p) + margin, n = 2 * h + 1;
 		int[] bottom = new int[n * n];
@@ -218,8 +219,10 @@ public final class IslandGeometry {
 				bottom[(x + h) * n + (z + h)] = b;
 			}
 		}
-		if(p.spikes > 0) addSpikes(p, bottom, h, n, loose);
+		int[] body = p.spikes > 0 ? bottom.clone() : bottom;
+		if(p.spikes > 0) addSpikes(p, bottom, body, h, n, loose);
 		if(loose != null) loose.finish(bottom);
+		if(bodyOut != null) bodyOut[0] = body;
 		return bottom;
 	}
 
@@ -231,10 +234,17 @@ public final class IslandGeometry {
 	 * outside the plan, or y + k reaches above the top, or y - k reaches below its bottom.
 	 */
 	public static void enumerate(Params params, IBlockConsumer out) throws InterruptedException {
+		enumerate(params, null, out);
+	}
+
+	// The same, handing the generation's Parts to `parts` (when given) before the first block
+	public static void enumerate(Params params, java.util.function.Consumer<Parts> parts, IBlockConsumer out) throws InterruptedException {
 		Params p = params.clamped();
 		int w = p.wall, h = halfBox(p) + w, n = 2 * h + 1, inner = h - w;
 		Loose loose = p.breakMode == BreakMode.SEGMENTED && p.spikes > 0 ? new Loose(n) : null;
-		int[] bottom = columns(p, w, loose);
+		int[][] body = parts == null ? null : new int[1][];
+		int[] bottom = columns(p, w, loose, body);
+		if(parts != null) parts.accept(new Parts(body[0], h, n, w));
 		if(loose != null && !loose.isEmpty()) {
 			enumerateUnion(bottom, loose, h, n, w, inner, out);
 			return;
@@ -413,8 +423,7 @@ public final class IslandGeometry {
 	 * Columns outside the plan stay empty: the top is the flat cap at y = 0, so a spike cannot grow
 	 * beyond the outline. The shell is then computed on these columns exactly as for the body alone.
 	 */
-	private static void addSpikes(Params p, int[] bottom, int h, int n, Loose loose) {
-		int[] body = bottom.clone();
+	private static void addSpikes(Params p, int[] bottom, int[] body, int h, int n, Loose loose) {
 		double[][] plan = spikePlan(p, body, h, n);
 		double radius = p.spikeBase + 0.5;
 		for(double[] s: plan) {
@@ -509,13 +518,39 @@ public final class IslandGeometry {
 		if(p.breakMode != BreakMode.SEGMENTED || p.spikes == 0) return cells;
 		int h = halfBox(p), n = 2 * h + 1;
 		Loose loose = new Loose(n);
-		columns(p, 0, loose);
+		columns(p, 0, loose, null);
 		for(int i = 0;i < n * n;++i) {
 			int[] iv = loose.at(i);
 			if(iv == null) continue;
 			for(int k = 0;k < iv.length;k += 2) for(int y = iv[k];y <= iv[k + 1];++y) cells.add(new int[] {i / n - h, y, i % n - h});
 		}
 		return cells;
+	}
+
+	/**
+	 * Build focus (FocusFilter): which part a block of one generation belongs to, from its position only, so
+	 * nothing is kept per block (the body's bottoms, one int per column). Spikes: below the body's own bottom
+	 * in that column (the cones, attached or loose, lie only there); Cap: the top `wall` rows (y from
+	 * -(wall - 1) to 0); Body: the rest of the shell. Each block has exactly one part.
+	 */
+	public static final class Parts {
+		private final int[] body;
+		private final int h, n, wall;
+
+		Parts(int[] body, int h, int n, int wall) {
+			this.body = body;
+			this.h = h;
+			this.n = n;
+			this.wall = wall;
+		}
+
+		public FocusFilter.Part partOf(int x, int y, int z) {
+			int ix = x + h, iz = z + h;
+			int b = ix < 0 || ix >= n || iz < 0 || iz >= n ? -1 : body[ix * n + iz];
+			if(b < 0 || y < -b) return FocusFilter.Part.SPIKES;
+			if(y >= -(wall - 1)) return FocusFilter.Part.CAP;
+			return FocusFilter.Part.BODY;
+		}
 	}
 
 	/**

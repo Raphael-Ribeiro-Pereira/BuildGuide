@@ -28,12 +28,12 @@ public class ScanSpeedConfigTest {
 		File dir = Files.createTempDirectory("bgscan").toFile(); File cfg = new File(dir, "buildguide.cfg");
 		Config fresh = new Config(dir);
 		check(fresh.scanSpeed.value == SliceScan.Speed.NORMAL, "a new buildguide.cfg: Scan speed Normal (the default)");
-		check(keys(cfg).equals(Arrays.asList("asyncEnabled", "shapeListRandomColorsDefaultEnabled", "persistenceEnabled", "ignoredBlocks", "worldUpdateMode", "scanSpeed")), "keys in their old order, scanSpeed last: " + keys(cfg));
+		check(keys(cfg).equals(Arrays.asList("asyncEnabled", "shapeListRandomColorsDefaultEnabled", "persistenceEnabled", "ignoredBlocks", "worldUpdateMode", "scanSpeed", "focusFrom")), "keys in their old order, scanSpeed then focusFrom (build focus) last: " + keys(cfg));
 
 		Files.write(cfg.toPath(), Arrays.asList("asyncEnabled = false", "shapeListRandomColorsDefaultEnabled = true", "persistenceEnabled = true", "ignoredBlocks = minecraft:dirt", "worldUpdateMode = LIVE"));
 		Config older = new Config(dir);
 		check(older.scanSpeed.value == SliceScan.Speed.NORMAL && older.worldUpdateMode.value.name().equals("LIVE") && !older.asyncEnabled.value && older.ignoredBlocks.value.equals("minecraft:dirt"), "a file from before (no scanSpeed): every saved value kept, Scan speed Normal");
-		check(keys(cfg).get(keys(cfg).size() - 1).equals("scanSpeed") && keys(cfg).size() == 6, "and the file is rewritten with scanSpeed added at the end");
+		check(keys(cfg).get(keys(cfg).size() - 2).equals("scanSpeed") && keys(cfg).size() == 7, "and the file is rewritten with scanSpeed added (before focusFrom, the newest)");
 
 		for(SliceScan.Speed s: SliceScan.Speed.values()){
 			older.scanSpeed.setValue(s); older.write(); Config back = new Config(dir);

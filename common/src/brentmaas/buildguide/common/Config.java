@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
+import brentmaas.buildguide.common.shape.FocusFilter;
 import brentmaas.buildguide.common.shape.SliceScan;
 
 public class Config {
@@ -25,7 +26,9 @@ public class Config {
 	public ModeConfigElement worldUpdateMode = new ModeConfigElement("worldUpdateMode", "config.buildguide.worldUpdateMode", WorldUpdateGate.Mode.IDLE, "config.buildguide.worldUpdateModeComment");
 	// Scan in Y layers: the time budget per frame (Instant, Fast, Normal, Slow; see SliceScan.Speed)
 	public ScanSpeedConfigElement scanSpeed = new ScanSpeedConfigElement("scanSpeed", "config.buildguide.scanSpeed", SliceScan.Speed.NORMAL, "config.buildguide.scanSpeedComment");
-	
+	// Build focus: the focus applies only to shapes of at least this many blocks (0 = always; see FocusFilter)
+	public IntConfigElement focusFrom = new IntConfigElement("focusFrom", "config.buildguide.focusFrom", FocusFilter.defaultThreshold, "config.buildguide.focusFromComment");
+
 	public Config(File configFolder) {
 		configFile = new File(configFolder, "buildguide.cfg");
 		
@@ -35,6 +38,7 @@ public class Config {
 		configElements.add(ignoredBlocks);
 		configElements.add(worldUpdateMode);
 		configElements.add(scanSpeed);
+		configElements.add(focusFrom);
 		
 		if(!configFile.exists()) {
 			write();
@@ -167,6 +171,17 @@ public class Config {
 		}
 	}
 	
+	// A whole number, not negative; anything else throws (or is raised to 0) and load() keeps the current value
+	public class IntConfigElement extends ConfigElement<Integer> {
+		public IntConfigElement(String key, String translationKey, Integer defaultValue, String commentTranslationKey) {
+			super(key, translationKey, defaultValue, commentTranslationKey);
+		}
+
+		public void setValue(String value) {
+			this.value = Math.max(0, Integer.parseInt(value.trim()));
+		}
+	}
+
 	// Free text; the value is stored as typed and also parsed into a normalised id set
 	public class StringConfigElement extends ConfigElement<String> {
 		private java.util.Set<String> ids = new java.util.HashSet<String>();
