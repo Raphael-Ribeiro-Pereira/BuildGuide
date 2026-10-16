@@ -105,6 +105,35 @@ public abstract class Shape {
 - Fabric `FillHooks`: `FillTask.tick()` on `END_CLIENT_TICK` (it stops the fill when the player is
   gone), and `ClientReceiveMessageEvents.ALLOW_GAME` drops the `commands.fill.*` answers while a fill
   runs (the key in the message or its first sibling, the red error form).
+- `FillPlan.boxesBySection(cells, ox, oy, oz, maxVolume)` (step 2, what `FillTask` uses): the same
+  cover one 16^3 chunk section (world coordinates) at a time, sections in ascending Y, Z, X.
+
+### Performance step 2 (`wip/perf2`)
+
+- `LongIndex` (common): a set of packed positions that numbers them (0, 1, 2... in the order added),
+  open addressing over primitive arrays, fixed capacity (throws when full).
+- `SliceScan.prepare(state, shapeExpected, ox, oy, oz, generation, epoch, palette, exclusionBoxes)`:
+  the loader's scan from a copy of the expected set (tracked = the shape's order minus the excluded
+  positions; null when none is tracked). It reads nothing but its arguments, so it runs on a worker;
+  the new constructor takes the epoch, palette and boxes read on the render thread, the old one
+  reads them from the state. `getPrepMillis()` (-1 when built on the caller's thread),
+  `worldBounds()` (for the chunk check). Its layers use a bitmap of the expanded box
+  (`maxBitmapBits`, else the index) and arrays by number; results identical to the scan as it was
+  (`SliceScanTest`, `PerfStep2Test`).
+- `ValidationState.publishScan(...)` (package-private): the state beginScan, setStatus per position,
+  setNearBlocks and endScan leave, with the scan's status map swapped in. `getExclusionBoxes()` (a
+  copy), `getStatuses(long[], byte[])` (one lock); `setExclusionBoxes` with the boxes it already has
+  does nothing.
+- Fabric `RenderHandler`: `prepareScan` (render thread: the state's inputs, then the worker
+  `Build Guide scan preparation` copies the expected set under the shape's lock and prepares),
+  `startScan` (once ready and, automatic scans, the chunks loaded); pending preparations per state in
+  a `WeakHashMap`, dropped when stale or replaced by a manual Validate.
+- `PreviewModel.meshChange`: `validation` only when a status or a structure error differs, not on
+  every version. Fabric `PreviewRenderer`: the mesh written on the worker `Build Guide preview mesh`,
+  sent on the render thread when ready, one build at a time (the latest request waits, an unwanted
+  build is freed unsent).
+- `TimingLog.recordScan(..., prepMillis)` (`prep=` last) and `TimingLog.recordPreview(render, build,
+  wait, blocks, reason)` (`phase=preview-rebuild ms= build= wait= blocks= reason= native=`).
 
 ### ValidationState (Etapa 2.1)
 

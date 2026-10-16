@@ -46,13 +46,14 @@ public class ValidationState {
 		}
 	}
 
-	private final Map<Long, Byte> status = new HashMap<Long, Byte>();
+	// Replaced whole by publishScan (the map a scan in layers filled), so not final
+	private Map<Long, Byte> status = new HashMap<Long, Byte>();
 	// Name of the block on IGNORED, WRONG_LAYER and WRONG_BLOCK positions (shown in the error list)
-	private final Map<Long, String> ignoredBlockNames = new HashMap<Long, String>();
+	private Map<Long, String> ignoredBlockNames = new HashMap<Long, String>();
 	// Index of IGNORED positions so lists and overlays are O(k), not a scan of the whole map. Insertion
 	// order: deterministic and stable between rebuilds
-	private final Set<Long> ignoredPositions = new LinkedHashSet<Long>();
-	private final Set<Long> wrongLayerPositions = new LinkedHashSet<Long>(), wrongBlockPositions = new LinkedHashSet<Long>();
+	private Set<Long> ignoredPositions = new LinkedHashSet<Long>();
+	private Set<Long> wrongLayerPositions = new LinkedHashSet<Long>(), wrongBlockPositions = new LinkedHashSet<Long>();
 	// Bumped on every mutation; readers (GUI list, world overlay) rebuild only when it changed
 	private long version = 0;
 	// Position picked in the error list, drawn distinctly in the overlay; -1 = none
@@ -142,6 +143,62 @@ public class ValidationState {
 	public synchronized void endScan() {
 		validated = true;
 		++version;
+	}
+
+	/**
+	 * A scan in Y layers in one go (SliceScan.publish): exactly the state beginScan (the shape's order),
+	 * setStatus for every tracked position in the loader's order, setNearBlocks and endScan leave, version
+	 * included, but with the status map the scan filled swapped in instead of written position by position.
+	 * statusMap holds the positions beginScan would track, in the shape's order; order, statuses, names and
+	 * present go together by index (present: the position is in statusMap); bounds is beginScan's box.
+	 */
+	synchronized void publishScan(HashMap<Long, Byte> statusMap, List<Long> order, byte[] statuses, String[] names, boolean[] present, List<NearBlock> near, int ox, int oy, int oz, int[] bounds) {
+		// invalidate() and beginScan()
+		status = statusMap;
+		ignoredBlockNames = new HashMap<Long, String>();
+		ignoredPositions = new LinkedHashSet<Long>();
+		wrongLayerPositions = new LinkedHashSet<Long>();
+		wrongBlockPositions = new LinkedHashSet<Long>();
+		nearBlocks = new LinkedHashMap<Long, NearBlock>();
+		highlightedPos = -1;
+		ok = missing = ignored = wrongLayer = wrongBlock = 0;
+		++scanEpoch;
+		++version;
+		scanOriginX = ox;
+		scanOriginY = oy;
+		scanOriginZ = oz;
+		++scanCount;
+		reconcileCursor = 0;
+		minX = bounds[0];
+		minY = bounds[1];
+		minZ = bounds[2];
+		maxX = bounds[3];
+		maxY = bounds[4];
+		maxZ = bounds[5];
+		// setStatus per position: each one a change from UNKNOWN (an unclassified position becomes MISSING)
+		for(int i = 0;i < statuses.length;++i) {
+			if(!present[i]) continue;
+			Long pos = order.get(i);
+			byte s = statuses[i] == UNKNOWN ? MISSING : statuses[i];
+			if(s != statuses[i]) status.put(pos, s);
+			adjust(s, 1);
+			if(namesBlock(s) && names[i] != null) ignoredBlockNames.put(pos, names[i]);
+			Set<Long> indexed = index(s);
+			if(indexed != null) indexed.add(pos);
+			++version;
+		}
+		// setNearBlocks and endScan
+		for(NearBlock nb: near) nearBlocks.put(nb.localPos, nb);
+		++version;
+		validated = true;
+		++version;
+	}
+
+	// A copy of the exclusion boxes (local, inclusive {minX, minY, minZ, maxX, maxY, maxZ}), for a scan built on another thread
+	public synchronized List<int[]> getExclusionBoxes() {
+		List<int[]> copy = new ArrayList<int[]>();
+		for(int[] b: exclusionBoxes) copy.add(b.clone());
+		return copy;
 	}
 	
 	public synchronized void requestScan() {
@@ -351,8 +408,11 @@ public class ValidationState {
 	// excluded right away for immediate feedback; the caller should also request a scan so that
 	// positions freed by a shrunk box come back
 	public synchronized void setExclusionBoxes(List<int[]> boxes) {
-		exclusionBoxes = new ArrayList<int[]>();
-		if(boxes != null) for(int[] b: boxes) exclusionBoxes.add(b.clone());
+		List<int[]> next = new ArrayList<int[]>();
+		if(boxes != null) for(int[] b: boxes) next.add(b.clone());
+		// The same boxes (every scan start sets them): what is tracked was filtered with them, nothing to exclude
+		if(sameBoxes(next, exclusionBoxes)) return;
+		exclusionBoxes = next;
 		if(status.isEmpty()) return;
 		List<Long> toExclude = new ArrayList<Long>();
 		for(long pos: status.keySet()) if(isExcluded(LocalPos.unpackX(pos), LocalPos.unpackY(pos), LocalPos.unpackZ(pos))) toExclude.add(pos);
@@ -360,6 +420,12 @@ public class ValidationState {
 		for(long pos: new ArrayList<Long>(nearBlocks.keySet())) if(isExcluded(LocalPos.unpackX(pos), LocalPos.unpackY(pos), LocalPos.unpackZ(pos))) nearBlocks.remove(pos);
 	}
 	
+	private static boolean sameBoxes(List<int[]> a, List<int[]> b) {
+		if(a.size() != b.size()) return false;
+		for(int i = 0;i < a.size();++i) if(!java.util.Arrays.equals(a.get(i), b.get(i))) return false;
+		return true;
+	}
+
 	public synchronized boolean isExcluded(int x, int y, int z) {
 		for(int[] b: exclusionBoxes) {
 			if(x >= b[0] && x <= b[3] && y >= b[1] && y <= b[4] && z >= b[2] && z <= b[5]) return true;
@@ -452,6 +518,14 @@ public class ValidationState {
 	public synchronized byte getStatus(long pos) {
 		Byte s = status.get(pos);
 		return s == null ? UNKNOWN : s;
+	}
+
+	// getStatus for many positions under one lock (the preview's colours: 50 000 lookups, not 50 000 locks)
+	public synchronized void getStatuses(long[] positions, byte[] out) {
+		for(int i = 0;i < positions.length;++i) {
+			Byte s = status.get(positions[i]);
+			out[i] = s == null ? UNKNOWN : s;
+		}
 	}
 
 	// Snapshot of the positions with the given status. IGNORED comes from its index (O(k), insertion

@@ -78,6 +78,19 @@ public class FillTest {
 		boxes = FillPlan.boxes(big, 100);
 		check(cover(big, boxes, 100).isEmpty(), "a small limit (100): no box above it, still exact (" + boxes.size() + " boxes)");
 		check(FillPlan.boxes(new ArrayList<>(), FillPlan.maxVolume).isEmpty(), "no cells: no box");
+		// One chunk section at a time (world coordinates): an exact cover, no box across a section's edge, each
+		// section's boxes together, sections in ascending Y, Z, X
+		for(int[] origin: new int[][]{{0, 0, 0}, {-7, 61, 13}}){
+			List<int[]> bySection = FillPlan.boxesBySection(sphere, origin[0], origin[1], origin[2], FillPlan.maxVolume);
+			boolean inside = true, together = true, ascending = true; Set<String> done = new HashSet<>(); String last = null; long lastKey = Long.MIN_VALUE;
+			for(int[] bx: bySection){
+				int sx = Math.floorDiv(origin[0] + bx[0], 16), sy = Math.floorDiv(origin[1] + bx[1], 16), sz = Math.floorDiv(origin[2] + bx[2], 16);
+				inside &= Math.floorDiv(origin[0] + bx[3], 16) == sx && Math.floorDiv(origin[1] + bx[4], 16) == sy && Math.floorDiv(origin[2] + bx[5], 16) == sz;
+				String sec = sx + "," + sy + "," + sz;
+				if(!sec.equals(last)){ together &= done.add(sec); long key = ((long) sy << 40) + ((long) sz << 20) + sx; ascending &= key > lastKey; lastKey = key; last = sec; }
+			}
+			check(cover(sphere, bySection, FillPlan.maxVolume).isEmpty() && inside && together && ascending, "by chunk section, origin " + Arrays.toString(origin) + ": exact cover, no box crosses a section, each section's boxes together, Y then Z then X (" + done.size() + " sections, " + bySection.size() + " boxes)");
+		}
 		check(FillPlan.command(new int[]{-2, 0, 3, 5, 1, 3}, 100, 64, -50, "minecraft:stone").equals("fill 98 64 -47 105 65 -47 minecraft:stone replace #minecraft:replaceable"), "the command: world coordinates, the block, replace only #minecraft:replaceable");
 
 		System.out.println("-- FillTask: the button");

@@ -273,3 +273,10 @@ whole; the `phase=render` line every 30 s and `sections=`, `frames=`, `maxframe=
 - Point 4: the preview not rebuilt whole every 100 ms while the validation changes.
 - Point 1: dropping hidden faces, after Raphael chooses the look (only the surface cubes, or a
   full-cube option).
+
+Step 2 (2026-10-16, `wip/perf2`, on top of `wip/fill`, waiting for the in-game test): points 3
+and 4 plus the Fill, from the `fill-wip` log. The scan prepared on a worker thread, its layers
+without boxing (an index and a bitmap), its result swapped into the state; the preview's statuses
+read under one lock, rebuilt only when a colour changes, its mesh written on a worker thread; the
+Fill one chunk section at a time. Still open: step 1's sections cost about 2.7 times one buffer to
+send in total; point 1 (hidden faces) waits for the look.

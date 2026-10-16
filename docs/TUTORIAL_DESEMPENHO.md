@@ -88,6 +88,8 @@ ao mundo), no máximo 200 linhas por sessão. Exemplo real do seu log de hoje:
 | `native=` | memória de vértices ainda presa, em MiB (deve voltar a 0) |
 | `focus=n/total` | com o foco: quantos blocos o mundo desenha, de quantos |
 | `slices=` / `maxslice=` | em quantos quadros o scan foi dividido e o maior pedaço |
+| `prep=` | (desde a etapa 2) no `scan`: quanto a preparação levou numa thread separada; não custa quadro nenhum |
+| `build=` / `wait=` | (desde a etapa 2) no `preview-rebuild`: `ms=` é só o envio à GPU na thread de render, `build=` a montagem numa thread separada e `wait=` quanto o preview novo levou para aparecer |
 | `sections=` | (desde a etapa 1 de desempenho) em quantas seções de 16³ blocos a forma foi dividida |
 | `frames=` / `maxframe=` | em quantos quadros a forma nova foi enviada à GPU e o maior pedaço, em ms (deve ficar perto de 3) |
 | `gpu=` | memória de vídeo dos buffers do mod, em MiB (deve ficar estável enquanto você edita) |

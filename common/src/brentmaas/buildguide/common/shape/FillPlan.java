@@ -72,6 +72,31 @@ public final class FillPlan {
 		return out;
 	}
 
+	/**
+	 * The same cover, one chunk section (16 x 16 x 16 in world coordinates, the shape at origin ox, oy, oz) at a
+	 * time: no box crosses a section's edge and each section's boxes come together, sections in ascending Y, then
+	 * Z, then X. The client rebuilds a section's mesh after its blocks change; filled section by section, each one
+	 * is rebuilt about once instead of once per layer of the shape (performance step 2: the fill of a 26 000-block
+	 * shape dropped the game to about 19 FPS without Sodium).
+	 */
+	public static List<int[]> boxesBySection(List<Long> cells, int ox, int oy, int oz, int maxVolume) {
+		Map<Long, List<Long>> sections = new HashMap<Long, List<Long>>();
+		for(long c: cells) {
+			long key = sectionKey(Math.floorDiv(ox + LocalPos.unpackX(c), 16), Math.floorDiv(oy + LocalPos.unpackY(c), 16), Math.floorDiv(oz + LocalPos.unpackZ(c), 16));
+			sections.computeIfAbsent(key, k -> new ArrayList<Long>()).add(c);
+		}
+		List<Long> keys = new ArrayList<Long>(sections.keySet());
+		Collections.sort(keys);
+		List<int[]> out = new ArrayList<int[]>();
+		for(long key: keys) out.addAll(boxes(sections.get(key), maxVolume));
+		return out;
+	}
+
+	// Sorts as Y, then Z, then X (each section coordinate shifted to be non-negative, 21 bits)
+	private static long sectionKey(int sx, int sy, int sz) {
+		return ((long) (sy + 0x100000) << 42) | ((long) (sz + 0x100000) << 21) | (sx + 0x100000);
+	}
+
 	// Greedy rectangles {x1, z1, x2, z2} over one layer's cells (sorted by Z then X: {y, z, x})
 	private static List<int[]> rectangles(List<long[]> layer, int maxVolume) {
 		int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE, minZ = Integer.MAX_VALUE, maxZ = Integer.MIN_VALUE;

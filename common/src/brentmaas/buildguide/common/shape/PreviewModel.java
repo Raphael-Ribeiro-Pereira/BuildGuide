@@ -103,7 +103,7 @@ public final class PreviewModel {
 		long version = state.getVersion();
 		if(!state.isValidated()) return new PreviewModel(positions, boundsArray(), null, new long[0], version, generation, filter, sliceAxis, sliceValue, layers, colourMode);
 		byte[] s = new byte[positions.length];
-		for(int i = 0;i < positions.length;++i) s[i] = state.getStatus(positions[i]);
+		state.getStatuses(positions, s);
 		List<NearBlock> near = state.getNearBlocks();
 		long[] e = new long[near.size()];
 		for(int i = 0;i < e.length;++i) e[i] = near.get(i).localPos;
@@ -133,7 +133,9 @@ public final class PreviewModel {
 		if(built.sliceAxis != next.sliceAxis || built.sliceValue != next.sliceValue) return "slice";
 		if(built.colourMode != next.colourMode) return "colour";
 		if(next.colourMode == ColourMode.LAYER && !next.layers.equals(built.layers)) return "layers";
-		if(built.stateVersion != next.stateVersion) return "validation";
+		// A new validation version that leaves every status and structure error as it was (a block on a position
+		// that stays ok, another name for the same error) changes nothing the mesh shows
+		if(built.stateVersion != next.stateVersion && !(java.util.Arrays.equals(built.status, next.status) && java.util.Arrays.equals(built.errors, next.errors))) return "validation";
 		return null;
 	}
 	

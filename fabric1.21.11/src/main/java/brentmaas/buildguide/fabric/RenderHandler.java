@@ -3,10 +3,14 @@ package brentmaas.buildguide.fabric;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
+import java.util.WeakHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import com.mojang.blaze3d.pipeline.BlendFunction;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
@@ -23,7 +27,6 @@ import brentmaas.buildguide.common.shape.GuidelinePicker;
 import brentmaas.buildguide.common.shape.LayerPalette;
 import brentmaas.buildguide.common.shape.SectionedBuffer;
 import brentmaas.buildguide.common.shape.Shape;
-import brentmaas.buildguide.common.shape.LocalPos;
 import brentmaas.buildguide.common.shape.ShapeLayers;
 import brentmaas.buildguide.common.shape.ShapeSet;
 import brentmaas.buildguide.common.shape.SliceScan;
@@ -243,13 +246,21 @@ public class RenderHandler extends AbstractRenderHandler {
 			state.setActiveScan(null);
 			state.setScanPercent(-1);
 		}
+		PendingScan pending = preparing.get(state);
+		if(pending != null && (manual || pending.isStale(state, validatable.getGeneration()))) {
+			pending.future.cancel(true);
+			preparing.remove(state);
+			pending = null;
+		}
 		ClientLevel world = Minecraft.getInstance().level;
 		if(world == null) return;
 		if(scan == null) {
-			long started = System.nanoTime();
-			scan = startScan(shapeSet, validatable, state, manual, world);
+			if(pending == null) {
+				prepareScan(shapeSet, validatable, state, manual);
+				return; // it starts on the frame its preparation is ready
+			}
+			scan = startScan(state, pending, world);
 			if(scan == null) return;
-			scan.setStartNanos(System.nanoTime() - started);
 		}
 		WorldProbe probe = new WorldProbe(world);
 		if(!scan.step(probe, BuildGuide.config.scanSpeed.value.budgetMillis * 1000000L, System::nanoTime)) {
@@ -261,62 +272,99 @@ public class RenderHandler extends AbstractRenderHandler {
 		long publishNanos = System.nanoTime() - publishing;
 		state.setActiveScan(null);
 		state.setScanPercent(-1);
-		TimingLog.recordScan(scan.getTotalMillis(), scan.getFrames(), scan.getMaxSliceMillis(), scan.getExpectedCount(), scan.getStartMillis(), publishNanos / 1000000);
+		TimingLog.recordScan(scan.getTotalMillis(), scan.getFrames(), scan.getMaxSliceMillis(), scan.getExpectedCount(), scan.getStartMillis(), publishNanos / 1000000, scan.getPrepMillis());
 		logValidation(state);
 	}
 
-	// A new scan, when one is due; null when it must wait
-	private SliceScan startScan(ShapeSet shapeSet, Shape validatable, ValidationState state, boolean manual, ClientLevel world) {
-		// Manual (button) scans start now. Automatic ones, requested by the shape after it regenerated,
-		// wait until the shape has been idle for a moment (holding +/- regenerates many times per
-		// second) and until the chunks under the shape are loaded (a scan of unloaded chunks would
-		// read everything as air). Origin changes request a scan too (P4): the same idle wait makes
-		// holding + on the origin give one scan
-		if(!manual) {
-			if(!state.isScanDue(System.currentTimeMillis(), autoScanIdleMillis)) return null;
-			if(validatable.getHowLongAgoCompletedMillis() < autoScanIdleMillis) return null;
+	// Scans being prepared, per validation state: the copy of the expected set and SliceScan.prepare (which reads
+	// no world) run on scanPreparation; the scan starts on the first frame it is ready
+	private static final ExecutorService scanPreparation = Executors.newSingleThreadExecutor(runnable -> {
+		Thread thread = new Thread(runnable, "Build Guide scan preparation");
+		thread.setDaemon(true);
+		return thread;
+	});
+	private final Map<ValidationState, PendingScan> preparing = new WeakHashMap<ValidationState, PendingScan>();
+
+	private static final class PendingScan {
+		final Future<SliceScan> future;
+		final long epoch, generation, startNanos;
+		final boolean manual;
+
+		PendingScan(Future<SliceScan> future, long epoch, long generation, boolean manual, long startNanos) {
+			this.future = future;
+			this.epoch = epoch;
+			this.generation = generation;
+			this.manual = manual;
+			this.startNanos = startNanos;
 		}
 
-		int ox = shapeSet.getOriginX();
-		int oy = shapeSet.getOriginY();
-		int oz = shapeSet.getOriginZ();
+		// Its inputs changed meanwhile (new generation, invalidation, new scan request)
+		boolean isStale(ValidationState state, long currentGeneration) {
+			return state.getScanEpoch() != epoch || currentGeneration != generation;
+		}
+	}
 
-		// Expected blocks in world coordinates, plus their bounding box
-		Set<Long> expectedWorld = new HashSet<Long>();
-		int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
-		int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE;
+	/**
+	 * Asks for a new scan when one is due. Manual (button) scans are asked for now. Automatic ones, requested by
+	 * the shape after it regenerated, wait until the shape has been idle for a moment (holding +/- regenerates
+	 * many times per second). Origin changes request a scan too (P4): the same idle wait makes holding + on the
+	 * origin give one scan. Only the state's inputs (exclusion boxes, palette, scan epoch) are read here; the
+	 * preparation itself runs on scanPreparation.
+	 */
+	private void prepareScan(ShapeSet shapeSet, Shape validatable, ValidationState state, boolean manual) {
+		if(!manual) {
+			if(!state.isScanDue(System.currentTimeMillis(), autoScanIdleMillis)) return;
+			if(validatable.getHowLongAgoCompletedMillis() < autoScanIdleMillis) return;
+		}
+		long started = System.nanoTime();
 		// Exclusion boxes of the shape set (local coords): excluded positions are neither expected nor scanned
 		state.setExclusionBoxes(shapeSet.getActiveExclusionBoxes());
-		for(long local: validatable.getExpectedBlocks()) {
-			int lx = LocalPos.unpackX(local), ly = LocalPos.unpackY(local), lz = LocalPos.unpackZ(local);
-			if(state.isExcluded(lx, ly, lz)) continue;
-			int wx = ox + lx;
-			int wy = oy + ly;
-			int wz = oz + lz;
-			expectedWorld.add(BlockPos.asLong(wx, wy, wz));
-			if(wx < minX) minX = wx;
-			if(wx > maxX) maxX = wx;
-			if(wy < minY) minY = wy;
-			if(wy > maxY) maxY = wy;
-			if(wz < minZ) minZ = wz;
-			if(wz > maxZ) maxZ = wz;
+		state.setPalette(paletteOf(validatable)); // before the SliceScan, which takes it
+		long epoch = state.getScanEpoch(), generation = validatable.getGeneration();
+		LayerPalette palette = state.getPalette();
+		List<int[]> boxes = state.getExclusionBoxes();
+		int ox = shapeSet.getOriginX(), oy = shapeSet.getOriginY(), oz = shapeSet.getOriginZ();
+		// The copy of the expected set too runs on the worker, under the shape's lock (a frame that finds the lock
+		// taken draws the shape as during a generation). Should a newer generation be there by then, the scan is
+		// stale (its epoch and generation are this frame's) and is dropped
+		Future<SliceScan> future = scanPreparation.submit(() -> {
+			List<Long> expected;
+			validatable.lock.lock();
+			try {
+				expected = Arrays.asList(validatable.getExpectedBlocks().toArray(new Long[0]));
+			}finally {
+				validatable.lock.unlock();
+			}
+			return SliceScan.prepare(state, expected, ox, oy, oz, generation, epoch, palette, boxes);
+		});
+		preparing.put(state, new PendingScan(future, epoch, generation, manual, System.nanoTime() - started));
+	}
+
+	/**
+	 * The prepared scan, once it is ready and (automatic scans) the chunks under the shape are loaded: a scan of
+	 * unloaded chunks would read everything as air, so it waits, prepared, and the request stays pending. Null
+	 * while it must wait, and when nothing is tracked (every position excluded: no scan).
+	 */
+	private SliceScan startScan(ValidationState state, PendingScan pending, ClientLevel world) {
+		if(!pending.future.isDone()) return null;
+		SliceScan scan;
+		try {
+			scan = pending.future.get();
+		}catch(Exception e) {
+			preparing.remove(state);
+			BuildGuide.logHandler.debugThrowable("The validation scan could not be prepared.", e);
+			return null;
 		}
-		if(expectedWorld.isEmpty()) {
+		if(scan == null) {
+			preparing.remove(state);
 			state.consumeScanRequest();
 			return null;
 		}
-		if(!manual && !world.hasChunksAt(new BlockPos(minX, minY, minZ), new BlockPos(maxX, maxY, maxZ))) return null; // stays pending
+		int[] b = scan.worldBounds();
+		if(!pending.manual && !world.hasChunksAt(new BlockPos(b[0], b[1], b[2]), new BlockPos(b[3], b[4], b[5]))) return null; // stays pending
+		preparing.remove(state);
 		state.consumeScanRequest();
-
-		// The tracked positions in the order the scan has always visited them (the set of world positions):
-		// the state's lists keep their order
-		List<Long> tracked = new ArrayList<Long>(expectedWorld.size());
-		for(long wl: expectedWorld) {
-			BlockPos wp = BlockPos.of(wl);
-			tracked.add(LocalPos.pack(wp.getX() - ox, wp.getY() - oy, wp.getZ() - oz));
-		}
-		state.setPalette(paletteOf(validatable)); // before the SliceScan, which takes it
-		SliceScan scan = new SliceScan(state, validatable.getExpectedBlocks(), tracked, ox, oy, oz, validatable.getGeneration());
+		scan.setStartNanos(pending.startNanos);
 		state.setActiveScan(scan);
 		return scan;
 	}

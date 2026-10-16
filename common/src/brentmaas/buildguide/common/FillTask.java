@@ -94,7 +94,7 @@ public final class FillTask {
 			return;
 		}
 		queue.clear();
-		for(int[] box: FillPlan.boxes(found, FillPlan.maxVolume)) queue.add(FillPlan.command(box, set.getOriginX(), set.getOriginY(), set.getOriginZ(), held));
+		for(int[] box: FillPlan.boxesBySection(found, set.getOriginX(), set.getOriginY(), set.getOriginZ(), FillPlan.maxVolume)) queue.add(FillPlan.command(box, set.getOriginX(), set.getOriginY(), set.getOriginZ(), held));
 		running = true;
 		block = held;
 		cells = found.size();

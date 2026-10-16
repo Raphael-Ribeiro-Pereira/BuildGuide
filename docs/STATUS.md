@@ -379,6 +379,47 @@ In-game checklist for `fill-wip`:
 
 Offline harness after Fill: 1262 asserts, 0 failures; Bridge 466 / 159 / 360.
 
+### Performance, step 2: the single-frame costs (on `wip/perf2`, on top of `wip/fill`, waiting for the in-game test; not merged)
+
+Raphael found `fill-wip` much heavier than `terrain-wip`. Its `latest.log` (2026-10-16, 01:52) did not
+show the world drawing heavier (`phase=render avg=0.04` ms a frame) but four other costs, three
+of them in single frames; the `terrain-wip` session had no Fill and no scan in its log, so the two
+sessions do not compare directly.
+- The scan: `start=26 publish=24` ms at 49,568 blocks, each in one frame, and a layer of 27 ms.
+- The preview, with the menu open: rebuilt every 1 to 2 s for 11 to 32 ms (`reason=validation`)
+  while the filled grass turned to dirt (a version change with no colour change).
+- The Fill: about 19 FPS while it ran (its commands went layer by layer, so every chunk section was
+  rebuilt once per layer; Sodium is off in this profile).
+- Step 1's sections: sending a shape in sections costs about 2.7 times one buffer in total (7.8
+  against 2.9 ms at 50k blocks), at most about 3 ms a frame. Left as it is for now.
+
+| What | Change |
+|---|---|
+| Scan start | the copy of the expected set and the whole preparation (`SliceScan.prepare`) run on a worker thread; the scan starts on the frame it is ready. A scan waiting for its chunks waits prepared (it was rebuilt every frame before). The tracked order is now the shape's own (it was a set of world positions): the error lists may list in another order |
+| Scan layers | no boxing per cell: positions numbered by `LongIndex`, statuses and names in arrays, the near pass asks a bitmap of the box (z fastest, neighbours side by side), the exclusion boxes copied (no synchronized call per cell) |
+| Scan publish | the status map is filled during the layers and swapped in (`ValidationState.publishScan`): the same version, counters and lists as before |
+| Preview | statuses read under one lock (`getStatuses`); rebuilt only when a status or a structure error changes; the mesh written on a worker thread and sent to the GPU when ready (the previous one stays meanwhile) |
+| Fill | boxes one chunk section at a time (no box crosses a 16^3 section, each section's boxes together): each section is rebuilt about once |
+
+Measured offline (`ScanHitchProbe` in the session scratchpad, a built island with ground around,
+warm JIT, the world a primitive set): at 59,717 blocks the render thread's part of the start went
+from 7 to 30 ms to bookkeeping only (the copy, 1 to 5 ms, and the 5 to 7 ms after it are on the worker), the
+slowest layer from about 10 to 5 ms, all layers from 243 to 130 ms, publish from 9 to 10 ms to
+3 ms. The first scan of a session still costs more (the JIT is cold).
+
+In-game checklist for `perf2-wip`:
+1. Holding + on a big shape with the menu open: no tall isolated bar in F3 + 2 when the shape
+   appears and when its scan ends; `phase=scan ... start= publish= prep=` with start and publish
+   small.
+2. The preview with the menu open during and after a Fill with grass: no rebuild every second
+   (`preview-rebuild` lines only when colours change); the preview shows the new mesh a frame or two
+   after a change, never empty once it showed something.
+3. Fill of a big shape: the FPS during the fill (compare with the 19 FPS of 2026-10-16).
+4. Validate, the error lists, the overlay and the counts are as before (only the order of the
+   lists may differ).
+
+Offline harness after step 2: 1285 asserts, 0 failures; Bridge 466 / 159 / 360.
+
 Offline harness at the close: 406 asserts, 0 failures; Bridge reference sizes 466 / 159 / 360.
 E6 (after two fixes), E7, P4 and E8 passed their in-game checklists before being committed
 (E7 7 of 7, P4 9 of 9, E8 9 of 9). The ghost fix was committed on Raphael's go-ahead after the

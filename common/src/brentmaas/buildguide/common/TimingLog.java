@@ -42,6 +42,20 @@ public final class TimingLog {
 		sink.accept(line);
 	}
 
+	/**
+	 * The preview's mesh made again (performance step 2): ms= is what the render thread spent (sending it to
+	 * the GPU), build= the worker thread's time writing it, wait= from the request until it was on screen, then
+	 * blocks, reason (generation, view, validation, slice, filter, colour, layers) and native=. Written when
+	 * ms + build pass the threshold.
+	 */
+	public static synchronized void recordPreview(long renderMillis, long buildMillis, long waitMillis, int blocks, String reason) {
+		if(renderMillis + buildMillis <= thresholdMillis || written >= maxLines) return;
+		++written;
+		String line = "[Build Guide] timing: phase=" + PREVIEW_REBUILD + " ms=" + renderMillis + " build=" + buildMillis + " wait=" + waitMillis + " blocks=" + blocks + " reason=" + reason + " native=" + VertexMemory.liveMegabytes();
+		if(written == maxLines) line += " (limit of " + maxLines + " timing lines reached, no more this session)";
+		sink.accept(line);
+	}
+
 	// The scan in Y layers (SliceScan): its total time, the frames it was spread over and the longest one
 	public static synchronized void recordScan(long totalMillis, int slices, long maxSliceMillis, int blocks) {
 		recordScan(totalMillis, slices, maxSliceMillis, blocks, -1, -1);
@@ -50,11 +64,17 @@ public final class TimingLog {
 	// With the two steps outside the layers, each in a single frame: preparing the scan (the expected positions
 	// in world coordinates and the SliceScan) and publishing its result. Negative: not measured, left out
 	public static synchronized void recordScan(long totalMillis, int slices, long maxSliceMillis, int blocks, long startMillis, long publishMillis) {
+		recordScan(totalMillis, slices, maxSliceMillis, blocks, startMillis, publishMillis, -1);
+	}
+
+	// With the preparation on the worker thread (performance step 2), which costs the frames nothing: " prep=" last
+	public static synchronized void recordScan(long totalMillis, int slices, long maxSliceMillis, int blocks, long startMillis, long publishMillis, long prepMillis) {
 		if(totalMillis + Math.max(0, startMillis) + Math.max(0, publishMillis) <= thresholdMillis || written >= maxLines) return;
 		++written;
 		String line = "[Build Guide] timing: phase=" + SCAN + " ms=" + totalMillis + " slices=" + slices + " maxslice=" + maxSliceMillis + " blocks=" + blocks;
 		if(startMillis >= 0) line += " start=" + startMillis;
 		if(publishMillis >= 0) line += " publish=" + publishMillis;
+		if(prepMillis >= 0) line += " prep=" + prepMillis;
 		if(written == maxLines) line += " (limit of " + maxLines + " timing lines reached, no more this session)";
 		sink.accept(line);
 	}
