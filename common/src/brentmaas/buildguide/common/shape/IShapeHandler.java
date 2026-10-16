@@ -17,4 +17,23 @@ public interface IShapeHandler {
 	public default String heldBlockId() {
 		return null;
 	}
+
+	// Fill (FillTask): the client world as a probe (null without one), the player's box in world coordinates
+	// {minX, minY, minZ, maxX, maxY, maxZ} (null: none), whether the player may run /fill (cheats or op), and one
+	// command sent to the server as if typed, without the slash (false: no connection). Defaults: no world
+	public default IBlockProbe worldProbe() {
+		return null;
+	}
+
+	public default double[] playerBox() {
+		return null;
+	}
+
+	public default boolean mayRunCommands() {
+		return false;
+	}
+
+	public default boolean sendCommand(String command) {
+		return false;
+	}
 }

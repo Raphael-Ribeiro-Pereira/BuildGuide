@@ -346,6 +346,39 @@ In-game checklist for `perf-wip`:
 
 Offline harness after step 1: 1229 asserts, 0 failures; Bridge 466 / 159 / 360.
 
+### Fill with the block in hand (on `wip/fill`, on top of `wip/perf`, waiting for the in-game test; not merged)
+
+A **Fill** button at the right end of the preview's focus row (Part, Layer): it places the block in
+the main hand into every empty cell the world shows, through `/fill` commands, so it needs commands
+(cheats on, Open to LAN with cheats, or op). Raphael chose this over holding right click or a
+printer (2026-10-16).
+
+- Cells: exactly the ones Area 3 could target (`GuidelinePicker.qualifies`): expected, in the world
+  buffer's focus, outside the exclusion boxes, loaded, empty (air, water, grass...), not inside the
+  player; and inside the build height.
+- Commands: `fill x1 y1 z1 x2 y2 z2 <block> replace #minecraft:replaceable`, one per box (greedy
+  rectangles per layer, stacked up while they repeat, at most 32768 blocks each, the server's default
+  limit): a solid 10^3 cuboid is one command, a solid sphere r = 20 (33,401 blocks) 583. The filter
+  means a block placed meanwhile is never overwritten.
+- Two clicks: the first shows `Fill N?` (N cells), a second within 5 s starts; while it runs the
+  button reads Stop. 20 commands per client tick. The server's "Successfully filled" answers are
+  counted and kept out of the chat; the chat gets one line at the start and one at the end
+  (placed of N, commands, those that placed nothing). Errors other than /fill's still show.
+- Refusals, each said in the chat: no block in the main hand, no right to run commands, the shape
+  still generating, nothing to fill.
+- Not in it: the palette (each layer's block) and undo. It uses only the block in hand.
+
+In-game checklist for `fill-wip`:
+1. Hand empty, then a block in hand without cheats: Fill says why and does nothing.
+2. With cheats: the first click shows `Fill N?`; after 5 s it goes back to Fill; two clicks fill the
+   shape with the block in hand, the chat shows only the start and the summary.
+3. Blocks already in the shape, water and grass: the solid ones stay, water and grass are replaced.
+4. The focus: Part Cap (Island) or Layer 2 fills only that part; Hidden says nothing to fill.
+5. An exclusion box and the cell you stand in stay empty.
+6. Stop in the middle of a big fill stops it; Validate afterwards shows the filled cells as OK.
+
+Offline harness after Fill: 1262 asserts, 0 failures; Bridge 466 / 159 / 360.
+
 Offline harness at the close: 406 asserts, 0 failures; Bridge reference sizes 466 / 159 / 360.
 E6 (after two fixes), E7, P4 and E8 passed their in-game checklists before being committed
 (E7 7 of 7, P4 9 of 9, E8 9 of 9). The ghost fix was committed on Raphael's go-ahead after the

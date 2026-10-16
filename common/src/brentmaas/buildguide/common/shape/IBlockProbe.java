@@ -32,4 +32,9 @@ public interface IBlockProbe {
 
 	// Display name of the block, only asked for when a status is set to IGNORED
 	public String name(int x, int y, int z);
+
+	// The height is inside the world's build limits (Fill never sends a position the server refuses). Default: any
+	public default boolean isInBuildHeight(int y) {
+		return true;
+	}
 }

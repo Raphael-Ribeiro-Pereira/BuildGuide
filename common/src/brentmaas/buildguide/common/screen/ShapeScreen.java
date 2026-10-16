@@ -1,6 +1,7 @@
 package brentmaas.buildguide.common.screen;
 
 import brentmaas.buildguide.common.BuildGuide;
+import brentmaas.buildguide.common.FillTask;
 import brentmaas.buildguide.common.State.ActiveScreen;
 import brentmaas.buildguide.common.property.Property;
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
@@ -85,6 +86,11 @@ public class ShapeScreen extends BaseScreen{
 	// they choose what the world shows (the preview always shows everything). The 3D area starts below it
 	public static final int focusRowY = previewTop + previewControlsHeight, focusRowHeight = 18, partWidth = 80, layerWidth = 64;
 	private IButton buttonFocusPart, buttonFocusLayer = null;
+	// Fill with the block in hand (FillTask) at the row's right end: it fills what the row selects. Its title
+	// follows the task ("Fill", "Fill N?", "Stop"), checked every frame
+	private static final int fillWidth = 72;
+	private IButton buttonFill;
+	private String fillTitle = null;
 	// Under the preview: a 2-px validation progress line, three tabs and the error list of the selected
 	// tab (at the minimum height 175..177, 177..193, 193..250). Replaces the bottom bar's progress on this
 	// screen. Vertical bands from the GUI height (E7): computed in init, 270 until then
@@ -174,6 +180,7 @@ public class ShapeScreen extends BaseScreen{
 	}
 
 	public void render() {
+		updateFillTitle();
 		super.render();
 
 		renderShapeHeader();
@@ -282,6 +289,20 @@ public class ShapeScreen extends BaseScreen{
 			});
 			addWidget(buttonFocusLayer);
 		}
+		fillTitle = FillTask.title();
+		buttonFill = BuildGuide.widgetHandler.createButton(wrapper.getWidth() - fillWidth - 2, focusRowY, fillWidth, controlsHeight, new Translatable(fillTitle), () -> {
+			FillTask.click(BuildGuide.stateManager.getState().isShapeAvailable() ? BuildGuide.stateManager.getState().getCurrentShapeSet() : null);
+			updateFillTitle();
+		});
+		buttonFill.setActive(available);
+		addWidget(buttonFill);
+	}
+
+	private void updateFillTitle() {
+		String title = FillTask.title();
+		if(buttonFill == null || title.equals(fillTitle)) return;
+		fillTitle = title;
+		buttonFill.setTitle(new Translatable(title));
 	}
 
 	// "Part: Cap"; a part the shape does not have reads All (Shape.selectedFocus)

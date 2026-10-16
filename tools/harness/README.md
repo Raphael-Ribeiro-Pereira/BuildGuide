@@ -44,6 +44,7 @@ java  -cp "$CLASSES;$OUT" TerrainGeometryTest # Terrain geometry: seeds, Types, 
 java  -cp "$CLASSES;$OUT" TerrainTest       # Terrain shape: the cap in the panel, Randomize/Natural/Undo, focus, persistence, labels, accordion, registry, GOLDEN of 12 terrains
 java  -cp "$CLASSES;$OUT" TerrainLayersTest # Terrain layers by height: cuts, column layer, palette truth table, sliced == instant scan, persistence, preview, focus by layer
 java  -cp "$CLASSES;$OUT" SectionTest       # world buffer in 16-block sections: same vertices as one buffer, bounds, endPart budget, live apply over frames, drops, no leak, render/world-buffer lines
+java  -cp "$CLASSES;$OUT" FillTest          # Fill with the block in hand: the cells (Area 3's rule, build height), exact box cover under 32768, the command, two clicks, refusals, 20 per tick, answers, Stop
 ```
 
 The whole suite is every `tools/harness/*.java` with a `main` except the probes listed below;

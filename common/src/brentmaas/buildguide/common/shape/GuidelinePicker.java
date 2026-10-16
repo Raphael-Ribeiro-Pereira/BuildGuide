@@ -117,7 +117,8 @@ public final class GuidelinePicker {
 		return Double.POSITIVE_INFINITY;
 	}
 
-	private static boolean qualifies(int x, int y, int z, double[] box, Cells cells, IBlockProbe probe) {
+	// Also the rule of Fill (FillPlan): a cell Area 3 could target is a cell Fill fills
+	static boolean qualifies(int x, int y, int z, double[] box, Cells cells, IBlockProbe probe) {
 		if(box != null && x < box[3] && x + 1 > box[0] && y < box[4] && y + 1 > box[1] && z < box[5] && z + 1 > box[2]) return false;
 		if(!cells.isTarget(x, y, z)) return false;
 		if(!probe.isLoaded(x, y, z)) return false;

@@ -3,12 +3,18 @@ package brentmaas.buildguide.fabric.shape;
 import java.util.Locale;
 import java.util.Optional;
 
+import brentmaas.buildguide.common.shape.IBlockProbe;
 import brentmaas.buildguide.common.shape.IShapeBuffer;
 import brentmaas.buildguide.common.shape.IShapeHandler;
 import brentmaas.buildguide.common.shape.SectionedBuffer;
 import brentmaas.buildguide.common.shape.ShapeSet.Origin;
+import brentmaas.buildguide.fabric.validation.WorldProbe;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.server.permissions.Permissions;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.BlockItem;
@@ -44,5 +50,35 @@ public class ShapeHandler implements IShapeHandler {
 		if(player == null || !(player.getMainHandItem().getItem() instanceof BlockItem item)) return null;
 		Block block = item.getBlock();
 		return block.defaultBlockState().isAir() ? null : BuiltInRegistries.BLOCK.getKey(block).toString();
+	}
+
+	// Fill (FillTask): the client world, as the scan reads it
+	@Override
+	public IBlockProbe worldProbe() {
+		ClientLevel level = Minecraft.getInstance().level;
+		return level == null ? null : new WorldProbe(level);
+	}
+
+	@Override
+	public double[] playerBox() {
+		LocalPlayer player = Minecraft.getInstance().player;
+		if(player == null) return null;
+		AABB box = player.getBoundingBox();
+		return new double[] {box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ};
+	}
+
+	// /fill needs the game master level (2): cheats on in singleplayer or on a LAN world, or op on a server
+	@Override
+	public boolean mayRunCommands() {
+		LocalPlayer player = Minecraft.getInstance().player;
+		return player != null && player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER);
+	}
+
+	@Override
+	public boolean sendCommand(String command) {
+		ClientPacketListener connection = Minecraft.getInstance().getConnection();
+		if(connection == null) return false;
+		connection.sendCommand(command);
+		return true;
 	}
 }

@@ -69,4 +69,9 @@ public class WorldProbe implements IBlockProbe {
 	public String name(int x, int y, int z) {
 		return stateAt(x, y, z).getBlock().getName().getString();
 	}
+
+	@Override
+	public boolean isInBuildHeight(int y) {
+		return !world.isOutsideBuildHeight(y);
+	}
 }

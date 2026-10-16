@@ -88,6 +88,24 @@ public abstract class Shape {
   drawn (`TimingLog.recordRender`, its own limit of 120 lines). `TimingLog.recordWorld` gains
   `sections=`, `frames=`, `maxframe=` and `gpu=` for a sectioned buffer.
 
+### Fill with the block in hand (`wip/fill`)
+
+- `FillPlan` (common, pure): `cells(expected, ox, oy, oz, exclusionBoxes, inFocus, probe,
+  playerBox)` returns the local positions Area 3 could target (`GuidelinePicker.qualifies`, now
+  package-private and shared) that are inside the build height (`IBlockProbe.isInBuildHeight`,
+  default true); `boxes(cells, maxVolume)` an exact cover by boxes (greedy rectangles per Y layer,
+  stacked while the same rectangle repeats, each at most `maxVolume`, 32768); `command(box, origin,
+  blockId)` the `/fill ... replace #minecraft:replaceable` text without the slash.
+- `FillTask` (common, client thread): the Fill button's `click(ShapeSet)` (stop, else plan and arm,
+  else start), `title()`, `tick()` (20 commands per tick), `answer(ok, blocks)` (whether a server
+  answer belongs to the running fill), `stop()`. Its clock can be replaced for the harness.
+- `IShapeHandler` defaults (no world): `worldProbe()`, `playerBox()`, `mayRunCommands()` (Fabric:
+  `Permissions.COMMANDS_GAMEMASTER`), `sendCommand(command)` (Fabric:
+  `ClientPacketListener.sendCommand`; false without a connection).
+- Fabric `FillHooks`: `FillTask.tick()` on `END_CLIENT_TICK` (it stops the fill when the player is
+  gone), and `ClientReceiveMessageEvents.ALLOW_GAME` drops the `commands.fill.*` answers while a fill
+  runs (the key in the message or its first sibling, the red error form).
+
 ### ValidationState (Etapa 2.1)
 
 `common/shape/ValidationState` — live, **mutable, per-position, `synchronized`** state
