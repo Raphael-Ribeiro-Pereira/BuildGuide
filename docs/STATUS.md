@@ -276,6 +276,43 @@ the expected set, the scan, the totals and Validate always cover all of it.
 
 Offline harness after the focus: 1096 asserts, 0 failures; Bridge 466 / 159 / 360.
 
+### Terrain (on `wip/terrain`, waiting for the in-game test; not merged)
+
+A new shape, registered after the Island: a seeded relief **skin** over a plan, never solid (Skin 1
+to 3 blocks, no floor, no wall at the edge). It shares no class with the Island (the plan code is a
+copy); the decompile diff against `FOCUS` shows `ShapeIsland`, `IslandGeometry`, `IslandNoise` and
+`IslandControls` identical.
+
+| Phase | Commit | What |
+|---|---|---|
+| Geometry | `45abc73` | `TerrainNoise`, `TerrainGeometry`: the Island's four Outlines; Hills (fractal), Mountains (ridged), Dunes (waves along the Rotation); a column goes down to its lowest neighbour inside the plan minus Skin - 1 (no gaps); the cap Height <= min(60, 3 x Scale) |
+| Shape | `147d831` | `ShapeTerrain` (sections Base, Relief, Random with a visible Seed), `TerrainControls` (Randomize, Natural, Undo), the cap in the panel, the focus (Part All / Hidden), GOLDEN of 12 terrains |
+| Layers | `f2943e0` | layers and the palette by **height** (`TerrainLayers`: a column's layer from its surface, t = h / Height); `ShapeLayers.layerAt` and `LayerPalette.classify` by position (the Island's layers unchanged) |
+
+- The cap came from a measured cost: without it the worst case was 381,733 blocks. With it, at
+  121 x 121, Roughness 1, Skin 3, every Scale at its cap: Hills 93,703, Mountains 129,882, Dunes
+  126,210 blocks (at most 83 MB of vertex buffer). Defaults on 121 x 121: 36,649 blocks.
+- Dunes: lee 0.35 of a wave and 0.20 of light noise (the lee alone hardly changes the count; the
+  noise's share does).
+- Natural (drawn from the current seed, which stays): Organic, Corner round 0.75 +- 0.15, Wobble
+  0.25 +- 0.08, Wobble size 6 +- 2, Roughness 0.40 +- 0.15, Edge fade 35 +- 10.
+- Known behaviour: a Height typed above 60 turns the field red like every range field (above
+  3 x Scale it is brought to the cap); Randomize moves Corner round and Wobble even where the
+  Outline hides them.
+
+In-game checklist for `terrain-wip` (jar SHA-256 `8F8720A6…6638`, commit `f2943e0`):
+1. Terrain is last in the shape list; each Type and Outline draws a skin with no holes, also on steep
+   Mountains (Scale 4, Height 12).
+2. Lowering Scale lowers Height in its field; a typed Height above 3 x Scale comes back as the cap.
+3. Randomize, Natural and Undo: one regeneration each, Outline and Type never change, Undo restores
+   the seed.
+4. Layers on: four colours by height (low to peaks), the legend in blocks above the base, Colour:
+   Layer in the preview, a block per layer validates (wrong layer orange, wrong block red).
+5. The focus: Part Hidden hides the terrain in the world only; Layer 1..4 shows only those columns.
+6. An Island saved before still loads and looks the same.
+
+Offline harness after the Terrain: 1178 asserts, 0 failures; Bridge 466 / 159 / 360.
+
 Offline harness at the close: 406 asserts, 0 failures; Bridge reference sizes 466 / 159 / 360.
 E6 (after two fixes), E7, P4 and E8 passed their in-game checklists before being committed
 (E7 7 of 7, P4 9 of 9, E8 9 of 9). The ghost fix was committed on Raphael's go-ahead after the

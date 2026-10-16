@@ -49,9 +49,10 @@ Order is the order of work. Rules that apply to all of it are in `docs/STATUS.md
      panel, Focus from (default 400) in Configuration.
 
 5. **Terrain: a new shape, relief (mountains)** with its own outline and seed, positioned by the
-   origin. One column per position. **In progress** (2026-10-14, `wip/terrain`): a skin of 1 to 3
-   blocks over a plan (the Island's four Outlines, copied, never shared), Hills, Mountains or
-   Dunes; then layers and the palette by height.
+   origin. One column per position. **Built, waiting for the in-game test** (2026-10-15,
+   `wip/terrain`, `45abc73`..`f2943e0`; see `docs/STATUS.md`): a skin of 1 to 3 blocks over a plan
+   (the Island's four Outlines, copied, never shared), Hills, Mountains or Dunes, Height <= 3 x
+   Scale; layers and the palette by height.
 
 6. **Tree: an experiment with a deadline** (round canopy and bonsai before the willow).
 
@@ -243,3 +244,21 @@ Open decisions:
 - **Raphael's full test.**
 - **Idea: scan only the focus.** Today the scan, the totals and Validate always cover the whole
   shape; scanning only the blocks in focus would cut the scan's cost too. Not decided.
+
+## Next: measure, then optimise the world rendering (2026-10-15)
+
+Why the mod is heavier than Litematica (read from Litematica's own code, decompiled locally for
+analysis only; details in the session notes):
+1. Every cube draws its 6 faces; Litematica drops the face between two neighbours. A 107k-block
+   Island (Wall 3) has 645k faces (39 MB); only 16% are exposed. Our cubes are 0.6 wide by
+   default, so the inner faces show: dropping them changes the look (a decision for Raphael).
+2. One buffer per shape, drawn whole every frame and remade whole on any change; Litematica uses
+   16^3 sections with frustum and render-distance culling, rebuilds only what changed on worker
+   threads and uploads with a time budget per frame.
+3. The scan prepares and publishes in one frame on the render thread with boxed per-block
+   collections (several `HashSet<Long>` / `HashMap<Long, Byte>` of ~6 MB each at 107k).
+4. The preview is a second full mesh, rebuilt every 100 ms while the validation changes.
+
+First step (no code): measure in the same profile with JFR and `modlab report`, following
+`docs/TUTORIAL_DESEMPENHO.md`, with the shape visible, with Part Hidden, and while editing; then
+the same with Litematica. Then choose between 16^3 sections, face culling and the scan.

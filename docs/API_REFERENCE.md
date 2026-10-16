@@ -428,6 +428,60 @@ anything more must split (the Step 4 reset button that shared the Validate row i
 Offline harness: `BuildGuide-tools/bridgetest/BridgeTest.java` (property indices in its
 header) — run it before any in-game test of Bridge changes.
 
+### Layers, palette and build focus (4C, 4D, focus, Terrain)
+
+A shape that has layers reports them from its **last generation**, so the world, the preview and the
+scan always agree:
+
+```java
+public boolean hasLayers();          // the panel's Layers box now (default false)
+public ShapeLayers getLayers();      // the last generation's layers, null without (default null)
+public String[] getPalette();        // one block id per layer, "" = any solid, null without (default null)
+```
+
+- `ShapeLayers(top, depth, cut1, cut2, cut3)` (immutable): four bands below `top`, cut at three
+  percentages of `depth`, compared in integers (a block on a cut goes to the next layer).
+  `layerOf(y)` is by depth; **`layerAt(x, y, z)` is what every consumer calls** (by `y` here).
+  `normalize(c1, c2, c3, changed)` keeps the cuts 5 apart in 5..95; `depthRange(layer)` feeds the
+  legend (`ShapeScreen.depthLabel`). Equality only between layers of the same class.
+- `TerrainLayers extends ShapeLayers`: the layer of a **column** from its surface height,
+  t = h / Height; built as `ShapeLayers(0, Height, cuts)` over the generation's `tops` array, so
+  `depthRange` reads heights above the base. Equal only with the same cuts and the same `tops`.
+- `LayerPalette(layers, rawIds)`: `classify(palette, x, y, z, flags, blockId)` is the one rule of the
+  scan, `SliceScan`, the block events and the safety net (`classify(palette, y, ...)` stays for
+  y-only layers); `needsId(x, y, z)` says whether the block id must be read. Statuses
+  `WRONG_LAYER = 5`, `WRONG_BLOCK = 6` in `ValidationState`.
+
+Build focus (the world shows a part / layer; the preview, the scan and the totals never change):
+
+```java
+public interface IFocusParts {                    // Shape implements it
+    default boolean hasParts();                   // false: Part is All or Hidden
+    default FocusFilter.Part partOf(int x, int y, int z);  // FocusFilter.WHOLE
+}
+// Shape
+public FocusFilter.Part getFocusPart(); public int getFocusLayer();   // transient; Island/Terrain persist them
+protected void storeFocus(FocusFilter.Part part, int layer);
+public void setFocus(FocusFilter.Part part, int layer);  // stores, then refreshFocus()
+public void refreshFocus();                      // remakes only the world buffer, through the WorldUpdateGate
+public FocusFilter getWorldFocus();              // the focus of the latest world buffer, null = all
+public int getWorldBlocks();                     // cubes in it (origin not counted)
+public LongPredicate worldFocusTest();           // for the overlay and the Area 3 picker; null = all
+public boolean isRefocusing();                   // the render thread keeps the old buffer meanwhile
+public static int focusThreshold();              // Configuration "Focus from" (default 400, 0 = always)
+```
+
+A shape that colours cubes one by one overrides `colourCube(buffer, x, y, z)`, so a world buffer made
+again for the focus keeps the generation's colours. `ValidationOverlay.build(..., inFocus)` and
+`GuidelinePicker.shapeCells(..., inFocus)` take the test (null = everything).
+
+Terrain (`ShapeTerrain`, registered last): geometry in `TerrainGeometry` (pure; `enumerate(params,
+tops, out)` hands the generation's column tops to `TerrainLayers`), recipes and the height cap in
+`TerrainControls`, noise in `TerrainNoise`. It shares no class with the Island. Height is held under
+`TerrainGeometry.maxHeightFor(scale)` = min(60, 3 x Scale) in the panel, on load and in the recipes.
+Persistence (30 values): plan (8), relief (6), random (6), focus part, focus layer, then Layers, the
+three cuts and Block 1 to 4.
+
 ## Properties (`common/property`)
 
 `Property<T>` owns a value and its widgets. Widgets are created **lazily** on the first

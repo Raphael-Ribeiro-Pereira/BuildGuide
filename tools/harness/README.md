@@ -37,7 +37,16 @@ java  -cp "$CLASSES;$OUT" OriginScanTest    # P4 scan origin: results stay in th
 java  -cp "$CLASSES;$OUT" PresetTest        # E8 presets: slot file (Windows-safe replace, bad lines), encoding, name= in the world save, two-click confirmation with an injected clock, preset data, load (reused/new instance, refusals leave the set untouched, full reset incl. Spline points) (63 asserts)
 java  -cp "$CLASSES;$OUT" ReconcileTest     # ghost fix: safety net (stuck error before, gone after; chunk gate; scan/unvalidated gates; round robin with 50k positions; log limit), update idempotence, client model with and without the second hook, cost per pass (35 asserts)
 java  -cp "$CLASSES;$OUT" GhostTest         # not an assert test: prints how a ghost error can arise in a model of the 1.21.11 client block-change code (ReconcileTest also drives it)
+java  -cp "$CLASSES;$OUT" FocusTest         # build focus core: Island parts (Cap/Body/Spikes), Part x Layer filter, threshold, saved selectors, focusFrom in the cfg
+java  -cp "$CLASSES;$OUT" FocusWorldTest    # build focus in the world: buffer only in focus, refocus without a generation or a scan, overlay, timing focus=
+java  -cp "$CLASSES;$OUT" FocusGuiTest      # build focus panel: button texts in px, the row at 270 and 360, the preview's note
+java  -cp "$CLASSES;$OUT" TerrainGeometryTest # Terrain geometry: seeds, Types, Dunes direction, the cap 3 x Scale, Edge fade, the skin without gaps (117 terrains), cost under 150k
+java  -cp "$CLASSES;$OUT" TerrainTest       # Terrain shape: the cap in the panel, Randomize/Natural/Undo, focus, persistence, labels, accordion, registry, GOLDEN of 12 terrains
+java  -cp "$CLASSES;$OUT" TerrainLayersTest # Terrain layers by height: cuts, column layer, palette truth table, sliced == instant scan, persistence, preview, focus by layer
 ```
+
+The whole suite is every `tools/harness/*.java` with a `main` except the probes listed below;
+the commit helpers run it and require 0 failures and Bridge 466 / 159 / 360.
 
 `CentreTest`, `Step4Test`, `BaseSetTest` are the Step 3/4 and 2.2c checks;
 `ScanCostTest`, `MemTest`, `OverlayCost`, `OverlayCost2`, `WorldCost` are timing/memory probes.
