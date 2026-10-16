@@ -15,6 +15,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import brentmaas.buildguide.common.BuildGuide;
 import brentmaas.buildguide.common.TimingLog;
 import brentmaas.buildguide.common.WorldUpdateGate;
+import brentmaas.buildguide.common.WorldUpload;
 import brentmaas.buildguide.common.property.Property;
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
 import brentmaas.buildguide.common.screen.BaseScreen;
@@ -49,6 +50,8 @@ public abstract class Shape implements IValidatable, IFocusParts {
 	// newer generations wait for the WorldUpdateGate. Render thread only; stays null for handlers that do not defer
 	public transient IShapeBuffer shownBuffer = null;
 	public final transient WorldUpdateGate worldGate = new WorldUpdateGate(System::currentTimeMillis);
+	// The buffer the gate let through, while its parts are still being sent to the GPU (render thread)
+	public final transient WorldUpload upload = new WorldUpload();
 	private int nBlocks = 0;
 	public boolean ready = false;
 	public boolean vertexBufferUnpacked = false;

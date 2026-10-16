@@ -17,9 +17,11 @@ import com.mojang.blaze3d.systems.RenderSystem;
 
 import brentmaas.buildguide.common.AbstractRenderHandler;
 import brentmaas.buildguide.common.BuildGuide;
+import brentmaas.buildguide.common.RenderStats;
 import brentmaas.buildguide.common.TimingLog;
 import brentmaas.buildguide.common.shape.GuidelinePicker;
 import brentmaas.buildguide.common.shape.LayerPalette;
+import brentmaas.buildguide.common.shape.SectionedBuffer;
 import brentmaas.buildguide.common.shape.Shape;
 import brentmaas.buildguide.common.shape.LocalPos;
 import brentmaas.buildguide.common.shape.ShapeLayers;
@@ -37,6 +39,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
@@ -96,9 +99,64 @@ public class RenderHandler extends AbstractRenderHandler {
 		}
 	}
 
+	// The frustum the world culls its terrain with in this frame (MixinLevelRenderer); null when it was not
+	// captured (another mod replaced prepareCullFrustum): then only the distance culls
+	private static Frustum frustum = null;
+	// Sections in view this frame (reused, render thread)
+	private final List<ShapeBuffer> visibleSections = new ArrayList<ShapeBuffer>();
+
+	public static void noteCullFrustum(Frustum cullFrustum) {
+		frustum = cullFrustum;
+	}
+
+	@Override
+	public void render() {
+		try {
+			super.render();
+		}finally {
+			frustum = null; // never used in a later frame
+		}
+	}
+
 	// Live apply (deferredWorldUpdates): the world draws the last applied buffer, not the one being generated
 	public void renderShapeBuffer(Shape shape) {
-		((ShapeBuffer) shape.shownBuffer).render();
+		if(shape.shownBuffer instanceof SectionedBuffer sectioned) {
+			visibleSections.clear();
+			for(SectionedBuffer.Section section: sectioned.getSections()) visibleSections.add((ShapeBuffer) section.getBuffer());
+			ShapeBuffer.renderAll(visibleSections);
+			visibleSections.clear();
+		}else {
+			((ShapeBuffer) shape.shownBuffer).render();
+		}
+	}
+
+	/**
+	 * The world buffer's sections that can be seen, in one render pass: those within the render distance (plus
+	 * a section) horizontally and inside the frustum the terrain is culled with, like the world's own sections.
+	 * Inside the set's translation (setupRenderingShapeSet).
+	 */
+	@Override
+	protected void renderWorldBuffer(ShapeSet shapeSet) {
+		Shape shape = shapeSet.getShape();
+		if(!(shape.shownBuffer instanceof SectionedBuffer sectioned)) {
+			renderShapeBuffer(shape);
+			return;
+		}
+		Minecraft mc = Minecraft.getInstance();
+		Vec3 camera = mc.gameRenderer.getMainCamera().position();
+		double ox = shapeSet.getOriginX(), oy = shapeSet.getOriginY(), oz = shapeSet.getOriginZ();
+		double reach = (mc.options.getEffectiveRenderDistance() + 1) * 16.0;
+		List<SectionedBuffer.Section> sections = sectioned.getSections();
+		visibleSections.clear();
+		for(SectionedBuffer.Section section: sections) {
+			if(section.getVertexCount() == 0) continue;
+			if(section.horizontalDistanceSq(camera.x, camera.z, ox, oz) > reach * reach) continue;
+			if(frustum != null && !frustum.isVisible(new AABB(ox + section.minX(), oy + section.minY(), oz + section.minZ(), ox + section.maxX(), oy + section.maxY(), oz + section.maxZ()))) continue;
+			visibleSections.add((ShapeBuffer) section.getBuffer());
+		}
+		ShapeBuffer.renderAll(visibleSections);
+		RenderStats.sections(visibleSections.size(), sections.size());
+		visibleSections.clear();
 	}
 
 	@Override

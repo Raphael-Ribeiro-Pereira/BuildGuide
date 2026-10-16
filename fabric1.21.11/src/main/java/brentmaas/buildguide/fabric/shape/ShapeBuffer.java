@@ -1,5 +1,6 @@
 package brentmaas.buildguide.fabric.shape;
 
+import java.util.List;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 
@@ -21,6 +22,7 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.VertexFormat;
 
+import brentmaas.buildguide.common.shape.GpuMemory;
 import brentmaas.buildguide.common.shape.IShapeBuffer;
 import brentmaas.buildguide.common.shape.VertexMemory;
 import brentmaas.buildguide.fabric.RenderHandler;
@@ -42,6 +44,8 @@ public class ShapeBuffer implements IShapeBuffer {
 	private final VertexMemory.Account memory;
 	private GpuBuffer vertexBuffer, indexBuffer;
 	private int indexCount;
+	// The vertex buffer's size on the GPU, for the gpu= diagnostic (GpuMemory)
+	private long gpuBytes = 0;
 	private int defaultR = 255, defaultG = 255, defaultB = 255, defaultA = 255;
 
 	public ShapeBuffer() {
@@ -79,6 +83,8 @@ public class ShapeBuffer implements IShapeBuffer {
 		}else {
 			try {
 				vertexBuffer = RenderSystem.getDevice().createBuffer(() -> "Build Guide vertices", GpuBuffer.USAGE_VERTEX, meshData.vertexBuffer());
+				gpuBytes = vertexBuffer.size();
+				GpuMemory.allocated(gpuBytes);
 				indexCount = meshData.drawState().indexCount();
 				indexBuffer = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS).getBuffer(indexCount);
 			}finally {
@@ -97,9 +103,37 @@ public class ShapeBuffer implements IShapeBuffer {
 	// The GPU buffer only, on the render thread: close() also reaches buffers whose generation may still be
 	// writing (Shape.update), so the native copy is never freed here
 	public void close() {
-		if(vertexBuffer != null) vertexBuffer.close();
+		if(vertexBuffer != null) {
+			vertexBuffer.close();
+			GpuMemory.freed(gpuBytes);
+		}
 		vertexBuffer = null;
 		// Don't also close indexBuffer, it is a reference to a global buffer used everywhere
+	}
+
+	/**
+	 * Several buffers in one render pass (the world buffer's sections in view): the world pipeline, the current
+	 * model-view and vanilla's shared index buffer, grown once for the largest, then one draw per buffer.
+	 */
+	public static void renderAll(List<ShapeBuffer> buffers) {
+		int maxIndexCount = 0;
+		for(ShapeBuffer buffer: buffers) if(buffer.vertexBuffer != null) maxIndexCount = Math.max(maxIndexCount, buffer.indexCount);
+		if(maxIndexCount == 0) return;
+		RenderSystem.AutoStorageIndexBuffer sequential = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
+		GpuBuffer indices = sequential.getBuffer(maxIndexCount);
+		RenderTarget renderTarget = Minecraft.getInstance().getMainRenderTarget();
+		GpuBufferSlice dynamicTransforms = RenderSystem.getDynamicUniforms().writeTransform(RenderSystem.getModelViewMatrix(), new Vector4f(1.0f), new Vector3f(), new Matrix4f());
+		try (RenderPass renderPass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "Build Guide", renderTarget.getColorTextureView(), OptionalInt.empty(), renderTarget.getDepthTextureView(), OptionalDouble.empty())) {
+			renderPass.setPipeline(RenderHandler.getRenderPipeline());
+			RenderSystem.bindDefaultUniforms(renderPass);
+			renderPass.setUniform("DynamicTransforms", dynamicTransforms);
+			renderPass.setIndexBuffer(indices, sequential.type());
+			for(ShapeBuffer buffer: buffers) {
+				if(buffer.vertexBuffer == null || buffer.indexCount == 0) continue;
+				renderPass.setVertexBuffer(0, buffer.vertexBuffer);
+				renderPass.drawIndexed(0, 0, buffer.indexCount, 1);
+			}
+		}
 	}
 	
 	// World rendering: main render target, current model-view, the world pipeline (depth test toggle)

@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import brentmaas.buildguide.common.shape.IShapeBuffer;
 import brentmaas.buildguide.common.shape.IShapeHandler;
+import brentmaas.buildguide.common.shape.SectionedBuffer;
 import brentmaas.buildguide.common.shape.ShapeSet.Origin;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
@@ -15,8 +16,10 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.phys.Vec3;
 
 public class ShapeHandler implements IShapeHandler {
+	// The world buffer of a shape (Shape is its only caller): in 16-block sections, each one a ShapeBuffer, so
+	// RenderHandler draws only the sections in view and a new shape is sent a few sections per frame
 	public IShapeBuffer newBuffer() {
-		return new ShapeBuffer();
+		return new SectionedBuffer(ShapeBuffer::new);
 	}
 	
 	public Origin getPlayerPosition() {

@@ -43,6 +43,7 @@ java  -cp "$CLASSES;$OUT" FocusGuiTest      # build focus panel: button texts in
 java  -cp "$CLASSES;$OUT" TerrainGeometryTest # Terrain geometry: seeds, Types, Dunes direction, the cap 3 x Scale, Edge fade, the skin without gaps (117 terrains), cost under 150k
 java  -cp "$CLASSES;$OUT" TerrainTest       # Terrain shape: the cap in the panel, Randomize/Natural/Undo, focus, persistence, labels, accordion, registry, GOLDEN of 12 terrains
 java  -cp "$CLASSES;$OUT" TerrainLayersTest # Terrain layers by height: cuts, column layer, palette truth table, sliced == instant scan, persistence, preview, focus by layer
+java  -cp "$CLASSES;$OUT" SectionTest       # world buffer in 16-block sections: same vertices as one buffer, bounds, endPart budget, live apply over frames, drops, no leak, render/world-buffer lines
 ```
 
 The whole suite is every `tools/harness/*.java` with a `main` except the probes listed below;
