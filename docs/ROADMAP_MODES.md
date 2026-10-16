@@ -262,3 +262,14 @@ analysis only; details in the session notes):
 First step (no code): measure in the same profile with JFR and `modlab report`, following
 `docs/TUTORIAL_DESEMPENHO.md`, with the shape visible, with Part Hidden, and while editing; then
 the same with Litematica. Then choose between 16^3 sections, face culling and the scan.
+
+Step 1 (2026-10-16, `wip/perf`, on top of `wip/terrain`, waiting for the in-game test): point 2.
+The world buffer in 16^3 sections, drawn only within the render distance and the terrain's
+frustum, in one render pass; a new shape sent a few sections per frame (3 ms) and swapped in
+whole; the `phase=render` line every 30 s and `sections=`, `frames=`, `maxframe=`, `gpu=` on
+`world-buffer` to measure it. Next, in this order unless the measurements say otherwise:
+- Point 3: the scan's preparation and publishing spread over frames, with `long` collections
+  instead of boxed ones (no decision needed).
+- Point 4: the preview not rebuilt whole every 100 ms while the validation changes.
+- Point 1: dropping hidden faces, after Raphael chooses the look (only the surface cubes, or a
+  full-cube option).

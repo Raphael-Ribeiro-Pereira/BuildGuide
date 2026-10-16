@@ -88,6 +88,22 @@ ao mundo), no máximo 200 linhas por sessão. Exemplo real do seu log de hoje:
 | `native=` | memória de vértices ainda presa, em MiB (deve voltar a 0) |
 | `focus=n/total` | com o foco: quantos blocos o mundo desenha, de quantos |
 | `slices=` / `maxslice=` | em quantos quadros o scan foi dividido e o maior pedaço |
+| `sections=` | (desde a etapa 1 de desempenho) em quantas seções de 16³ blocos a forma foi dividida |
+| `frames=` / `maxframe=` | em quantos quadros a forma nova foi enviada à GPU e o maior pedaço, em ms (deve ficar perto de 3) |
+| `gpu=` | memória de vídeo dos buffers do mod, em MiB (deve ficar estável enquanto você edita) |
+
+Desde a etapa 1 há também uma linha a cada 30 s enquanto alguma forma está ligada:
+
+```
+[Build Guide] timing: phase=render frames=1800 avg=0.42 max=3.1 sections=34/260 gpu=39.2 native=0.0
+```
+
+| Campo | Significado |
+|---|---|
+| `frames=` | quadros desenhados nesses 30 s (dividido por 30 dá o FPS médio) |
+| `avg=` / `max=` | quanto o Build Guide gastou por quadro na thread de render, em ms: a média e o pior |
+| `sections=n/total` | quantas seções foram desenhadas (na média por quadro) de quantas existem; as de trás de você e as além da render distance são puladas |
+| `gpu=` / `native=` | memória de vídeo e memória de vértices presas, em MiB |
 
 Para achar as linhas: abra `logs/latest.log` do perfil e procure por `timing:`. O `modlab report` (seção
 6) já as coloca na linha do tempo junto com o resto.
@@ -214,6 +230,16 @@ Como ler a comparação:
 
 Com esses relatórios decidimos o que atacar primeiro: dividir a forma em seções de 16³ (como o
 Litematica), não desenhar as faces escondidas, ou espalhar o scan e tirar o boxing.
+
+**Etapa 1 (16/10, `perf-wip`): as seções de 16³ já estão no jar.** O que olhar com ela:
+
+- Olhando a forma e depois de costas para ela: na linha `phase=render`, o `sections=n/total` deve cair
+  bastante de costas, e o FPS (F3) subir.
+- Segurando o + num controle de uma forma grande (Live): a linha `world-buffer` deve mostrar
+  `frames=` maior que 1 e `maxframe=` perto de 3, e o F3 + 2 sem a barra alta isolada que aparecia
+  antes. A forma nova aparece alguns quadros depois, inteira, nunca pela metade.
+- O cenário B menos A continua valendo para o custo de GPU que sobra (as faces escondidas, que são a
+  etapa seguinte, dependem da sua decisão sobre o visual).
 
 ---
 

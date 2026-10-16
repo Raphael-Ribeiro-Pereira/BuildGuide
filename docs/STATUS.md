@@ -313,6 +313,39 @@ In-game checklist for `terrain-wip` (jar SHA-256 `8F8720A6…6638`, commit `f294
 
 Offline harness after the Terrain: 1178 asserts, 0 failures; Bridge 466 / 159 / 360.
 
+### Performance, step 1: the world buffer in sections (on `wip/perf`, waiting for the in-game test; not merged)
+
+Branched from `wip/terrain` (`2724d58`), so its jar has the Terrain too. It changes how the world
+draws a shape, not the shapes: the decompile diff against `TERRAIN` (declared beforehand) is 4 new
+classes (`SectionedBuffer`, `WorldUpload`, `RenderStats`, `GpuMemory`) and 8 changed
+(`AbstractRenderHandler`, `TimingLog`, `IShapeBuffer`, `Shape`, the Fabric `RenderHandler`,
+`ShapeBuffer`, `ShapeHandler`, `MixinLevelRenderer`); `en_us.json` showed up only through the
+line-ending normalisation (the same bytes in both jars).
+
+| Phase | Commit | What |
+|---|---|---|
+| Sections | `b86d7fe` | the world buffer in 16 x 16 x 16 sections, one `ShapeBuffer` each (the same vertices and colours as one buffer); drawn only within the render distance + 1 section and inside the terrain's frustum (captured at `prepareCullFrustum`), all in one render pass; a new shape sent a few sections per frame (3 ms) and swapped in whole; `phase=render` every 30 s and `sections=`, `frames=`, `maxframe=`, `gpu=` on `world-buffer` |
+
+- Why: Litematica draws only the 16^3 sections in view and sends changes with a time budget; we drew
+  the whole shape every frame and sent a big one in a single frame (the hitch when it appears).
+- Offline: an Island 81 x 81 with spikes and layers (31,319 blocks) is 123 sections that hold exactly
+  the cubes of one buffer; 245 sections over generations, focus changes and drops, all freed once.
+- Not measurable offline: the FPS and the GPU side. The `phase=render` line is there for that.
+- Known: a big shape now appears a few frames after it is generated (whole, never half).
+
+In-game checklist for `perf-wip`:
+1. Every shape looks as before (Island with layers and spikes, Terrain, Sphere, Bridge), also with
+   Cube size 1 (Visualisation): no hole or missing block along the 16-block section edges.
+2. Turning around: nothing appears late at the screen edges; `phase=render ... sections=n/total`
+   drops while looking away from a big shape, and the FPS (F3) goes up.
+3. Flying beyond the render distance: the far sections go away with the terrain and come back.
+4. Holding + on a big shape with Live: the world keeps the old shape until the new one is complete;
+   `world-buffer ... frames=N maxframe=` about 3 ms; no isolated tall bar in F3 + 2.
+5. Validate, the error overlay, Area 3 placing and the focus (Part, Layer) work as before.
+6. `gpu=` stays level while editing (it must not grow) and goes down when a shape is removed.
+
+Offline harness after step 1: 1229 asserts, 0 failures; Bridge 466 / 159 / 360.
+
 Offline harness at the close: 406 asserts, 0 failures; Bridge reference sizes 466 / 159 / 360.
 E6 (after two fixes), E7, P4 and E8 passed their in-game checklists before being committed
 (E7 7 of 7, P4 9 of 9, E8 9 of 9). The ghost fix was committed on Raphael's go-ahead after the
@@ -325,11 +358,12 @@ Build output: `fabric1.21.11/build/libs/BuildGuide-Fabric-0.4.8.jar` (mod versio
 
 | Item | Value |
 |---|---|
-| Active jar in the mods folder | `BuildGuide-Fabric-0.4.8-focus-wip.jar` |
-| SHA-256 | `6923FAB6A40E250901C68746389327DA9FF8573498C920B5D86621CB9132B09C` |
-| Source | commit `0ff9af7`: the build output and the mods copy have the same SHA-256; `FocusFilter`, `IFocusParts`, `IslandGeometry$Parts`, `ShapeScreen`, `RenderHandler` and `GuidelinePicker` are inside. The merged head `428c206` differs only in the Focus from default (30000 there, 400 here), which reaches the mods folder with the next deploy |
-| Tested | the offline harness (1096 asserts); in game, validated (2026-10-14); Raphael's full test is pending |
-| Previous jars | `BuildGuide-Fabric-0.4.8-palette-wip.jar` (SHA-256 `F0C0A242D361BB0E73BC4EF477EE274AA905C7ED8681154FF004227B438B26B0`, commit `e35fad3`), `BuildGuide-Fabric-0.4.8-leakfix-wip.jar` (SHA-256 `D0089DE876C5855AFF509974DFA2400037F1B5DCAD05E63B45A0E6C4095EDABF`, commit `481d42a`), `BuildGuide-Fabric-0.4.8-layers-wip.jar` (SHA-256 `14B66C4E9A572D5224C01F5217BBB087BB48BB8BE908909CF67408824AE2F7CC`, commit `c8a8579`), `BuildGuide-Fabric-0.4.8-scan-slices-wip.jar` (SHA-256 `A280A6440BB423878D6AAFA316709E852D63EF2EEBB3FF3F643E826C4724A067`, commit `7762309`), `BuildGuide-Fabric-0.4.8-spikes2-wip.jar` (SHA-256 `89F6B80A37150060E598EF0988446699E8B43F5E050267E83A9398909BE5D87B`, commit `3e63cbd`), `BuildGuide-Fabric-0.4.8-spikes-wip.jar` (SHA-256 `C3564E26FD888E46E106724E051C27C19D74EE962365FD9BB90775E77DE03A6E`, commit `a6d1c23`), `BuildGuide-Fabric-0.4.8-live-apply-wip.jar` (SHA-256 `8DB5202C0AFEC1F4645D0E4052852B188BE4CA9CF35C9FC969DF5CC092994198`, commit `416b5e0`), `BuildGuide-Fabric-0.4.8-island-ux-wip.jar` (SHA-256 `DD5B7BD8ADF1714F0BC152A303B6ED3F2FB2EA5E9C8F79034B52BD27DAE76557`, commit `07d554c`), `BuildGuide-Fabric-0.4.8-island-wip.jar` (SHA-256 `556D80E49975B12802361D5CB8971EE632415A7E841C0EC71D8AF06826C92DE9`, commit `f7937be`), `BuildGuide-Fabric-0.4.8-area3-wip2.jar` (SHA-256 `B5AC963F068EFF59954521F29F24D994BBFE61CF9F55C2C1DE9256E055392A32`, commit `584674b`), `BuildGuide-Fabric-0.4.8-area3-wip.jar` (first Area 3 test) and `BuildGuide-Fabric-0.4.8-ghost-fix-wip.jar` (SHA-256 `1E2F5E96A659D474EF14D9CDDBF5930E6B695DF66F31C782A7C1E5654E55BDB6`, commit `9c3fbde`), kept as `.bak` |
+| Active jar in the mods folder | `BuildGuide-Fabric-0.4.8-terrain-wip.jar` (deployed 2026-10-15) |
+| SHA-256 | `8F8720A6C522676F562DEBBCAC85DBA1CBD7F8C6ACF0C2CE75F97971D2E96638` |
+| Source | `wip/terrain` at `2724d58` (code identical to `f2943e0`, only docs after it; it includes `428c206`, Focus from 400 for a `buildguide.cfg` without `focusFrom`): the build output and the mods copy have the same SHA-256; `ShapeTerrain`, `TerrainGeometry`, `TerrainControls`, `TerrainNoise` and `TerrainLayers` are inside |
+| Tested | the offline harness (1178 asserts); in game: Raphael's test pending |
+| Next jar | `perf-wip` (`wip/perf`, `b86d7fe`): built and checked offline, not deployed yet (the game was open) |
+| Previous jars | `BuildGuide-Fabric-0.4.8-focus-wip.jar` (SHA-256 `6923FAB6A40E250901C68746389327DA9FF8573498C920B5D86621CB9132B09C`, commit `0ff9af7`), `BuildGuide-Fabric-0.4.8-palette-wip.jar` (SHA-256 `F0C0A242D361BB0E73BC4EF477EE274AA905C7ED8681154FF004227B438B26B0`, commit `e35fad3`), `BuildGuide-Fabric-0.4.8-leakfix-wip.jar` (SHA-256 `D0089DE876C5855AFF509974DFA2400037F1B5DCAD05E63B45A0E6C4095EDABF`, commit `481d42a`), `BuildGuide-Fabric-0.4.8-layers-wip.jar` (SHA-256 `14B66C4E9A572D5224C01F5217BBB087BB48BB8BE908909CF67408824AE2F7CC`, commit `c8a8579`), `BuildGuide-Fabric-0.4.8-scan-slices-wip.jar` (SHA-256 `A280A6440BB423878D6AAFA316709E852D63EF2EEBB3FF3F643E826C4724A067`, commit `7762309`), `BuildGuide-Fabric-0.4.8-spikes2-wip.jar` (SHA-256 `89F6B80A37150060E598EF0988446699E8B43F5E050267E83A9398909BE5D87B`, commit `3e63cbd`), `BuildGuide-Fabric-0.4.8-spikes-wip.jar` (SHA-256 `C3564E26FD888E46E106724E051C27C19D74EE962365FD9BB90775E77DE03A6E`, commit `a6d1c23`), `BuildGuide-Fabric-0.4.8-live-apply-wip.jar` (SHA-256 `8DB5202C0AFEC1F4645D0E4052852B188BE4CA9CF35C9FC969DF5CC092994198`, commit `416b5e0`), `BuildGuide-Fabric-0.4.8-island-ux-wip.jar` (SHA-256 `DD5B7BD8ADF1714F0BC152A303B6ED3F2FB2EA5E9C8F79034B52BD27DAE76557`, commit `07d554c`), `BuildGuide-Fabric-0.4.8-island-wip.jar` (SHA-256 `556D80E49975B12802361D5CB8971EE632415A7E841C0EC71D8AF06826C92DE9`, commit `f7937be`), `BuildGuide-Fabric-0.4.8-area3-wip2.jar` (SHA-256 `B5AC963F068EFF59954521F29F24D994BBFE61CF9F55C2C1DE9256E055392A32`, commit `584674b`), `BuildGuide-Fabric-0.4.8-area3-wip.jar` (first Area 3 test) and `BuildGuide-Fabric-0.4.8-ghost-fix-wip.jar` (SHA-256 `1E2F5E96A659D474EF14D9CDDBF5930E6B695DF66F31C782A7C1E5654E55BDB6`, commit `9c3fbde`), kept as `.bak` |
 
 - The file name still says `wip`: it was never renamed after the test. Renaming is a choice
   for Raphael (nothing depends on the name); a rebuild of `acf4904` gives the same classes.
@@ -363,7 +397,8 @@ Process
    user has confirmed the stage in-game; the user runs the in-game tests.
 9. Before every in-game test: build green, harness green. Declare the expected decompile diff
    *before* running it, then diff the new jar against the previous baseline
-   (`BuildGuide-tools\decompiled\<NAME>`, Vineflower, CRLF normalised). The baseline is now `FOCUS`.
+   (`BuildGuide-tools\decompiled\<NAME>`, Vineflower, CRLF normalised). The baseline is now `FOCUS`
+   for `feat/cone-expanded`, `TERRAIN` for `wip/terrain` and `PERF` for `wip/perf`.
 10. Deploy only with the game and the Modrinth App closed; abort if javaw, the Modrinth App, or a
     java whose command line contains fabric, knot, net.minecraft, .minecraft, ModrinthApp,
     `Fabulously Optimized (1)` or devlaunchinjector is running (any other java, such as an IDE

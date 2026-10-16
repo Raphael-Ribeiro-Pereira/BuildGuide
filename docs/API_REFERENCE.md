@@ -56,6 +56,38 @@ public abstract class Shape {
   ~62–76 B/block (sphere r=50 ≈ 1.9 MB, 100k ≈ 7 MB), about 10% of the vertex buffer the
   same shape already pays, so it is always kept.
 
+### The world buffer: sections, culling, sending over frames (performance step 1, `wip/perf`)
+
+- `IShapeHandler.newBuffer()` is the world buffer of a shape (`Shape` is its only caller). On
+  Fabric it returns a `SectionedBuffer` of `ShapeBuffer`s; the harness keeps plain recording
+  buffers. The overlay, the preview and the Area 3 outline create `ShapeBuffer` directly.
+- `SectionedBuffer` (common): each quad goes whole to the 16 x 16 x 16 section its first vertex
+  is in (`floor(v / 16)` per axis, local coordinates), one loader buffer per section, made on
+  the generation thread as quads arrive. A section gets exactly the vertices and colours one
+  buffer would get, in the same order (the colour is set on a section only when it changes).
+  `Section` exposes `sx/sy/sz`, the exact vertex bounds (`minX()`..`maxZ()`), the vertex count,
+  `horizontalDistanceSq` and its buffer. `end()`, `close()` and `releaseVertexData()` keep the
+  `IShapeBuffer` rules for the whole; a write after the release throws and makes no section.
+- `IShapeBuffer.endPart(clock, deadline)` (default: `end()`, done in one call): sends part of
+  the buffer, at least one step, until the clock reaches the deadline; returns whether all of
+  it is sent. `SectionedBuffer` sends sections in creation order.
+- Live apply (`AbstractRenderHandler.renderShapeSetDeferred`) sends the buffer the gate let
+  through with `endPart`, `WorldUpload.budgetNanos` (3 ms) per frame, under the shape's lock, and
+  swaps it in only when all of it is sent. Once started it does not ask the gate again;
+  `Shape.upload` (render thread) remembers it, and a buffer the shape no longer holds (a newer
+  generation, a focus change) is dropped: `close()` on its parts already on the GPU. A plain
+  buffer is still applied in one frame.
+- `AbstractRenderHandler.renderWorldBuffer(ShapeSet)` (default: `renderShapeBuffer(shape)`)
+  draws the world buffer inside the set's translation. Fabric draws only the sections within
+  the render distance + 1 section horizontally and inside the terrain's cull frustum, captured
+  by `MixinLevelRenderer` at the return of `prepareCullFrustum` (`require = 0`: without it, the
+  distance alone) and cleared after the mod's pass. All visible sections go in one render pass
+  (`ShapeBuffer.renderAll`), the shared quad index buffer grown once for the largest section.
+- Monitoring: `GpuMemory` (common) counts the GPU bytes of the mod's vertex buffers
+  (`ShapeBuffer.end` / `close`). `RenderStats` writes `phase=render` every 30 s while shapes are
+  drawn (`TimingLog.recordRender`, its own limit of 120 lines). `TimingLog.recordWorld` gains
+  `sections=`, `frames=`, `maxframe=` and `gpu=` for a sectioned buffer.
+
 ### ValidationState (Etapa 2.1)
 
 `common/shape/ValidationState` — live, **mutable, per-position, `synchronized`** state
