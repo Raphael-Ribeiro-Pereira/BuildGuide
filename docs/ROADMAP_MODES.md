@@ -280,3 +280,10 @@ without boxing (an index and a bitmap), its result swapped into the state; the p
 read under one lock, rebuilt only when a colour changes, its mesh written on a worker thread; the
 Fill one chunk section at a time. Still open: step 1's sections cost about 2.7 times one buffer to
 send in total; point 1 (hidden faces) waits for the look.
+
+Step 3 (2026-10-17, `wip/perf3`): the freezes Raphael still had (opening the GUI, big updates
+with a validation; none with Enabled off) were the error list: one row per position in a vanilla
+list whose fill is quadratic (50,000 rows about 3 s), built three times on opening and again every
+100 ms while the validation changed. Now linear, at most 1,000 rows a tab, built once on opening.
+Litematica's verifier, for comparison, lists mismatches grouped by block with counts. Grouping our
+rows by block the same way is a possible next step.

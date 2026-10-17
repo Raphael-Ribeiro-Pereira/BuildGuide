@@ -34,6 +34,21 @@ public class SelectorListImpl extends ObjectSelectionList<SelectorListImpl.Entry
 		setScrollAmount(scroll);
 	}
 	
+	/**
+	 * Every row has the slot height, so the next row's y and the content height follow from the row count.
+	 * Vanilla's AbstractSelectionList sums the height of every row it holds each time addEntry places a new
+	 * one, so filling n rows cost n^2: 9 000 rows took about 0.2 s, 50 000 about 3 s (performance step 3)
+	 */
+	@Override
+	public int getNextY() {
+		return getY() + 2 - (int) scrollAmount() + children().size() * defaultEntryHeight;
+	}
+	
+	@Override
+	protected int contentHeight() {
+		return children().size() * defaultEntryHeight + 4;
+	}
+	
 	public void setYPosition(int y) {
 		//Selector lists don't do y position
 	}

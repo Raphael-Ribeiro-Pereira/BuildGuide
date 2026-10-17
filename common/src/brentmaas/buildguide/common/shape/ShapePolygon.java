@@ -34,6 +34,10 @@ public class ShapePolygon extends Shape {
 	private PropertyEnum<rotation> propertyRot = new PropertyEnum<rotation>(rotation.ROT0, new Translatable("property.buildguide.rotation"), () -> update(), rotationNames);
 	private PropertyNonzeroInt propertyDepth = new PropertyNonzeroInt(1, new Translatable("property.buildguide.depth"), () -> update());
 	private PropertyBoolean propertyEvenMode = new PropertyBoolean(false, new Translatable("property.buildguide.evenmode"), () -> update());
+	// A polygonal room (2026-10-17): the inside of the first layer (floor) and of the last (ceiling) along the
+	// depth, so the outline becomes the walls of a closed X-sided room. Persisted after the older values
+	private PropertyBoolean propertyFloor = new PropertyBoolean(false, new Translatable("property.buildguide.floor"), () -> update());
+	private PropertyBoolean propertyCeiling = new PropertyBoolean(false, new Translatable("property.buildguide.ceiling"), () -> update());
 	
 	public ShapePolygon() {
 		super();
@@ -44,6 +48,8 @@ public class ShapePolygon extends Shape {
 		properties.add(propertyRot);
 		properties.add(propertyDepth);
 		properties.add(propertyEvenMode);
+		properties.add(propertyFloor);
+		properties.add(propertyCeiling);
 	}
 	
 	protected void updateShape(IShapeBuffer buffer) throws InterruptedException {
@@ -63,6 +69,8 @@ public class ShapePolygon extends Shape {
 			break;
 		}
 		int maxR = (int) Math.ceil(((r + offset) / Math.cos(Math.PI / n)));
+		// The layers along the depth, first to last (a negative depth goes the other way from the origin)
+		int first = propertyDepth.value > 0 ? 0 : propertyDepth.value + 1, last = propertyDepth.value > 0 ? propertyDepth.value - 1 : 0;
 		for(int a = -maxR;a <= maxR;++a) {
 			for(int b = -maxR;b <= maxR;++b) {
 				double theta = Math.atan2(b - offset, a - offset) + Math.PI;
@@ -70,21 +78,28 @@ public class ShapePolygon extends Shape {
 				int i = (int) (n * theta / 2 / Math.PI + 0.5);
 				double dr = (a - offset) * Math.cos(2 * i * Math.PI / n - Math.PI) + (b - offset) * Math.sin(2 * i * Math.PI / n - Math.PI) - r + 1e-10; // Epsilon to fix floating point errors for whole and half numbers
 				if(dr >= -0.5 && dr < 0.5) {
-					for(int h = (propertyDepth.value > 0 ? 0 : propertyDepth.value + 1);h < (propertyDepth.value > 0 ? propertyDepth.value : 1);++h) {
-						switch(propertyDir.value) {
-						case X:
-							addShapeCube(buffer, h, a * rotXX[rot] + b * rotYX[rot], b * rotXX[rot] + a * rotXY[rot]);
-							break;
-						case Y:
-							addShapeCube(buffer, a * rotXX[rot] + b * rotYX[rot], h, b * rotXX[rot] + a * rotXY[rot]);
-							break;
-						case Z:
-							addShapeCube(buffer, b * rotXX[rot] + a * rotXY[rot], a * rotXX[rot] + b * rotYX[rot], h);
-							break;
-						}
-					}
+					for(int h = first;h <= last;++h) addPolygonCube(buffer, a, b, h, rot);
+				}else if(dr < -0.5) {
+					// Inside the outline: the floor and the ceiling (one layer when the depth is 1)
+					if(propertyFloor.value) addPolygonCube(buffer, a, b, first, rot);
+					if(propertyCeiling.value && (last != first || !propertyFloor.value)) addPolygonCube(buffer, a, b, last, rot);
 				}
 			}
+		}
+	}
+
+	// (a, b) in the polygon's plane, h along the depth, turned to the direction and rotation
+	private void addPolygonCube(IShapeBuffer buffer, int a, int b, int h, int rot) throws InterruptedException {
+		switch(propertyDir.value) {
+		case X:
+			addShapeCube(buffer, h, a * rotXX[rot] + b * rotYX[rot], b * rotXX[rot] + a * rotXY[rot]);
+			break;
+		case Y:
+			addShapeCube(buffer, a * rotXX[rot] + b * rotYX[rot], h, b * rotXX[rot] + a * rotXY[rot]);
+			break;
+		case Z:
+			addShapeCube(buffer, b * rotXX[rot] + a * rotXY[rot], a * rotXX[rot] + b * rotYX[rot], h);
+			break;
 		}
 	}
 }

@@ -163,7 +163,8 @@ public class ShapeScreen extends BaseScreen{
 		buttonPreviewExpand.setActive(BuildGuide.stateManager.getState().isShapeAvailable());
 		addWidget(buttonPreviewExpand);
 		initPreviewControls();
-		errorList.setCategory(initialTab());
+		// The tab first, then one build of its rows by init (setCategory would build them for the old list too)
+		errorList.selectCategory(initialTab());
 		errorList.init(rightX, bands.tabsBottom, wrapper.getWidth(), bands.listBottom, currentShapeOrNull());
 		addWidget(errorList.getList());
 		preview.attach();

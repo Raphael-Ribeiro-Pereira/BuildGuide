@@ -135,6 +135,17 @@ public abstract class Shape {
 - `TimingLog.recordScan(..., prepMillis)` (`prep=` last) and `TimingLog.recordPreview(render, build,
   wait, blocks, reason)` (`phase=preview-rebuild ms= build= wait= blocks= reason= native=`).
 
+### Performance step 3 and the polygon room (`wip/perf3`)
+
+- `ValidationListComponent.maxRows` (1,000): a tab lists at most that many positions, the first by
+  position, then a row `screen.buildguide.errors.more` with the count of the rest and position -1.
+  `selectCategory(category)` sets the tab without building (a screen that opens again calls it
+  before `init`); `init` marks its rows current, so the next `update` builds only after a change.
+- Fabric `SelectorListImpl`: `getNextY` and `contentHeight` from the row count (every row has the
+  slot height). Vanilla walks every row on each `addEntry`, which made filling a list quadratic.
+- `ShapePolygon`: `propertyFloor` and `propertyCeiling` (PropertyBoolean, persisted after Even mode):
+  the inside (`dr < -0.5`) of the first and of the last layer along the depth.
+
 ### ValidationState (Etapa 2.1)
 
 `common/shape/ValidationState` — live, **mutable, per-position, `synchronized`** state

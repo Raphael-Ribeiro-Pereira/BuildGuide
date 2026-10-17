@@ -420,6 +420,55 @@ In-game checklist for `perf2-wip`:
 
 Offline harness after step 2: 1285 asserts, 0 failures; Bridge 466 / 159 / 360.
 
+### Performance, step 3: the error list (on `wip/perf3`, on top of `wip/perf2`, waiting for the in-game test; not merged)
+
+Raphael (2026-10-17): still very laggy; the freezes are when the GUI key opens the menu and when a
+big shape updates with a validation; with the Enabled checkbox off nothing freezes at all. The
+`perf2-wip` log agreed: every logged phase was small, yet one frame took 36 ms, and with the
+checkbox off only two frames drew in 70 s of editing. What only exists with a validation is the
+error list (and the overlay), and the list was the cause:
+- vanilla's `AbstractSelectionList.addEntry` places a row by summing the height of every row it
+  already holds (`getNextY`), so filling n rows costs n^2: 9,000 rows about 0.2 s, 20,000 0.5 s,
+  50,000 3 s (`ListCostProbe` in the session scratchpad);
+- the list had one row per position (48,632 missing, 8,969 structure errors in that session), built
+  with `String.format` per row, and opening the screen built and filled it three times
+  (`setCategory` on the old list, `init`, the first `update`); with the menu open it was built and
+  filled again at most every 100 ms while the validation changed.
+
+What Litematica does instead (read from its decompiled jar, analysis only): its verifier groups the
+mismatches by expected / found block, so its result list has a few rows with counts; malilib's
+`WidgetListBase` makes widgets only for the rows that fit; only the nearest
+`verifierErrorHilightMaxPositions` are highlighted; the verification runs once, chunk by chunk, in
+the client tick with a time limit, not after every change. The schematic preview mod loads and
+meshes its previews on other threads (`CompletableFuture`) and caches them.
+
+| What | Change |
+|---|---|
+| List widget | `SelectorListImpl` overrides `getNextY` and `contentHeight` (every row has the slot height): filling is linear |
+| Rows | at most `ValidationListComponent.maxRows` (1,000) per tab, the first by position, then "... and N more"; sorted by primitive keys; `String.format` only for the rows shown |
+| Opening the screen | `selectCategory` before `init` (nothing built for the old list), `init` marks its rows current: one build instead of three |
+
+Offline: 50,000 missing and 9,000 errors build 1,001 rows each in 5 to 7 ms warm (13 to 38 ms
+before), and the fill no longer grows with the square.
+
+In-game checklist for `perf3-wip`:
+1. Open the GUI (the key) on a big validated shape, on each tab: no freeze; the long tabs end with
+   "... and N more".
+2. With the menu open, hold + on a big shape and let it validate: no freeze while the list updates.
+3. Clicking a row still highlights its position; the "and N more" row clears the highlight.
+4. Polygon, Floor and Ceiling (below).
+
+### Polygon: Floor and Ceiling (on `wip/perf3`)
+
+Raphael asked for the polygons to work as an X-sided house; of the options (roof, wall thickness,
+floor and ceiling, straight corners) he chose floor and ceiling. Two checkboxes after Even mode:
+Floor fills the inside of the first layer along the depth, Ceiling the inside of the last one (with
+a depth of 1 both give one full polygon, no block twice; a negative depth has its floor at the
+lowest layer). Off, the polygon is exactly as before (40 random cases against the old loop).
+Persistence: 8 values, the two new ones last; older saves load with both off.
+
+Offline harness after step 3 and the polygon room: 1303 asserts, 0 failures; Bridge 466 / 159 / 360.
+
 Offline harness at the close: 406 asserts, 0 failures; Bridge reference sizes 466 / 159 / 360.
 E6 (after two fixes), E7, P4 and E8 passed their in-game checklists before being committed
 (E7 7 of 7, P4 9 of 9, E8 9 of 9). The ghost fix was committed on Raphael's go-ahead after the
@@ -432,12 +481,12 @@ Build output: `fabric1.21.11/build/libs/BuildGuide-Fabric-0.4.8.jar` (mod versio
 
 | Item | Value |
 |---|---|
-| Active jar in the mods folder | `BuildGuide-Fabric-0.4.8-terrain-wip.jar` (deployed 2026-10-15) |
-| SHA-256 | `8F8720A6C522676F562DEBBCAC85DBA1CBD7F8C6ACF0C2CE75F97971D2E96638` |
-| Source | `wip/terrain` at `2724d58` (code identical to `f2943e0`, only docs after it; it includes `428c206`, Focus from 400 for a `buildguide.cfg` without `focusFrom`): the build output and the mods copy have the same SHA-256; `ShapeTerrain`, `TerrainGeometry`, `TerrainControls`, `TerrainNoise` and `TerrainLayers` are inside |
-| Tested | the offline harness (1178 asserts); in game: Raphael's test pending |
-| Next jar | `perf-wip` (`wip/perf`, `b86d7fe`): built and checked offline, not deployed yet (the game was open) |
-| Previous jars | `BuildGuide-Fabric-0.4.8-focus-wip.jar` (SHA-256 `6923FAB6A40E250901C68746389327DA9FF8573498C920B5D86621CB9132B09C`, commit `0ff9af7`), `BuildGuide-Fabric-0.4.8-palette-wip.jar` (SHA-256 `F0C0A242D361BB0E73BC4EF477EE274AA905C7ED8681154FF004227B438B26B0`, commit `e35fad3`), `BuildGuide-Fabric-0.4.8-leakfix-wip.jar` (SHA-256 `D0089DE876C5855AFF509974DFA2400037F1B5DCAD05E63B45A0E6C4095EDABF`, commit `481d42a`), `BuildGuide-Fabric-0.4.8-layers-wip.jar` (SHA-256 `14B66C4E9A572D5224C01F5217BBB087BB48BB8BE908909CF67408824AE2F7CC`, commit `c8a8579`), `BuildGuide-Fabric-0.4.8-scan-slices-wip.jar` (SHA-256 `A280A6440BB423878D6AAFA316709E852D63EF2EEBB3FF3F643E826C4724A067`, commit `7762309`), `BuildGuide-Fabric-0.4.8-spikes2-wip.jar` (SHA-256 `89F6B80A37150060E598EF0988446699E8B43F5E050267E83A9398909BE5D87B`, commit `3e63cbd`), `BuildGuide-Fabric-0.4.8-spikes-wip.jar` (SHA-256 `C3564E26FD888E46E106724E051C27C19D74EE962365FD9BB90775E77DE03A6E`, commit `a6d1c23`), `BuildGuide-Fabric-0.4.8-live-apply-wip.jar` (SHA-256 `8DB5202C0AFEC1F4645D0E4052852B188BE4CA9CF35C9FC969DF5CC092994198`, commit `416b5e0`), `BuildGuide-Fabric-0.4.8-island-ux-wip.jar` (SHA-256 `DD5B7BD8ADF1714F0BC152A303B6ED3F2FB2EA5E9C8F79034B52BD27DAE76557`, commit `07d554c`), `BuildGuide-Fabric-0.4.8-island-wip.jar` (SHA-256 `556D80E49975B12802361D5CB8971EE632415A7E841C0EC71D8AF06826C92DE9`, commit `f7937be`), `BuildGuide-Fabric-0.4.8-area3-wip2.jar` (SHA-256 `B5AC963F068EFF59954521F29F24D994BBFE61CF9F55C2C1DE9256E055392A32`, commit `584674b`), `BuildGuide-Fabric-0.4.8-area3-wip.jar` (first Area 3 test) and `BuildGuide-Fabric-0.4.8-ghost-fix-wip.jar` (SHA-256 `1E2F5E96A659D474EF14D9CDDBF5930E6B695DF66F31C782A7C1E5654E55BDB6`, commit `9c3fbde`), kept as `.bak` |
+| Active jar in the mods folder | `BuildGuide-Fabric-0.4.8-perf2-wip.jar` (deployed 2026-10-16) |
+| SHA-256 | `F12384911780D9CC4EF0FEA0493CFFCF58E423BE12D82E820C12C7FEB0125B04` |
+| Source | `wip/perf2` at `a4758b6` (on top of `wip/fill`, `wip/perf` and `wip/terrain`): the build output and the mods copy have the same SHA-256; `LongIndex`, `SliceScan`, `RenderHandler$PendingScan` and `PreviewRenderer` checked inside |
+| Tested | the offline harness (1285 asserts); in game (2026-10-17): still laggy, see performance step 3 |
+| Next jar | `perf3-wip` (`wip/perf3`): the error list and the polygon room |
+| Previous jars | `BuildGuide-Fabric-0.4.8-fill-wip.jar` (SHA-256 `4828F694FD843595F17B1A3522B171A5E6920012C7345D8C20660B202A54E58F`, commit `c502556`), `BuildGuide-Fabric-0.4.8-terrain-wip.jar` (SHA-256 `8F8720A6C522676F562DEBBCAC85DBA1CBD7F8C6ACF0C2CE75F97971D2E96638`, commit `2724d58`), `BuildGuide-Fabric-0.4.8-focus-wip.jar` (SHA-256 `6923FAB6A40E250901C68746389327DA9FF8573498C920B5D86621CB9132B09C`, commit `0ff9af7`), `BuildGuide-Fabric-0.4.8-palette-wip.jar` (SHA-256 `F0C0A242D361BB0E73BC4EF477EE274AA905C7ED8681154FF004227B438B26B0`, commit `e35fad3`), `BuildGuide-Fabric-0.4.8-leakfix-wip.jar` (SHA-256 `D0089DE876C5855AFF509974DFA2400037F1B5DCAD05E63B45A0E6C4095EDABF`, commit `481d42a`), `BuildGuide-Fabric-0.4.8-layers-wip.jar` (SHA-256 `14B66C4E9A572D5224C01F5217BBB087BB48BB8BE908909CF67408824AE2F7CC`, commit `c8a8579`), `BuildGuide-Fabric-0.4.8-scan-slices-wip.jar` (SHA-256 `A280A6440BB423878D6AAFA316709E852D63EF2EEBB3FF3F643E826C4724A067`, commit `7762309`), `BuildGuide-Fabric-0.4.8-spikes2-wip.jar` (SHA-256 `89F6B80A37150060E598EF0988446699E8B43F5E050267E83A9398909BE5D87B`, commit `3e63cbd`), `BuildGuide-Fabric-0.4.8-spikes-wip.jar` (SHA-256 `C3564E26FD888E46E106724E051C27C19D74EE962365FD9BB90775E77DE03A6E`, commit `a6d1c23`), `BuildGuide-Fabric-0.4.8-live-apply-wip.jar` (SHA-256 `8DB5202C0AFEC1F4645D0E4052852B188BE4CA9CF35C9FC969DF5CC092994198`, commit `416b5e0`), `BuildGuide-Fabric-0.4.8-island-ux-wip.jar` (SHA-256 `DD5B7BD8ADF1714F0BC152A303B6ED3F2FB2EA5E9C8F79034B52BD27DAE76557`, commit `07d554c`), `BuildGuide-Fabric-0.4.8-island-wip.jar` (SHA-256 `556D80E49975B12802361D5CB8971EE632415A7E841C0EC71D8AF06826C92DE9`, commit `f7937be`), `BuildGuide-Fabric-0.4.8-area3-wip2.jar` (SHA-256 `B5AC963F068EFF59954521F29F24D994BBFE61CF9F55C2C1DE9256E055392A32`, commit `584674b`), `BuildGuide-Fabric-0.4.8-area3-wip.jar` (first Area 3 test) and `BuildGuide-Fabric-0.4.8-ghost-fix-wip.jar` (SHA-256 `1E2F5E96A659D474EF14D9CDDBF5930E6B695DF66F31C782A7C1E5654E55BDB6`, commit `9c3fbde`), kept as `.bak` |
 
 - The file name still says `wip`: it was never renamed after the test. Renaming is a choice
   for Raphael (nothing depends on the name); a rebuild of `acf4904` gives the same classes.

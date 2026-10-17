@@ -30,6 +30,11 @@ import brentmaas.buildguide.common.shape.ValidationState.NearBlock;
 public class ValidationListComponent {
 	public static final long rebuildIntervalMillis = 100;
 	public static final int rowHeight = 12;
+	// At most this many position rows per tab, the first ones by position, then one row saying how many more.
+	// Like Litematica's lists, which hold what a person reads, not one row per block: a tab of 50 000 missing
+	// positions cost seconds to fill (the vanilla list walks every row it holds to place the next one) and was
+	// built again at most every 100 ms while the validation changed (performance step 3)
+	public static final int maxRows = 1000;
 	
 	// Tabs of the Shape screen's list (GUI redesign E6): one category at a time, no headers
 	public static enum Category {
@@ -94,6 +99,10 @@ public class ValidationListComponent {
 		this.shape = shape;
 		Entries entries = buildEntries(shape, category);
 		rowPositions = entries.positions;
+		// The rows are current: the next update() rebuilds only once something changed
+		shownVersion = entries.version;
+		shownShape = shape;
+		lastRebuild = clock.getAsLong();
 		list = factory.create(x1, x2, y1, y2, rowHeight, entries.titles, 0, this::click);
 		return list;
 	}
@@ -106,6 +115,11 @@ public class ValidationListComponent {
 		return category;
 	}
 	
+	// The tab init() will build, without building anything now (a screen that opens again sets it before init)
+	public void selectCategory(Category category) {
+		this.category = category;
+	}
+
 	// Switch tab: the rows are rebuilt at once
 	public void setCategory(Category category) {
 		this.category = category;
@@ -178,22 +192,41 @@ public class ValidationListComponent {
 		}
 		// Rows stay where the scan saw them in the world, even after the origin moved (P4)
 		int ox = state.getScanOriginX(), oy = state.getScanOriginY(), oz = state.getScanOriginZ();
+		// Rows past maxRows are only counted
+		int hidden = 0;
 		if(category == Category.ERRORS) {
 			List<NearBlock> errors = state.getNearBlocks();
-			errors.sort(Comparator.comparingInt((NearBlock nb) -> LocalPos.unpackX(nb.localPos)).thenComparingInt(nb -> LocalPos.unpackY(nb.localPos)).thenComparingInt(nb -> LocalPos.unpackZ(nb.localPos)));
-			for(NearBlock nb: errors) row(titles, positions, nb.localPos, ox, oy, oz, nb.blockName, String.format(Locale.ROOT, "%.1f", nb.distance));
+			errors.sort(Comparator.comparingLong((NearBlock nb) -> sortKey(nb.localPos)));
+			for(NearBlock nb: errors) {
+				if(titles.size() >= maxRows) ++hidden;
+				else row(titles, positions, nb.localPos, ox, oy, oz, nb.blockName, String.format(Locale.ROOT, "%.1f", nb.distance));
+			}
 			// Wrong blocks on the shape (4D): after the structure errors, with their layer
-			for(long pos: sortedByPosition(state.getPositions(ValidationState.WRONG_BLOCK))) layerRow(titles, positions, state, pos, ox, oy, oz);
+			for(long pos: sortedByPosition(state.getPositions(ValidationState.WRONG_BLOCK))) {
+				if(titles.size() >= maxRows) ++hidden;
+				else layerRow(titles, positions, state, pos, ox, oy, oz);
+			}
 		}else if(category == Category.WRONG_LAYER) {
-			for(long pos: sortedByPosition(state.getPositions(ValidationState.WRONG_LAYER))) layerRow(titles, positions, state, pos, ox, oy, oz);
+			long[] sorted = sortedByPosition(state.getPositions(ValidationState.WRONG_LAYER));
+			for(int i = 0;i < Math.min(sorted.length, maxRows);++i) layerRow(titles, positions, state, sorted[i], ox, oy, oz);
+			hidden = Math.max(0, sorted.length - maxRows);
 		}else if(category == Category.IGNORED) {
-			for(long pos: sortedByPosition(state.getPositions(ValidationState.IGNORED))) row(titles, positions, pos, ox, oy, oz, state.getIgnoredBlockName(pos), null);
+			long[] sorted = sortedByPosition(state.getPositions(ValidationState.IGNORED));
+			for(int i = 0;i < Math.min(sorted.length, maxRows);++i) row(titles, positions, sorted[i], ox, oy, oz, state.getIgnoredBlockName(sorted[i]), null);
+			hidden = Math.max(0, sorted.length - maxRows);
 		}else {
 			// Missing: where a block still has to go; no block name (air or a non-solid block)
-			for(long pos: sortedByPosition(state.getPositions(ValidationState.MISSING))) {
+			long[] sorted = sortedByPosition(state.getPositions(ValidationState.MISSING));
+			for(int i = 0;i < Math.min(sorted.length, maxRows);++i) {
+				long pos = sorted[i];
 				titles.add(new Translatable("[" + (ox + LocalPos.unpackX(pos)) + ", " + (oy + LocalPos.unpackY(pos)) + ", " + (oz + LocalPos.unpackZ(pos)) + "]"));
 				positions.add(pos);
 			}
+			hidden = Math.max(0, sorted.length - maxRows);
+		}
+		if(hidden > 0) {
+			titles.add(new Translatable("screen.buildguide.errors.more", "" + hidden));
+			positions.add(-1L);
 		}
 		if(titles.isEmpty()) {
 			titles.add(new Translatable("screen.buildguide.errors.none"));
@@ -218,8 +251,17 @@ public class ValidationListComponent {
 		positions.add(pos);
 	}
 
-	private static List<Long> sortedByPosition(List<Long> positions) {
-		positions.sort(Comparator.comparingInt((Long p) -> LocalPos.unpackX(p)).thenComparingInt(p -> LocalPos.unpackY(p)).thenComparingInt(p -> LocalPos.unpackZ(p)));
-		return positions;
+	// Sorted by x, then y, then z: a primitive sort of keys that order that way
+	private static long[] sortedByPosition(List<Long> positions) {
+		long[] keys = new long[positions.size()];
+		for(int i = 0;i < keys.length;++i) keys[i] = sortKey(positions.get(i));
+		java.util.Arrays.sort(keys);
+		for(int i = 0;i < keys.length;++i) keys[i] = LocalPos.pack((int) ((keys[i] >>> 42) & 0x1FFFFF) - 0x100000, (int) ((keys[i] >>> 21) & 0x1FFFFF) - 0x100000, (int) (keys[i] & 0x1FFFFF) - 0x100000);
+		return keys;
+	}
+
+	// Each coordinate shifted to be non-negative, x highest: ascending keys are ascending x, then y, then z
+	private static long sortKey(long pos) {
+		return (((long) LocalPos.unpackX(pos) + 0x100000L) << 42) | (((long) LocalPos.unpackY(pos) + 0x100000L) << 21) | ((long) LocalPos.unpackZ(pos) + 0x100000L);
 	}
 }

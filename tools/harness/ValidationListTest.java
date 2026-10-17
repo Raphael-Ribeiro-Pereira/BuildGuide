@@ -14,7 +14,8 @@ public class ValidationListTest {
 	static String k(Translatable t){ return t.getTranslationKey(); }
 	static class FakeList implements ISelectorList { int l,r,t,b,h; List<Translatable> titles; ISelectorListCallback cb; int sets=0;
 		public void setEntries(List<Translatable> ts){ titles=ts; sets++; } public void setVisibility(boolean v){} public void setYPosition(int y){} }
-	static List<String> keys(ValidationListComponent.Entries e){ List<String> l=new ArrayList<>(); for(Translatable t: e.titles) l.add(k(t)); return l; }
+	static List<String> keys(ValidationListComponent.Entries e){ return titleKeys(e.titles); }
+	static List<String> titleKeys(List<Translatable> ts){ List<String> l=new ArrayList<>(); for(Translatable t: ts) l.add(k(t)); return l; }
 
 	public static void main(String[] a){
 		System.out.println("-- messages");
@@ -58,13 +59,20 @@ public class ValidationListTest {
 		check(c.getCategory()==Category.ERRORS, "default tab: Errors");
 		c.init(192,193,480,250,s);
 		check(fl.l==192 && fl.r==480 && fl.t==193 && fl.b==250 && fl.h==12 && fl.titles.size()==2, "init: rectangle (192,193)-(480,250) passed as left, right, top, bottom; rows 12 px; Errors rows");
-		c.update(s); check(fl.sets==1, "first update after init rebuilds right away");
-		c.update(s); check(fl.sets==1, "nothing changed: no rebuild");
+		// Performance step 3: init's rows are current, so the first update does not build them again (opening the
+		// screen built and filled them three times before)
+		c.update(s); check(fl.sets==0, "first update after init: nothing changed since init, no rebuild");
+		c.update(s); check(fl.sets==0, "nothing changed: no rebuild");
 		now+=50; st.updateBlock(LocalPos.pack(5,1,0),true,false,false,null);
-		c.update(s); check(fl.sets==1, "state changed 50 ms after the last rebuild: waits");
-		now+=60; c.update(s); check(fl.sets==2 && fl.titles.size()==1, "after 100 ms: rebuilt, 1 error left");
+		c.update(s); check(fl.sets==0, "state changed 50 ms after init (the last build): waits");
+		now+=60; c.update(s); check(fl.sets==1 && fl.titles.size()==1, "after 100 ms: rebuilt, 1 error left");
 		ShapeBridge s2=new ShapeBridge(); now+=200; c.update(s2);
-		check(fl.sets==3 && k(fl.titles.get(0)).equals("screen.buildguide.notvalidated"), "shape switch: rebuilt for the other shape");
+		check(fl.sets==2 && k(fl.titles.get(0)).equals("screen.buildguide.notvalidated"), "shape switch: rebuilt for the other shape");
+		FakeList fl2=new FakeList(); ValidationListComponent c2=new ValidationListComponent(()->now,(l,r,t,b,h,ts,cur,cb)->{ fl2.titles=ts; fl2.cb=cb; return fl2; });
+		c2.selectCategory(Category.MISSING);
+		check(fl2.sets==0 && c2.getCategory()==Category.MISSING, "selectCategory: only the tab, nothing built (the screen sets it before init)");
+		c2.init(192,193,480,250,s);
+		check(fl2.sets==0 && keys(ValidationListComponent.buildEntries(s,Category.MISSING)).equals(titleKeys(fl2.titles)), "init builds the selected tab's rows once");
 		c.update(s); now+=200; c.update(s);
 		fl.cb.run(0); check(st.getHighlightedPos()==LocalPos.pack(0,1,0), "click on an error row highlights its position");
 		fl.cb.run(0); check(st.getHighlightedPos()==-1, "click on the highlighted row again clears it");
@@ -75,6 +83,21 @@ public class ValidationListTest {
 		st.updateBlock(LocalPos.pack(0,1,0),true,false,false,null); c.setCategory(Category.ERRORS);
 		fl.cb.run(0); check(st.getHighlightedPos()==-1, "click on 'None' (no position) clears the highlight, like a header did");
 		c.setCategory(Category.IGNORED); fl.cb.run(0); fl.cb.run(99); fl.cb.run(-1); check(st.getHighlightedPos()==LocalPos.pack(4,0,0), "out-of-range index: ignored (the highlight stays)");
+
+		System.out.println("-- at most maxRows rows (performance step 3)");
+		ShapeBridge big=new ShapeBridge(); ValidationState bs=big.getValidationState(); List<Long> many=new ArrayList<>();
+		for(int x=0;x<60;x++) for(int z=0;z<50;z++) many.add(LocalPos.pack(x,0,z));
+		Collections.shuffle(many, new Random(5)); bs.beginScan(many,0,0,0); for(long p: many) bs.setStatus(p,ValidationState.MISSING,null);
+		List<ValidationState.NearBlock> nb=new ArrayList<>(); for(int x=0;x<60;x++) for(int z=0;z<50;z++) nb.add(new ValidationState.NearBlock(LocalPos.pack(x,1,z),"Dirt",1.4142135f)); bs.setNearBlocks(nb); bs.endScan();
+		ValidationListComponent.Entries bm=ValidationListComponent.buildEntries(big,Category.MISSING);
+		check(bm.titles.size()==ValidationListComponent.maxRows+1 && ValidationListComponent.maxRows==1000, "3000 missing: 1000 rows and one more row ("+bm.titles.size()+")");
+		check(k(bm.titles.get(0)).equals("[0, 0, 0]") && k(bm.titles.get(999)).equals("[19, 0, 49]") && bm.positions.get(999)==LocalPos.pack(19,0,49), "the first 1000 by position (x, then y, then z): "+k(bm.titles.get(999)));
+		Translatable more=bm.titles.get(1000);
+		check(k(more).equals("screen.buildguide.errors.more") && Arrays.equals(more.getValues(), new Object[]{"2000"}) && bm.positions.get(1000)==-1, "the last row: how many more (2000), no position (a click clears the highlight)");
+		ValidationListComponent.Entries be=ValidationListComponent.buildEntries(big,Category.ERRORS);
+		check(be.titles.size()==1001 && k(be.titles.get(0)).equals("[0, 1, 0] Dirt (d=1.4)") && k(be.titles.get(1000)).equals("screen.buildguide.errors.more"), "3000 structure errors: 1000 rows with the distance, then how many more: "+k(be.titles.get(0)));
+		ValidationListComponent.Entries small=ValidationListComponent.buildEntries(s,Category.MISSING);
+		check(!titleKeys(small.titles).contains("screen.buildguide.errors.more"), "under the limit: no extra row");
 		System.out.println(fails==0 ? "ALL OK" : fails+" FAILED");
 	}
 }
