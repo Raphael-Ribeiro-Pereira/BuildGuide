@@ -22,7 +22,11 @@ public final class FocusFilter {
 		FLOOR("floor"),
 		ROOF("roof"),
 		DETAILS("details"),
-		PILLARS("pillars");
+		PILLARS("pillars"),
+		// Farming land's parts
+		WATER("water"),
+		FIELD("field"),
+		EDGE("edge");
 
 		public final String translationKey;
 

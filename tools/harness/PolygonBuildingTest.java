@@ -43,7 +43,8 @@ public class PolygonBuildingTest {
 
 		System.out.println("-- registry and panel");
 		List<String> regs = new ArrayList<>(); for(String l: Files.readAllLines(new File("common/src/brentmaas/buildguide/common/BuildGuide.java").toPath())) if(l.contains("ShapeRegistry.registerShape(")) regs.add(l.trim());
-		check(!regs.isEmpty() && regs.get(regs.size() - 1).startsWith("ShapeRegistry.registerShape(ShapePolygonBuilding.class"), "registered last (saved shapes keep their index)");
+		int bi = -1, ti = -1; for(int k = 0; k < regs.size(); k++){ if(regs.get(k).startsWith("ShapeRegistry.registerShape(ShapePolygonBuilding.class")) bi = k; if(regs.get(k).startsWith("ShapeRegistry.registerShape(ShapeTerrain.class")) ti = k; }
+		check(ti >= 0 && bi == ti + 1, "registered right after the Terrain (saved shapes keep their index)");
 		ShapePolygonBuilding fresh = new ShapePolygonBuilding();
 		check(fresh.getSectionCount() == 6, "six sections: Shape, Walls, Windows, Roof, Relief, Pillars");
 

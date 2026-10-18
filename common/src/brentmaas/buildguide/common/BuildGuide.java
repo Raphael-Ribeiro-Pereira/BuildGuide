@@ -12,6 +12,7 @@ import brentmaas.buildguide.common.shape.ShapeCone;
 import brentmaas.buildguide.common.shape.ShapeCuboid;
 import brentmaas.buildguide.common.shape.ShapeEllipse;
 import brentmaas.buildguide.common.shape.ShapeEllipsoid;
+import brentmaas.buildguide.common.shape.ShapeFarmingLand;
 import brentmaas.buildguide.common.shape.ShapeGrid;
 import brentmaas.buildguide.common.shape.ShapeIsland;
 import brentmaas.buildguide.common.shape.ShapeLine;
@@ -70,6 +71,7 @@ public class BuildGuide {
 		ShapeRegistry.registerShape(ShapeIsland.class, "shape.buildguide.island");
 		ShapeRegistry.registerShape(ShapeTerrain.class, "shape.buildguide.terrain");
 		ShapeRegistry.registerShape(ShapePolygonBuilding.class, "shape.buildguide.polygonbuilding");
+		ShapeRegistry.registerShape(ShapeFarmingLand.class, "shape.buildguide.farmingland");
 		
 		renderHandler.register();
 	}
