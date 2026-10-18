@@ -2,6 +2,7 @@ package brentmaas.buildguide.common.shape;
 
 import brentmaas.buildguide.common.property.Property;
 import brentmaas.buildguide.common.property.PropertyBoolean;
+import brentmaas.buildguide.common.property.PropertyEnum;
 import brentmaas.buildguide.common.property.PropertyInt;
 import brentmaas.buildguide.common.property.PropertyMinimumFloat;
 import brentmaas.buildguide.common.property.PropertyMinimumInt;
@@ -11,9 +12,15 @@ import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
 /**
  * Polygon building (2026-10-18): an X-sided house standing on the Y axis. Walls with windows, a floor, a
  * roof with a raised rim, an inner ring, spokes from the centre to the corners and a skylight, and pillars
- * under the corners. Each column is decided once (Geometry.contains), so no block is emitted twice.
+ * under the corners. Relief (2026-10-18): columns on the corners and bands round the floor and the roof,
+ * standing out of the walls, and the roof's pattern repeated under the floor (its skylight optional). Each
+ * position is decided once (Geometry.partAt), so no block is emitted twice; the same function gives the
+ * build focus parts (Walls, Floor, Roof, Details, Pillars).
  */
 public class ShapePolygonBuilding extends Shape {
+	private static final String[] focusPartNames = {"All", "Cap", "Body", "Spikes", "Hidden", "Walls", "Floor", "Roof", "Details", "Pillars"};
+	private static final FocusFilter.Part[] buildingParts = {FocusFilter.Part.WALLS, FocusFilter.Part.FLOOR, FocusFilter.Part.ROOF, FocusFilter.Part.DETAILS, FocusFilter.Part.PILLARS};
+
 	// Shape
 	private PropertyMinimumInt propertySides = new PropertyMinimumInt(6, new Translatable("property.buildguide.sides"), () -> update(), 3);
 	private PropertyPositiveFloat propertyRadius = new PropertyPositiveFloat(10, new Translatable("property.buildguide.radius"), () -> update());
@@ -37,22 +44,57 @@ public class ShapePolygonBuilding extends Shape {
 	// Pillars
 	private PropertyMinimumInt propertyPillarHeight = new PropertyMinimumInt(0, new Translatable("property.buildguide.pillarheight"), () -> update(), 0);
 	private PropertyMinimumInt propertyPillarWidth = new PropertyMinimumInt(2, new Translatable("property.buildguide.pillarwidth"), () -> update(), 1);
+	// Persisted after the values above (2026-10-18): Windows on the Walls; Relief; the build focus (not panel rows)
+	private PropertyBoolean propertyWindows = new PropertyBoolean(true, new Translatable("property.buildguide.windows"), () -> update());
+	private PropertyMinimumInt propertyRelief = new PropertyMinimumInt(1, new Translatable("property.buildguide.relief"), () -> update(), 0);
+	private PropertyBoolean propertyColumns = new PropertyBoolean(true, new Translatable("property.buildguide.columns"), () -> update());
+	private PropertyBoolean propertyBands = new PropertyBoolean(true, new Translatable("property.buildguide.bands"), () -> update());
+	private PropertyBoolean propertyFloorPattern = new PropertyBoolean(false, new Translatable("property.buildguide.floorpattern"), () -> update());
+	private PropertyBoolean propertyFloorSkylight = new PropertyBoolean(false, new Translatable("property.buildguide.floorskylight"), () -> update());
+	private PropertyEnum<FocusFilter.Part> propertyFocusPart = new PropertyEnum<FocusFilter.Part>(FocusFilter.Part.ALL, new Translatable("screen.buildguide.focus.part"), null, focusPartNames);
+	private PropertyInt propertyFocusLayer = new PropertyInt(FocusFilter.LAYER_ALL, new Translatable("screen.buildguide.focus.layer"), null);
+
+	// What the last generation's parts are computed from, set before its first block
+	private volatile Geometry generated = null;
 
 	public ShapePolygonBuilding() {
 		super();
 
 		Property<?>[] shapeRows = {propertySides, propertyRadius, propertyAngle, propertyEvenMode};
-		Property<?>[] wallRows = {propertyHeight, propertyThickness, propertyFloor, propertyWindowBottom, propertyWindowHeight, propertyWindowWidth, propertyWindowGap};
+		Property<?>[] wallRows = {propertyHeight, propertyThickness, propertyFloor};
+		Property<?>[] windowRows = {propertyWindows, propertyWindowBottom, propertyWindowHeight, propertyWindowWidth, propertyWindowGap};
 		Property<?>[] roofRows = {propertyRoof, propertyRimWidth, propertyRimHeight, propertyRing, propertySpokes, propertySkylight};
+		Property<?>[] reliefRows = {propertyRelief, propertyColumns, propertyBands, propertyFloorPattern, propertyFloorSkylight};
 		Property<?>[] pillarRows = {propertyPillarHeight, propertyPillarWidth};
-		for(Property<?> p: shapeRows) properties.add(p);
-		for(Property<?> p: wallRows) properties.add(p);
-		for(Property<?> p: roofRows) properties.add(p);
-		for(Property<?> p: pillarRows) properties.add(p);
+		// The order saved: the first values as they were, the newer ones after them
+		Property<?>[] saved = {propertySides, propertyRadius, propertyAngle, propertyEvenMode, propertyHeight, propertyThickness, propertyFloor, propertyWindowBottom, propertyWindowHeight, propertyWindowWidth, propertyWindowGap,
+				propertyRoof, propertyRimWidth, propertyRimHeight, propertyRing, propertySpokes, propertySkylight, propertyPillarHeight, propertyPillarWidth,
+				propertyWindows, propertyRelief, propertyColumns, propertyBands, propertyFloorPattern, propertyFloorSkylight, propertyFocusPart, propertyFocusLayer};
+		for(Property<?> p: saved) properties.add(p);
+		hideFromGui(propertyFocusPart);
+		hideFromGui(propertyFocusLayer);
 		assignSection(declareSection(new Translatable("property.buildguide.section.shape")), shapeRows);
 		assignSection(declareSection(new Translatable("property.buildguide.section.walls")), wallRows);
+		assignSection(declareSection(new Translatable("property.buildguide.section.windows")), windowRows);
 		assignSection(declareSection(new Translatable("property.buildguide.section.roof")), roofRows);
+		assignSection(declareSection(new Translatable("property.buildguide.section.relief")), reliefRows);
 		assignSection(declareSection(new Translatable("property.buildguide.section.pillars")), pillarRows);
+	}
+
+	// Rows of the open section in the order of the panel, not of the save
+	@Override
+	public void onSelectedInGUI() {
+		Property<?>[] order = {propertySides, propertyRadius, propertyAngle, propertyEvenMode,
+				propertyHeight, propertyThickness, propertyFloor, propertyWindows, propertyWindowBottom, propertyWindowHeight, propertyWindowWidth, propertyWindowGap,
+				propertyRoof, propertyRimWidth, propertyRimHeight, propertyRing, propertySpokes, propertySkylight,
+				propertyRelief, propertyColumns, propertyBands, propertyFloorPattern, propertyFloorSkylight,
+				propertyPillarHeight, propertyPillarWidth};
+		int row = 0;
+		for(Property<?> p: order) {
+			if(isShown(p)) row = placeRow(row, p);
+			else hideRow(p);
+		}
+		hideRow(propertyFocusPart, propertyFocusLayer);
 	}
 
 	Geometry geometry() {
@@ -64,6 +106,7 @@ public class ShapePolygonBuilding extends Shape {
 		g.height = propertyHeight.value;
 		g.thickness = propertyThickness.value;
 		g.floor = propertyFloor.value;
+		g.windows = propertyWindows.value;
 		g.windowBottom = propertyWindowBottom.value;
 		g.windowHeight = propertyWindowHeight.value;
 		g.windowWidth = propertyWindowWidth.value;
@@ -74,6 +117,11 @@ public class ShapePolygonBuilding extends Shape {
 		g.ring = propertyRing.value;
 		g.spokes = propertySpokes.value;
 		g.skylight = propertySkylight.value;
+		g.relief = propertyRelief.value;
+		g.columns = propertyColumns.value;
+		g.bands = propertyBands.value;
+		g.floorPattern = propertyFloorPattern.value;
+		g.floorSkylight = propertyFloorSkylight.value;
 		g.pillarHeight = propertyPillarHeight.value;
 		g.pillarWidth = propertyPillarWidth.value;
 		g.prepare();
@@ -82,32 +130,74 @@ public class ShapePolygonBuilding extends Shape {
 
 	protected void updateShape(IShapeBuffer buffer) throws InterruptedException {
 		Geometry g = geometry();
+		generated = g;
 		setOriginOffset(g.offset, 0.0, g.offset);
 		for(int x = -g.maxR;x <= g.maxR;++x) {
 			for(int z = -g.maxR;z <= g.maxR;++z) {
 				for(int y = g.minY;y <= g.maxY;++y) {
-					if(g.contains(x, y, z)) addShapeCube(buffer, x, y, z);
+					if(g.partAt(x, y, z) != null) addShapeCube(buffer, x, y, z);
 				}
 			}
 		}
 	}
 
+	// Build focus: Walls, Floor, Roof, Details (rim, ring, spokes, relief, the floor's pattern) and Pillars
+	@Override
+	public boolean hasParts() {
+		return true;
+	}
+
+	@Override
+	public FocusFilter.Part[] focusParts() {
+		return buildingParts;
+	}
+
+	@Override
+	public FocusFilter.Part partOf(int x, int y, int z) {
+		Geometry g = generated;
+		FocusFilter.Part part = g == null ? null : g.partAt(x, y, z);
+		return part == null ? FocusFilter.Part.WALLS : part;
+	}
+
+	@Override
+	public FocusFilter.Part getFocusPart() {
+		FocusFilter.Part part = propertyFocusPart.value;
+		for(FocusFilter.Part p: buildingParts) if(p == part) return part;
+		return part == FocusFilter.Part.HIDDEN ? part : FocusFilter.Part.ALL;
+	}
+
+	// A saved layer out of 0..4 counts as All
+	@Override
+	public int getFocusLayer() {
+		int layer = propertyFocusLayer.value;
+		return layer < 0 || layer > ShapeLayers.COUNT ? FocusFilter.LAYER_ALL : layer;
+	}
+
+	@Override
+	protected void storeFocus(FocusFilter.Part part, int layer) {
+		propertyFocusPart.setValue(part);
+		propertyFocusLayer.setValue(layer);
+	}
+
 	/**
 	 * The building as a pure function of a position (no net.minecraft). Distances are in the polygon's own
 	 * measure: the distance along the normal of the nearest side, so a "radius" is the apothem, as in
-	 * ShapePolygon (whose outline is the wall here at thickness 1).
+	 * ShapePolygon (whose outline is the wall here at thickness 1). y = 0 is the floor, the walls go up to
+	 * height - 1, the roof is at height; the pattern above it at height + 1, the floor's below at -1.
 	 */
 	static final class Geometry {
 		int n;
 		double r, angle, offset;
 		int height, thickness;
-		boolean floor;
+		boolean floor, windows;
 		int windowBottom, windowHeight, windowWidth, windowGap;
 		boolean roof;
 		int rimWidth, rimHeight;
 		double ring;
 		boolean spokes;
 		double skylight;
+		int relief;
+		boolean columns, bands, floorPattern, floorSkylight;
 		int pillarHeight, pillarWidth;
 
 		int maxR, minY, maxY;
@@ -118,9 +208,10 @@ public class ShapePolygonBuilding extends Shape {
 		void prepare() {
 			circumR = r / Math.cos(Math.PI / n);
 			halfSide = r * Math.tan(Math.PI / n);
-			maxR = (int) Math.ceil(circumR + offset) + 1;
-			minY = -pillarHeight;
-			maxY = height - 1 + (roof ? 1 : 0) + Math.max(rimHeight, roof && (ring > 0 || spokes) ? 1 : 0);
+			maxR = (int) Math.ceil((r + relief + 1) / Math.cos(Math.PI / n) + offset) + 1;
+			int top = roof && (ring > 0 || spokes || skylight > 0) ? 1 : 0;
+			minY = -Math.max(pillarHeight, floorPattern ? 1 : 0);
+			maxY = height - 1 + (roof ? 1 : 0) + Math.max(rimHeight, top);
 			vertexCos = new double[n];
 			vertexSin = new double[n];
 			pillarX = new int[n];
@@ -142,51 +233,84 @@ public class ShapePolygonBuilding extends Shape {
 			return (int) Math.floor(n * theta / 2 / Math.PI + 0.5);
 		}
 
-		// Distance along the nearest side's normal (the polygon's own "radius" of the point)
+		// Distance along side i's normal (the polygon's own "radius" of the point)
 		private double polyDist(double px, double pz, int i) {
 			double phi = 2 * Math.PI * i / n + angle;
 			return px * Math.cos(phi) + pz * Math.sin(phi) + 1e-10; // Epsilon as in ShapePolygon
 		}
 
+		// Along side i, from its middle
+		private double along(double px, double pz, int i) {
+			double phi = 2 * Math.PI * i / n + angle;
+			return -px * Math.sin(phi) + pz * Math.cos(phi);
+		}
+
 		boolean contains(int x, int y, int z) {
-			if(y < minY || y > maxY) return false;
+			return partAt(x, y, z) != null;
+		}
+
+		// The part of the block at this position, null where there is none
+		FocusFilter.Part partAt(int x, int y, int z) {
+			if(y < minY || y > maxY) return null;
 			double px = x - offset, pz = z - offset;
-			if(y < 0) return isPillar(x, z);
 			int i = side(px, pz);
 			double d = polyDist(px, pz, i);
 			double dr = d - r;
-			if(dr >= 0.5) return false;
+			if(dr >= 0.5) return relief(px, pz, i, dr, y) ? FocusFilter.Part.DETAILS : null;
+			if(y < 0) {
+				if(y == -1 && floorPattern && pattern(px, pz, d, dr, floorSkylight)) return FocusFilter.Part.DETAILS;
+				return isPillar(x, z) && y >= -pillarHeight ? FocusFilter.Part.PILLARS : null;
+			}
 			boolean wall = dr >= 0.5 - thickness;
-			if(y < height) {
-				if(wall) return !isWindow(px, pz, i, y);
-				return y == 0 && floor;
+			if(y == 0) {
+				if(floor && !(floorSkylight && hole(d))) return FocusFilter.Part.FLOOR;
+				return wall ? FocusFilter.Part.WALLS : null;
 			}
-			boolean hole = skylight > 0 && d - skylight < -0.5;
-			if(y == height) {
-				if(roof) return !hole;
-				return false;
-			}
+			if(y < height) return wall && !isWindow(px, pz, i, y) ? FocusFilter.Part.WALLS : null;
+			if(y == height) return roof && !hole(d) ? FocusFilter.Part.ROOF : null;
 			// Above the roof: the rim on the outline, then (first layer only) the ring and the spokes
 			int above = y - height;
-			if(above <= rimHeight && dr >= 0.5 - Math.max(rimWidth, 0) && rimWidth > 0) return true;
-			if(above != 1 || !roof || hole) return false;
+			if(rimWidth > 0 && above <= rimHeight && dr >= 0.5 - rimWidth) return FocusFilter.Part.DETAILS;
+			if(above == 1 && roof && pattern(px, pz, d, dr, true)) return FocusFilter.Part.DETAILS;
+			return null;
+		}
+
+		private boolean hole(double d) {
+			return skylight > 0 && d - skylight < -0.5;
+		}
+
+		// The roof's pattern (the floor's is the same): the rim's first layer, the ring, the skylight's border
+		// and the spokes; with the skylight open nothing inside it
+		private boolean pattern(double px, double pz, double d, double dr, boolean open) {
+			if(open && hole(d)) return false;
+			if(rimWidth > 0 && dr >= 0.5 - rimWidth) return true;
 			if(ring > 0 && Math.abs(d - ring) < 0.5) return true;
-			if(skylight > 0 && Math.abs(d - skylight) < 0.5 && (ring > 0 || spokes)) return true; // the skylight's border
+			if(open && skylight > 0 && Math.abs(d - skylight) < 0.5 && (ring > 0 || spokes)) return true;
 			if(spokes) {
 				for(int v = 0;v < n;++v) {
-					double along = px * vertexCos[v] + pz * vertexSin[v];
-					double across = -px * vertexSin[v] + pz * vertexCos[v];
-					if(Math.abs(across) < 0.5 && along >= -0.5) return true;
+					double a = px * vertexCos[v] + pz * vertexSin[v];
+					double c = -px * vertexSin[v] + pz * vertexCos[v];
+					if(Math.abs(c) < 0.5 && a >= -0.5) return true;
 				}
 			}
 			return false;
 		}
 
+		// Out of the walls, up to `relief` blocks: columns on the corners from the bottom to the top of the
+		// rim, and bands round the floor (and the floor's pattern) and the roof
+		private boolean relief(double px, double pz, int i, double dr, int y) {
+			if(relief <= 0 || dr >= 0.5 + relief) return false;
+			int bottom = floorPattern ? -1 : 0, top = height + (roof ? Math.max(rimHeight, 0) : -1);
+			if(y < bottom || y > top) return false;
+			if(columns && Math.abs(along(px, pz, i)) >= halfSide - 1) return true;
+			if(bands && (y == bottom || y == 0 || (roof && y == height))) return true;
+			return false;
+		}
+
 		private boolean isWindow(double px, double pz, int i, int y) {
-			if(windowHeight <= 0 || windowWidth <= 0) return false;
+			if(!windows || windowHeight <= 0 || windowWidth <= 0) return false;
 			if(y < windowBottom || y >= windowBottom + windowHeight) return false;
-			double phi = 2 * Math.PI * i / n + angle;
-			double u = -px * Math.sin(phi) + pz * Math.cos(phi);
+			double u = along(px, pz, i);
 			if(Math.abs(u) > halfSide - 1.5) return false; // keep the corners solid
 			int m = (int) Math.floor(u + 0.5);
 			int period = windowWidth + windowGap;

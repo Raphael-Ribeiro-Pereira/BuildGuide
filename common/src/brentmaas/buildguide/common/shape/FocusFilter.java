@@ -16,7 +16,13 @@ public final class FocusFilter {
 		CAP("cap"),
 		BODY("body"),
 		SPIKES("spikes"),
-		HIDDEN("hidden");
+		HIDDEN("hidden"),
+		// Polygon building's parts (appended: a saved part is its ordinal's name)
+		WALLS("walls"),
+		FLOOR("floor"),
+		ROOF("roof"),
+		DETAILS("details"),
+		PILLARS("pillars");
 
 		public final String translationKey;
 
@@ -55,11 +61,22 @@ public final class FocusFilter {
 		return layer == LAYER_ALL || blockLayer == layer;
 	}
 
+	// The Island's parts, what a shape with parts offers unless it names its own (IFocusParts.focusParts)
+	public static final Part[] islandParts = {Part.CAP, Part.BODY, Part.SPIKES};
+
 	// The part button's next value: All, Cap, Body, Spikes, Hidden with parts; All, Hidden without
 	public static Part nextPart(Part part, boolean hasParts) {
-		if(!hasParts) return part == Part.ALL ? Part.HIDDEN : Part.ALL;
-		Part[] all = Part.values();
-		return all[((part == null ? 0 : part.ordinal()) + 1) % all.length];
+		return nextPart(part, hasParts ? islandParts : new Part[0]);
+	}
+
+	// The part button's next value: All, then the shape's parts in order, then Hidden, then All again
+	public static Part nextPart(Part part, Part[] parts) {
+		if(part == null || part == Part.ALL) return parts.length > 0 ? parts[0] : Part.HIDDEN;
+		if(part == Part.HIDDEN) return Part.ALL;
+		for(int i = 0;i < parts.length;++i) {
+			if(parts[i] == part) return i + 1 < parts.length ? parts[i + 1] : Part.HIDDEN;
+		}
+		return Part.ALL;
 	}
 
 	// The layer button's next value: All, 1, 2, 3, 4, All

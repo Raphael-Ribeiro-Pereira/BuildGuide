@@ -275,7 +275,7 @@ public class ShapeScreen extends BaseScreen{
 		buttonFocusPart = BuildGuide.widgetHandler.createButton(x, focusRowY, partWidth, controlsHeight, partTitle(shape), () -> {
 			Shape s = currentShapeOrNull();
 			if(s == null) return;
-			s.setFocus(FocusFilter.nextPart(s.getFocusPart(), s.hasParts()), s.getFocusLayer());
+			s.setFocus(FocusFilter.nextPart(s.getFocusPart(), s.focusParts()), s.getFocusLayer());
 			buttonFocusPart.setTitle(partTitle(s));
 		});
 		buttonFocusPart.setActive(available);

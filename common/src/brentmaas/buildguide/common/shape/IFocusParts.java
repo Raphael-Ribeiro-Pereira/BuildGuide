@@ -11,6 +11,11 @@ public interface IFocusParts {
 		return false;
 	}
 
+	// The parts the Part button offers between All and Hidden (the Island's by default when it has parts)
+	default FocusFilter.Part[] focusParts() {
+		return hasParts() ? FocusFilter.islandParts : new FocusFilter.Part[0];
+	}
+
 	// The part of the last generation's block at this local position
 	default FocusFilter.Part partOf(int x, int y, int z) {
 		return FocusFilter.WHOLE;

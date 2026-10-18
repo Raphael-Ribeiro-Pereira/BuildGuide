@@ -45,10 +45,10 @@ public class PolygonBuildingTest {
 		List<String> regs = new ArrayList<>(); for(String l: Files.readAllLines(new File("common/src/brentmaas/buildguide/common/BuildGuide.java").toPath())) if(l.contains("ShapeRegistry.registerShape(")) regs.add(l.trim());
 		check(!regs.isEmpty() && regs.get(regs.size() - 1).startsWith("ShapeRegistry.registerShape(ShapePolygonBuilding.class"), "registered last (saved shapes keep their index)");
 		ShapePolygonBuilding fresh = new ShapePolygonBuilding();
-		check(fresh.getSectionCount() == 4, "four sections: Shape, Walls, Roof, Pillars");
+		check(fresh.getSectionCount() == 6, "six sections: Shape, Walls, Windows, Roof, Relief, Pillars");
 
 		System.out.println("-- a hexagon, radius 10, height 5, the defaults");
-		ShapePolygonBuilding hex = make("propertyPillarHeight", 3);
+		ShapePolygonBuilding hex = make("propertyPillarHeight", 3, "propertyRelief", 0);
 		Set<Long> c = hex.getExpectedBlocks();
 		check(!hex.error && hex.getNumberOfBlocks() == c.size(), "every block once: " + c.size());
 		if(show) for(int y = -1; y <= 6; y++) print(c, y, 12);
@@ -64,17 +64,17 @@ public class PolygonBuildingTest {
 		check(pillars == 6 * 4 && layer(c, -3).size() == 24 && layer(c, -4).size() == 0, "pillars 6 x 2 x 2, 3 deep: " + pillars);
 
 		System.out.println("-- switches");
-		ShapePolygonBuilding bare = make("propertyFloor", false, "propertyRoof", false, "propertyWindowHeight", 0, "propertyRimWidth", 0);
+		ShapePolygonBuilding bare = make("propertyFloor", false, "propertyRoof", false, "propertyWindows", false, "propertyRimWidth", 0, "propertyRelief", 0);
 		Set<Long> b = bare.getExpectedBlocks();
 		check(layer(b, 0).equals(Set.copyOf(layer(b, 3)).stream().map(p -> LocalPos.pack(LocalPos.unpackX(p), 0, LocalPos.unpackZ(p))).collect(java.util.stream.Collectors.toSet())), "no floor, no windows: every wall layer the same ring");
 		check(layer(b, 5).isEmpty() && layer(b, 6).isEmpty(), "no roof: nothing above the walls");
-		ShapePolygonBuilding thick = make("propertyThickness", 2, "propertyWindowHeight", 0);
+		ShapePolygonBuilding thick = make("propertyThickness", 2, "propertyWindowHeight", 0, "propertyRelief", 0);
 		check(layer(thick.getExpectedBlocks(), 1).size() > wall.size() + 40, "thickness 2: a wider ring");
 		ShapePolygonBuilding tall = make("propertyRimHeight", 3);
 		check(tall.getExpectedBlocks().stream().mapToInt(LocalPos::unpackY).max().getAsInt() == 8, "rim height 3 rises to y=8");
 
 		System.out.println("-- spokes reach the corners, square turned by 90");
-		ShapePolygonBuilding sq = make("propertySides", 4, "propertyRadius", 8f, "propertyRing", 0f, "propertySkylight", 0f, "propertyRimWidth", 0);
+		ShapePolygonBuilding sq = make("propertySides", 4, "propertyRadius", 8f, "propertyRing", 0f, "propertySkylight", 0f, "propertyRimWidth", 0, "propertyFloorPattern", true);
 		Set<Long> s6 = layer(sq.getExpectedBlocks(), 6);
 		Set<Long> turned = new HashSet<>(); for(long p: s6) turned.add(LocalPos.pack(-LocalPos.unpackZ(p), 6, LocalPos.unpackX(p)));
 		check(turned.equals(s6), "4 sides: the spokes layer is the same turned by 90 degrees");
@@ -82,9 +82,36 @@ public class PolygonBuildingTest {
 		Set<Long> all = sq.getExpectedBlocks(); Set<Long> t2 = new HashSet<>(); for(long p: all) t2.add(LocalPos.pack(-LocalPos.unpackZ(p), LocalPos.unpackY(p), LocalPos.unpackX(p)));
 		check(t2.equals(all), "4 sides: the whole building the same turned by 90 degrees");
 
+		System.out.println("-- relief, the floor's pattern, parts");
+		ShapePolygonBuilding rel = make("propertyFloorPattern", true);
+		Set<Long> rc = rel.getExpectedBlocks();
+		if(show) for(int y = -1; y <= 6; y++) print(rc, y, 13);
+		check(rel.getNumberOfBlocks() == rc.size(), "every block once with relief: " + rc.size());
+		check(layer(rc, 2).size() > win.size() + 6 && layer(rc, 0).size() > floor.size() + 40, "columns on the corners (y=2) and a band round the floor: " + layer(rc, 2).size() + ", " + layer(rc, 0).size());
+		Set<Long> under = layer(rc, -1), over = new HashSet<>(); for(long p: layer(rc, 6)) over.add(LocalPos.pack(LocalPos.unpackX(p), -1, LocalPos.unpackZ(p)));
+		Set<Long> diff = new HashSet<>(under); diff.removeAll(over);
+		check(under.size() > 60 && has(rc, 0, -1, 0) && !has(rc, 0, 6, 0), "under the floor the roof's pattern, the centre closed (no floor skylight): " + under.size() + " extra " + diff.size());
+		check(has(rc, 0, 0, 0), "the floor closed without Floor skylight");
+		ShapePolygonBuilding sun = make("propertyFloorPattern", true, "propertyFloorSkylight", true);
+		check(!has(sun.getExpectedBlocks(), 0, 0, 0) && !has(sun.getExpectedBlocks(), 0, -1, 0), "Floor skylight: the floor and its pattern open in the middle");
+		ShapePolygonBuilding nowin = make("propertyWindows", false, "propertyRelief", 0);
+		check(layer(nowin.getExpectedBlocks(), 2).size() == wall.size(), "Windows off: y=2 the whole ring");
+		check(rel.hasParts() && rel.focusParts().length == 5 && rel.partOf(0, 0, 0) == FocusFilter.Part.FLOOR && rel.partOf(0, 5, 3) == FocusFilter.Part.ROOF && rel.partOf(0, 6, 3) == FocusFilter.Part.DETAILS && rel.partOf(10, 1, 0) == FocusFilter.Part.WALLS, "parts: floor, roof, details, walls");
+		ShapePolygonBuilding pil = make("propertyPillarHeight", 2);
+		long pils = pil.getExpectedBlocks().stream().filter(p -> pil.partOf(LocalPos.unpackX(p), LocalPos.unpackY(p), LocalPos.unpackZ(p)) == FocusFilter.Part.PILLARS).count();
+		check(pils == 48, "parts: pillars 6 x 4 x 2 = " + pils);
+		FocusFilter.Part q = FocusFilter.Part.ALL; StringBuilder seq = new StringBuilder(); for(int k = 0; k < 8; k++){ q = FocusFilter.nextPart(q, rel.focusParts()); seq.append(q).append(' '); }
+		check(seq.toString().equals("WALLS FLOOR ROOF DETAILS PILLARS HIDDEN ALL WALLS "), "Part button: All, Walls, Floor, Roof, Details, Pillars, Hidden: " + seq);
+		check(FocusFilter.nextPart(FocusFilter.Part.SPIKES, true) == FocusFilter.Part.HIDDEN, "the Island's button unchanged");
+		rel.setFocus(FocusFilter.Part.ROOF, 0); FocusWorldTest.settle(rel);
+		ShapePolygonBuilding re = new ShapePolygonBuilding(); re.restorePersistence(rel.toPersistence());
+		check(re.getFocusPart() == FocusFilter.Part.ROOF, "the focus saved: " + re.getFocusPart());
+
 		System.out.println("-- persistence");
 		String data = fresh.toPersistence();
-		check(data.split(",").length == 19, "19 values: " + data);
+		check(data.split(",").length == 27, "27 values: " + data);
+		ShapePolygonBuilding old = new ShapePolygonBuilding(); old.restorePersistence("6,10.0,0,false,5,1,true,2,2,2,2,true,1,1,5.0,true,2.0,0,2");
+		check(!old.error && old.toPersistence().startsWith("6,10.0,0,false,5,1,true,2,2,2,2,true,1,1,5.0,true,2.0,0,2,true,1,true,true,false,false"), "a save of the first version (19 values) loads: " + old.toPersistence());
 		ShapePolygonBuilding back = new ShapePolygonBuilding(); back.restorePersistence(data.replace("6,10.0", "8,12.0"));
 		check(!back.error && back.toPersistence().startsWith("8,12.0"), "saved and loaded: " + back.toPersistence());
 
