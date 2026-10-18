@@ -14,7 +14,7 @@ public class AccordionTest {
 	// case, 206 px as in E6), 360 is GUI scale 3 on 1080p
 	static final int[] HEIGHTS = {ShapeLayout.minHeight, 360};
 	static final int HEADER = brentmaas.buildguide.common.screen.ShapeScreen.headerHeight, ORIGIN_ROWS = 4;
-	static final Class<?>[] SHAPES = {ShapeCatenary.class, ShapeCircle.class, ShapeCone.class, ShapeCuboid.class, ShapeEllipse.class, ShapeEllipsoid.class, ShapeGrid.class, ShapeLine.class, ShapeParabola.class, ShapeParaboloid.class, ShapePolygon.class, ShapePolygonalPyramid.class, ShapeSphere.class, ShapeTorus.class, ShapeSpline.class, ShapeBridge.class, ShapeIsland.class, ShapeTerrain.class};
+	static final Class<?>[] SHAPES = {ShapeCatenary.class, ShapeCircle.class, ShapeCone.class, ShapeCuboid.class, ShapeEllipse.class, ShapeEllipsoid.class, ShapeGrid.class, ShapeLine.class, ShapeParabola.class, ShapeParaboloid.class, ShapePolygon.class, ShapePolygonalPyramid.class, ShapeSphere.class, ShapeTorus.class, ShapeSpline.class, ShapeBridge.class, ShapeIsland.class, ShapeTerrain.class, ShapePolygonBuilding.class};
 
 	public static void main(String[] a) throws Exception {
 		check(Property.rowHeight == 18, "row height 18");

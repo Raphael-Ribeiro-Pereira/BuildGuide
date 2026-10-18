@@ -143,7 +143,8 @@ public class TerrainTest {
 		ShapeTerrain sec = new ShapeTerrain();
 		check(sec.getSectionCount() == 4 && sec.getSectionName(0).getTranslationKey().equals("property.buildguide.section.base") && sec.getSectionName(1).getTranslationKey().equals("property.buildguide.section.relief") && sec.getSectionName(2).getTranslationKey().equals("property.buildguide.section.layers") && sec.getSectionName(3).getTranslationKey().equals("property.buildguide.section.seed") && sec.countRows(3) == 6 && sec.countRows(2) == 1, "Base, Relief, Layers (the box alone while off), Random (6 rows, Seed included)");
 		List<String> reg = new ArrayList<>(); for(String l: Files.readAllLines(Paths.get("common/src/brentmaas/buildguide/common/BuildGuide.java"))) if(l.contains("registerShape(")) reg.add(l.trim());
-		check(reg.get(reg.size() - 1).startsWith("ShapeRegistry.registerShape(ShapeTerrain.class") && reg.get(reg.size() - 2).startsWith("ShapeRegistry.registerShape(ShapeIsland.class"), "registered last, right after the Island");
+		int ti = -1, ii = -1; for(int k = 0; k < reg.size(); k++){ if(reg.get(k).startsWith("ShapeRegistry.registerShape(ShapeTerrain.class")) ti = k; if(reg.get(k).startsWith("ShapeRegistry.registerShape(ShapeIsland.class")) ii = k; }
+		check(ii >= 0 && ti == ii + 1, "registered right after the Island (the shapes after it are newer)");
 
 		System.out.println("-- generation and the build focus");
 		File dir = Files.createTempDirectory("bgterrain").toFile(); BuildGuide.config = new Config(dir); BuildGuide.config.focusFrom.value = 0;

@@ -18,6 +18,7 @@ import brentmaas.buildguide.common.shape.ShapeLine;
 import brentmaas.buildguide.common.shape.ShapeParabola;
 import brentmaas.buildguide.common.shape.ShapeParaboloid;
 import brentmaas.buildguide.common.shape.ShapePolygon;
+import brentmaas.buildguide.common.shape.ShapePolygonBuilding;
 import brentmaas.buildguide.common.shape.ShapePolygonalPyramid;
 import brentmaas.buildguide.common.shape.ShapeRegistry;
 import brentmaas.buildguide.common.shape.ShapeSphere;
@@ -68,6 +69,7 @@ public class BuildGuide {
 		ShapeRegistry.registerShape(ShapeBridge.class, "shape.buildguide.bridge");
 		ShapeRegistry.registerShape(ShapeIsland.class, "shape.buildguide.island");
 		ShapeRegistry.registerShape(ShapeTerrain.class, "shape.buildguide.terrain");
+		ShapeRegistry.registerShape(ShapePolygonBuilding.class, "shape.buildguide.polygonbuilding");
 		
 		renderHandler.register();
 	}
