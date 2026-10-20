@@ -77,6 +77,11 @@ public class SliceScan {
 	private final long[] bitmap;
 	private final int bx0, by0, bz0, bw, bh, bd;
 	private int nextY;
+	// Within layer nextY (performance step 4): how far it got, so a frame can stop inside a layer. Classifying its
+	// expected positions comes first, classifyChunk at a time (nextClassify counts them), then the near sweep one
+	// x row at a time (nextRow); a layer is one unit of work no more
+	public static final int classifyChunk = 512;
+	private int nextClassify = 0, nextRow = Integer.MIN_VALUE;
 	private final Map<Long, NearBlock> near = new HashMap<Long, NearBlock>();
 	private final Set<Long> dirty = new LinkedHashSet<Long>();
 	private int frames = 0;
@@ -241,14 +246,16 @@ public class SliceScan {
 	}
 
 	/**
-	 * One frame of work: layers until budgetNanos is spent (measured with nanoClock), at least one. A budget
-	 * of 0 or less means no limit (Instant). Returns whether the scan is complete.
+	 * One frame of work until budgetNanos is spent (measured with nanoClock), at least one unit. A budget of 0 or
+	 * less means no limit (Instant). Returns whether the scan is complete. A unit is classifyChunk expected
+	 * positions or one x row of the near sweep (performance step 4: a whole layer was one unit, so a wide shape
+	 * went over the budget by up to a layer, 9 ms at NORMAL's 6). Every cell is still read once, in the same
+	 * order as layer by layer, so the result is the same.
 	 */
 	public boolean step(IBlockProbe probe, long budgetNanos, LongSupplier nanoClock) {
 		long start = nanoClock.getAsLong();
 		do {
-			scanLayer(probe, nextY);
-			++nextY;
+			scanUnit(probe);
 		}while(!isDone() && (budgetNanos <= 0 || nanoClock.getAsLong() - start < budgetNanos));
 		long spent = nanoClock.getAsLong() - start;
 		++frames;
@@ -257,13 +264,28 @@ public class SliceScan {
 		return isDone();
 	}
 
-	private void scanLayer(IBlockProbe probe, int y) {
-		int l = y - minY;
-		if(l >= 0 && l < byLayer.length) for(int i: byLayer[l]) classify(probe, i);
-		for(int x = minX - ValidationState.nearRadius;x <= maxX + ValidationState.nearRadius;++x) {
-			for(int z = minZ - ValidationState.nearRadius;z <= maxZ + ValidationState.nearRadius;++z) {
-				nearCell(probe, x, y, z, false);
+	// The next unit of layer nextY: a chunk of its expected positions, else a row of its near sweep; after the last
+	// row the next layer
+	private void scanUnit(IBlockProbe probe) {
+		int r = ValidationState.nearRadius;
+		if(nextRow == Integer.MIN_VALUE) {
+			int l = nextY - minY;
+			int[] layer = l >= 0 && l < byLayer.length ? byLayer[l] : null;
+			if(layer != null && nextClassify < layer.length) {
+				int end = Math.min(layer.length, nextClassify + classifyChunk);
+				for(int k = nextClassify;k < end;++k) classify(probe, layer[k]);
+				nextClassify = end;
+				if(nextClassify == layer.length) nextRow = minX - r;
+				return;
 			}
+			nextRow = minX - r; // nothing to classify: the first row is this unit
+		}
+		int x = nextRow;
+		for(int z = minZ - r;z <= maxZ + r;++z) nearCell(probe, x, nextY, z, false);
+		if(++nextRow > maxX + r) {
+			++nextY;
+			nextRow = Integer.MIN_VALUE;
+			nextClassify = 0;
 		}
 	}
 

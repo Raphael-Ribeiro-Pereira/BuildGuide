@@ -1,7 +1,6 @@
 package brentmaas.buildguide.common.shape;
 
-import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.LongPredicate;
 
@@ -42,29 +41,41 @@ public class ValidationOverlay {
 	 * always drawn, and so is the highlighted position.
 	 */
 	public static void build(IShapeBuffer buffer, ValidationState state, ShapeSet.Origin playerLocal, LongPredicate inFocus) {
-		List<long[]> entries = new ArrayList<long[]>(); // {pos, colourIndex}
-		for(long pos: state.getPositions(ValidationState.IGNORED)) entries.add(new long[] {pos, 1});
-		for(NearBlock nb: state.getNearBlocks()) entries.add(new long[] {nb.localPos, 2});
-		// Palette per layer (4D): wrong blocks on the shape are red like structure errors, another layer's block
-		// orange; both are solid blocks, so they get a shell
-		for(long pos: state.getPositions(ValidationState.WRONG_BLOCK)) if(inFocus == null || inFocus.test(pos)) entries.add(new long[] {pos, 2});
-		for(long pos: state.getPositions(ValidationState.WRONG_LAYER)) if(inFocus == null || inFocus.test(pos)) entries.add(new long[] {pos, 3});
-
-		if(entries.size() > maxCubes && playerLocal != null) {
-			// Only when over the cap: keep the errors closest to the player (deterministic tie-break by position)
-			final int px = playerLocal.x, py = playerLocal.y, pz = playerLocal.z;
-			entries.sort(Comparator.<long[]>comparingLong(e -> distanceSquared(e[0], px, py, pz)).thenComparingLong(e -> e[0]));
-			entries = entries.subList(0, maxCubes);
+		// The entries as two primitive arrays (position, colour index), in this order: ignored, structure errors,
+		// wrong blocks, wrong layer. Palette per layer (4D): wrong blocks on the shape are red like structure
+		// errors, another layer's block orange; both are solid blocks, so they get a shell
+		List<Long> ignored = state.getPositions(ValidationState.IGNORED);
+		List<NearBlock> near = state.getNearBlocks();
+		List<Long> wrongBlock = state.getPositions(ValidationState.WRONG_BLOCK), wrongLayer = state.getPositions(ValidationState.WRONG_LAYER);
+		int capacity = ignored.size() + near.size() + wrongBlock.size() + wrongLayer.size(), n = 0;
+		long[] positions = new long[capacity];
+		byte[] kinds = new byte[capacity];
+		for(long pos: ignored) {
+			positions[n] = pos;
+			kinds[n++] = 1;
+		}
+		for(NearBlock nb: near) {
+			positions[n] = nb.localPos;
+			kinds[n++] = 2;
+		}
+		for(long pos: wrongBlock) if(inFocus == null || inFocus.test(pos)) {
+			positions[n] = pos;
+			kinds[n++] = 2;
+		}
+		for(long pos: wrongLayer) if(inFocus == null || inFocus.test(pos)) {
+			positions[n] = pos;
+			kinds[n++] = 3;
 		}
 
+		int[] drawn = nearestFirst(positions, n, playerLocal);
 		long highlighted = state.getHighlightedPos();
-		for(long[] e: entries) {
-			long pos = e[0];
+		for(int e: drawn) {
+			long pos = positions[e];
 			if(pos == highlighted) continue; // drawn last, on top
-			if(e[1] == 1) {
+			if(kinds[e] == 1) {
 				buffer.setColour(255, 220, 40, 160);
 				pushCube(buffer, pos);
-			}else if(e[1] == 3) {
+			}else if(kinds[e] == 3) {
 				buffer.setColour(255, 140, 26, 160);
 				pushShell(buffer, pos);
 			}else {
@@ -79,6 +90,44 @@ public class ValidationOverlay {
 			if(s == ValidationState.UNKNOWN || s == ValidationState.WRONG_LAYER || s == ValidationState.WRONG_BLOCK) pushShell(buffer, highlighted);
 			else pushCube(buffer, highlighted);
 		}
+	}
+
+	/**
+	 * The entries to draw, as indices into positions: all of them in their order when they fit (or without a
+	 * player), else the maxCubes nearest to the player, nearest first, ties by position. Performance step 4: the
+	 * same choice and order as sorting every entry with a comparator, which took 5 to 30 ms on the render thread
+	 * with 20 000 structure errors; now one primitive sort of the distances finds the cut, and only the entries
+	 * kept are put in order.
+	 */
+	static int[] nearestFirst(long[] positions, int n, ShapeSet.Origin playerLocal) {
+		if(n <= maxCubes || playerLocal == null) {
+			int[] all = new int[n];
+			for(int e = 0;e < n;++e) all[e] = e;
+			return all;
+		}
+		int px = playerLocal.x, py = playerLocal.y, pz = playerLocal.z;
+		long[] d2 = new long[n];
+		for(int e = 0;e < n;++e) d2[e] = distanceSquared(positions[e], px, py, pz);
+		long[] sorted = Arrays.copyOf(d2, n);
+		Arrays.sort(sorted);
+		long cut = sorted[maxCubes - 1];
+		// Everything nearer than the cut, then the nearest of the ties at the cut by position
+		int below = 0;
+		for(int e = 0;e < n;++e) if(d2[e] < cut) ++below;
+		int ties = 0;
+		for(int e = 0;e < n;++e) if(d2[e] == cut) ++ties;
+		long[] tied = new long[ties];
+		ties = 0;
+		for(int e = 0;e < n;++e) if(d2[e] == cut) tied[ties++] = positions[e];
+		Arrays.sort(tied);
+		long lastTied = tied[maxCubes - below - 1];
+		Integer[] kept = new Integer[maxCubes];
+		int k = 0;
+		for(int e = 0;e < n && k < maxCubes;++e) if(d2[e] < cut || (d2[e] == cut && positions[e] <= lastTied)) kept[k++] = e;
+		Arrays.sort(kept, (a, b) -> d2[a] != d2[b] ? Long.compare(d2[a], d2[b]) : Long.compare(positions[a], positions[b]));
+		int[] out = new int[k];
+		for(int e = 0;e < k;++e) out[e] = kept[e];
+		return out;
 	}
 
 	private static void pushShell(IShapeBuffer buffer, long pos) {

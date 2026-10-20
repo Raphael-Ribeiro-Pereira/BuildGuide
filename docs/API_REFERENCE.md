@@ -146,6 +146,32 @@ public abstract class Shape {
 - `ShapePolygon`: `propertyFloor` and `propertyCeiling` (PropertyBoolean, persisted after Even mode):
   the inside (`dr < -0.5`) of the first and of the last layer along the depth.
 
+### Performance step 4 (`wip/perf4`)
+
+- `LongHashSet` (common): a `Set<Long>` of packed positions on primitive arrays (open addressing,
+  at most half full; -1 kept apart), in the order added. `add(long)`, `contains(long)`, `get(k)`,
+  `toLongArray()` allocate nothing per position; `clear()` keeps the arrays when they were well
+  used. No removal but `clear()`. `Shape.expectedBlocks` is one (it was a `HashSet<Long>`):
+  `getExpectedBlocks()` still returns a `Set<Long>`, so boxed readers keep working, and iterate in
+  emission order now.
+- `PreviewModel.of(collection, ...)`: a `LongHashSet` is copied with `toLongArray()`.
+- `SliceScan.step`: the unit of work is `classifyChunk` (512) expected positions of a layer or one x
+  row of its near sweep, not a whole layer; the same cells in the same order, so the same result
+  (`PerfStep4Test`). A frame goes over its budget by one unit at most.
+- `ValidationOverlay.nearestFirst(positions, n, playerLocal)` (package-private): the indices drawn,
+  all in order when they fit, else the `maxCubes` nearest (ties by position), nearest first: the
+  same choice and order as sorting every entry, found with one primitive sort of the distances.
+- `TimingLog.recordPreview(render, build, wait, blocks, reason, frames, maxFrameNanos)`: with
+  `frames > 0` the line ends with ` frames=<n> maxframe=<ms>`; the old overload is unchanged.
+- Fabric `PreviewRenderer`: the mesh is a `SectionedBuffer` of `ShapeBuffer`s, sent a few sections
+  per frame within `WorldUpload.budgetNanos` while the previous mesh stays on screen
+  (`textureIsReadyToBlit` is false while sending); a newer build drops a mesh still being sent.
+  `ShapeBuffer.renderAll(buffers, colour, depth, modelView, pipeline)` draws sections into any target.
+- Fabric `RenderHandler`: `isIgnored` compares the block with the ignored blocks resolved once per
+  change of the setting (`IgnoredBlocks`); the scan's result is published on the frame after its
+  last unit; the scan preparation copies the expected set with `toLongArray()` under the lock and
+  boxes it after.
+
 ### ValidationState (Etapa 2.1)
 
 `common/shape/ValidationState` — live, **mutable, per-position, `synchronized`** state

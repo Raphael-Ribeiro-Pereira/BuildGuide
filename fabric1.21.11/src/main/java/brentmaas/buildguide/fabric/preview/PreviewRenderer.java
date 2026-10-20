@@ -1,5 +1,7 @@
 package brentmaas.buildguide.fabric.preview;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -10,9 +12,11 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 
 import brentmaas.buildguide.common.TimingLog;
+import brentmaas.buildguide.common.WorldUpload;
 import brentmaas.buildguide.common.shape.PreviewCamera;
 import brentmaas.buildguide.common.shape.PreviewMesh;
 import brentmaas.buildguide.common.shape.PreviewModel;
+import brentmaas.buildguide.common.shape.SectionedBuffer;
 import brentmaas.buildguide.fabric.RenderHandler;
 import brentmaas.buildguide.fabric.shape.ShapeBuffer;
 import net.minecraft.client.gui.render.pip.PictureInPictureRenderer;
@@ -25,14 +29,17 @@ import net.minecraft.client.renderer.MultiBufferSource;
  * and z in [-1000, 1000], and given a pose translated to the texture centre (getTranslateY) and
  * scaled by (guiScale, guiScale, -guiScale), i.e. one unit = one GUI pixel.
  *
- * The mesh (GPU buffer, one draw call) is rebuilt only when it would show something else
- * (PreviewModel.meshChange). Performance step 2: its vertices are written on a worker thread
- * (PreviewMesh.fill writes only the ShapeBuffer's native memory, and a model never changes) and
- * sent to the GPU on the render thread once ready; meanwhile the previous mesh stays on screen,
- * framed by the model it was built for. One build at a time: a model that needs a mesh while one is
- * being built waits for it, and a finished build no model wants any more is freed unsent. The
- * texture is kept while the model and the camera do not change, so a still preview costs one blit
- * per frame.
+ * The mesh is rebuilt only when it would show something else (PreviewModel.meshChange). Performance step 2:
+ * its vertices are written on a worker thread (PreviewMesh.fill writes only native memory, and a model never
+ * changes); meanwhile the previous mesh stays on screen, framed by the model it was built for. One build at a
+ * time: a model that needs a mesh while one is being built waits for it, and a finished build no model wants
+ * any more is freed unsent.
+ *
+ * Performance step 4: the mesh is in 16-block sections (SectionedBuffer, like the world buffer) and reaches the
+ * GPU a few sections per frame within WorldUpload's budget; the previous mesh is drawn until every section is
+ * there. Sending it whole took 8 to 25 ms in one frame at 50 000 blocks, every time the shape changed with the
+ * menu open. The texture is kept while the model and the camera do not change and nothing is being sent, so a
+ * still preview costs one blit per frame.
  */
 public class PreviewRenderer extends PictureInPictureRenderer<PreviewRenderState> {
 	// Keep the model inside the projection's depth range (+-1000) at any zoom
@@ -44,15 +51,23 @@ public class PreviewRenderer extends PictureInPictureRenderer<PreviewRenderState
 	});
 
 	private PreviewModel meshModel = null;
-	private ShapeBuffer mesh = null;
+	private SectionedBuffer mesh = null;
 	// The build running (null: none), for which model and why, and the next model that needs one meanwhile
-	private Future<ShapeBuffer> building = null;
+	private Future<SectionedBuffer> building = null;
 	private PreviewModel buildingModel = null, wantedModel = null;
 	private String buildingReason = null, wantedReason = null;
 	private long buildingStarted = 0, buildingMillis = 0;
+	// A finished build being sent to the GPU, a few sections per frame (null: none), and its timing
+	private SectionedBuffer sending = null;
+	private PreviewModel sendingModel = null;
+	private String sendingReason = null;
+	private long sendingBuildMillis = 0, sendingStarted = 0, sendNanos = 0, maxSendNanos = 0;
+	private int sendFrames = 0;
 	// What the current texture shows
 	private PreviewModel shownModel = null;
 	private float shownYaw, shownPitch, shownZoom;
+	// The sections drawn this frame (reused, render thread)
+	private final List<ShapeBuffer> drawList = new ArrayList<ShapeBuffer>();
 
 	public PreviewRenderer(MultiBufferSource.BufferSource bufferSource) {
 		super(bufferSource);
@@ -74,10 +89,11 @@ public class PreviewRenderer extends PictureInPictureRenderer<PreviewRenderState
 		return height / 2.0f;
 	}
 
-	// A finished build is drawn on the next frame, so the texture is redrawn then even if nothing else changed
+	// A finished build, or one being sent, needs renderToTexture on every frame until its mesh is on screen
 	@Override
 	protected boolean textureIsReadyToBlit(PreviewRenderState state) {
 		if(building != null && building.isDone()) return false;
+		if(sending != null) return false;
 		return state.model() == shownModel && state.yaw() == shownYaw && state.pitch() == shownPitch && state.zoom() == shownZoom;
 	}
 
@@ -85,17 +101,20 @@ public class PreviewRenderer extends PictureInPictureRenderer<PreviewRenderState
 	protected void renderToTexture(PreviewRenderState state, PoseStack poseStack) {
 		PreviewModel model = state.model();
 		collectBuild();
+		sendPart();
 		// Rebuild only when the mesh would show something else (PreviewModel.meshChange), compared with the mesh
-		// that will be on screen once the build running (if any) lands: a new instance with the same key keeps it
-		String reason = PreviewModel.meshChange(building != null ? buildingModel : meshModel, model);
+		// that will be on screen once the build running or being sent (if any) lands: a new instance with the same
+		// key keeps it
+		PreviewModel coming = building != null ? buildingModel : sending != null ? sendingModel : meshModel;
+		String reason = PreviewModel.meshChange(coming, model);
 		if(reason != null) requestBuild(model, reason);
-		else if(building == null) meshModel = model;
+		else if(building == null && sending == null) meshModel = model;
 		if(mesh == null) {
 			shownModel = model;
 			shownYaw = state.yaw();
 			shownPitch = state.pitch();
 			shownZoom = state.zoom();
-			return; // the first mesh is not built yet: an empty texture until then
+			return; // the first mesh is not there yet: an empty texture until then
 		}
 		// Framed by the model the mesh was built for (a newer geometry may still be on its way)
 		PreviewModel drawn = meshModel;
@@ -115,7 +134,10 @@ public class PreviewRenderer extends PictureInPictureRenderer<PreviewRenderState
 		poseStack.mulPose(new Quaternionf().rotationY((float) Math.toRadians(state.yaw())));
 		poseStack.translate(-drawn.centreX(), -drawn.centreY(), -drawn.centreZ());
 
-		mesh.render(RenderSystem.outputColorTextureOverride, RenderSystem.outputDepthTextureOverride, poseStack.last().pose(), RenderHandler.BUILD_GUIDE_PREVIEW);
+		drawList.clear();
+		for(SectionedBuffer.Section section: mesh.getSections()) drawList.add((ShapeBuffer) section.getBuffer());
+		ShapeBuffer.renderAll(drawList, RenderSystem.outputColorTextureOverride, RenderSystem.outputDepthTextureOverride, poseStack.last().pose(), RenderHandler.BUILD_GUIDE_PREVIEW);
+		drawList.clear();
 
 		shownModel = model;
 		shownYaw = state.yaw();
@@ -136,7 +158,7 @@ public class PreviewRenderer extends PictureInPictureRenderer<PreviewRenderState
 		// Geometry and colours come from common (PreviewMesh); the worker only writes them
 		building = meshBuilder.submit(() -> {
 			long started = System.nanoTime();
-			ShapeBuffer buffer = new ShapeBuffer();
+			SectionedBuffer buffer = new SectionedBuffer(ShapeBuffer::new);
 			PreviewMesh.fill(buffer, model);
 			buildingMillis = (System.nanoTime() - started) / 1000000;
 			return buffer;
@@ -144,12 +166,13 @@ public class PreviewRenderer extends PictureInPictureRenderer<PreviewRenderState
 	}
 
 	/**
-	 * The build running, once it is done: sent to the GPU and shown, unless a newer model already wants another
-	 * mesh (then it is freed unsent and that one is built). Render thread.
+	 * The build running, once it is done: it starts being sent to the GPU, unless a newer model already wants
+	 * another mesh (then it is freed unsent and that one is built). A mesh still being sent from an earlier build
+	 * is dropped for it. Render thread.
 	 */
 	private void collectBuild() {
 		if(building == null || !building.isDone()) return;
-		ShapeBuffer built;
+		SectionedBuffer built;
 		try {
 			built = building.get();
 		}catch(Exception e) {
@@ -169,12 +192,42 @@ public class PreviewRenderer extends PictureInPictureRenderer<PreviewRenderState
 			return;
 		}
 		if(built == null) return;
-		long sending = System.nanoTime();
-		built.end();
+		dropSending();
+		sending = built;
+		sendingModel = model;
+		sendingReason = reason;
+		sendingBuildMillis = buildingMillis;
+		sendingStarted = buildingStarted;
+		sendNanos = 0;
+		maxSendNanos = 0;
+		sendFrames = 0;
+	}
+
+	// This frame's part of the mesh being sent; once all of it is there it replaces the one on screen
+	private void sendPart() {
+		if(sending == null) return;
+		long started = System.nanoTime();
+		boolean sent = sending.endPart(System::nanoTime, started + WorldUpload.budgetNanos);
+		long spent = System.nanoTime() - started;
+		sendNanos += spent;
+		maxSendNanos = Math.max(maxSendNanos, spent);
+		++sendFrames;
+		if(!sent) return;
 		if(mesh != null) mesh.close();
-		mesh = built;
-		meshModel = model;
-		TimingLog.recordPreview((System.nanoTime() - sending) / 1000000, buildingMillis, (System.nanoTime() - buildingStarted) / 1000000, model.positions.length, reason);
+		mesh = sending;
+		meshModel = sendingModel;
+		sending = null;
+		TimingLog.recordPreview(sendNanos / 1000000, sendingBuildMillis, (System.nanoTime() - sendingStarted) / 1000000, meshModel.positions.length, sendingReason, sendFrames, maxSendNanos);
+		sendingModel = null;
+	}
+
+	// A mesh being sent that will not be shown: its sections on the GPU closed, the rest of its native copy freed
+	private void dropSending() {
+		if(sending == null) return;
+		sending.close();
+		sending.releaseVertexData();
+		sending = null;
+		sendingModel = null;
 	}
 
 	@Override
@@ -183,8 +236,9 @@ public class PreviewRenderer extends PictureInPictureRenderer<PreviewRenderState
 		if(mesh != null) mesh.close();
 		mesh = null;
 		meshModel = null;
+		dropSending();
 		// A build still running is freed once it ends (the same worker, so after it)
-		Future<ShapeBuffer> running = building;
+		Future<SectionedBuffer> running = building;
 		building = null;
 		buildingModel = null;
 		wantedModel = null;

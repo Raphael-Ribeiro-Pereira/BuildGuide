@@ -469,6 +469,68 @@ Persistence: 8 values, the two new ones last; older saves load with both off.
 
 Offline harness after step 3 and the polygon room: 1303 asserts, 0 failures; Bridge 466 / 159 / 360.
 
+### Polygon building and Farming land (on `wip/polygon` and `wip/farm`, on top of `wip/perf3`; not merged)
+
+- Polygon building (`59b16d2`, `7a60f52`): an X-sided house on the Y axis (walls with windows, floor,
+  roof with rim, inner ring, spokes and skylight, pillars, relief: corner columns and edge bands,
+  the roof's pattern under the floor); build focus parts Walls, Floor, Roof, Details, Pillars.
+  Raphael tested the first version (`polygon-wip`, 2026-10-18): "the test passed".
+- Farming land (`90da321`): where the water goes in a farm of any outline (rectangle, polygon,
+  circle); crops on the cheapest 9 x 9 grid with water added wherever the outline leaves farmland
+  out of reach, sugar cane in rows every third line; parts Water, Field, Edge. Not tested in game.
+
+### Performance, step 4: what Litematica does that we did not (on `wip/perf4`, on top of `wip/farm`, waiting for the in-game test; not merged)
+
+Raphael (2026-10-20): the mod is still much heavier than Litematica, which draws more and more
+detailed things. The game's own timing lines (Fabulously Optimized logs of 2026-10-17 and 18) say
+where: drawing is cheap (`phase=render avg=0.03` to `0.04` ms a frame at about 580 FPS, so not the
+GPU), the stutters are single frames on the render thread:
+- the 3D preview sent to the GPU whole, every time the shape changed with the menu open:
+  `preview-rebuild ms=8` to `25` at 20,000 to 70,000 blocks (one buffer of up to 36 MiB);
+- the preview snapshot `9` to `11` ms (a walk over a `HashSet<Long>` of 50,000 boxed positions);
+- the scan's `publish=12` ms in the same frame as its last layers, and layers of up to 9 ms at
+  NORMAL's 6 ms budget (a layer could not be split);
+- `phase=render ... max=36.2` and `22.1` ms frames.
+
+What Litematica does instead (its decompiled 1.21.11 jar, analysis only): the schematic is meshed per
+16^3 section on worker threads and only the sections that change are rebuilt; the uploads have a
+time budget; the verifier's colours are part of the same section meshes; its world data is in
+primitive palettes, never a boxed object per block; its overlay can skip the sides shared by two
+blocks of the same kind (`OVERLAY_REDUCED_INNER_SIDES`).
+
+| What | Change |
+|---|---|
+| Expected set | `LongHashSet` (primitive, emission order) instead of `HashSet<Long>`: no Long and no node per block per generation; the preview snapshot and the scan copy are one array copy (the scan's copy under the shape's lock, the boxing after it on the worker) |
+| Preview | the mesh in 16-block sections, sent a few per frame within the world upload's 3 ms budget while the previous mesh stays on screen; `preview-rebuild` gets `frames=` and `maxframe=` |
+| Scan | a unit is 512 positions of a layer or one x row of its near sweep (it was a whole layer), so a frame goes over the budget by one row at most; the result is published on the next frame, never together with the last layers |
+| Ignored blocks | resolved to the blocks once per change of the setting and compared by identity: the scan built a `namespace:path` String for every solid block it read (and so did every block event) |
+| Overlay | the 4,000 nearest errors found with one primitive sort of the distances instead of sorting every entry with a comparator; the same cubes in the same order |
+
+Measured offline (`Perf4Probe` in the session scratchpad, an unbuilt island of 37,100 blocks with
+ground around it, 19,293 structure errors, warm JIT): the slowest scan frame at 6 ms went from 8.6
+to 16 ms to 6.0 to 7 ms, the overlay from 3.9 to 4.8 ms to 1.6 to 2.9 ms, the snapshot from up to
+34 ms (cold) to under 1 ms once warm. Not measurable offline: the preview upload (GPU) and the
+world reads (the ignored-block String was per block read in game).
+
+Left as they were: the publish itself (3 to 10 ms offline, now alone in its frame); the world
+buffer's sections (about 3 ms a frame while a new shape is sent); the chat line after every
+automatic scan.
+
+In-game checklist for `perf4-wip`:
+1. With the menu open, hold + on a big shape (50,000 blocks or more) and let it validate: the
+   preview follows a few frames later without a tall bar in F3 + 2; `preview-rebuild` lines show
+   `frames=` and `maxframe=` about 3 ms or less.
+2. A scan of a big shape: `phase=scan ... maxslice=` close to the Scan speed budget (6 at Normal),
+   never 9 or more; the counts and lists as before.
+3. `phase=render ... max=` over a few minutes of building next to a validated shape: lower than the
+   36 and 22 ms of 2026-10-17.
+4. Ignored blocks (Configuration, e.g. scaffolding) still count as IGNORED; changing the setting
+   takes effect on the next scan.
+5. The preview, the overlay (red, yellow, orange, the white highlight), Area 3, Fill and the
+   focus work as before.
+
+Offline harness after step 4: 1375 asserts, 0 failures; Bridge 466 / 159 / 360.
+
 Offline harness at the close: 406 asserts, 0 failures; Bridge reference sizes 466 / 159 / 360.
 E6 (after two fixes), E7, P4 and E8 passed their in-game checklists before being committed
 (E7 7 of 7, P4 9 of 9, E8 9 of 9). The ghost fix was committed on Raphael's go-ahead after the
@@ -481,12 +543,12 @@ Build output: `fabric1.21.11/build/libs/BuildGuide-Fabric-0.4.8.jar` (mod versio
 
 | Item | Value |
 |---|---|
-| Active jar in the mods folder | `BuildGuide-Fabric-0.4.8-perf2-wip.jar` (deployed 2026-10-16) |
-| SHA-256 | `F12384911780D9CC4EF0FEA0493CFFCF58E423BE12D82E820C12C7FEB0125B04` |
-| Source | `wip/perf2` at `a4758b6` (on top of `wip/fill`, `wip/perf` and `wip/terrain`): the build output and the mods copy have the same SHA-256; `LongIndex`, `SliceScan`, `RenderHandler$PendingScan` and `PreviewRenderer` checked inside |
-| Tested | the offline harness (1285 asserts); in game (2026-10-17): still laggy, see performance step 3 |
-| Next jar | `perf3-wip` (`wip/perf3`): the error list and the polygon room |
-| Previous jars | `BuildGuide-Fabric-0.4.8-fill-wip.jar` (SHA-256 `4828F694FD843595F17B1A3522B171A5E6920012C7345D8C20660B202A54E58F`, commit `c502556`), `BuildGuide-Fabric-0.4.8-terrain-wip.jar` (SHA-256 `8F8720A6C522676F562DEBBCAC85DBA1CBD7F8C6ACF0C2CE75F97971D2E96638`, commit `2724d58`), `BuildGuide-Fabric-0.4.8-focus-wip.jar` (SHA-256 `6923FAB6A40E250901C68746389327DA9FF8573498C920B5D86621CB9132B09C`, commit `0ff9af7`), `BuildGuide-Fabric-0.4.8-palette-wip.jar` (SHA-256 `F0C0A242D361BB0E73BC4EF477EE274AA905C7ED8681154FF004227B438B26B0`, commit `e35fad3`), `BuildGuide-Fabric-0.4.8-leakfix-wip.jar` (SHA-256 `D0089DE876C5855AFF509974DFA2400037F1B5DCAD05E63B45A0E6C4095EDABF`, commit `481d42a`), `BuildGuide-Fabric-0.4.8-layers-wip.jar` (SHA-256 `14B66C4E9A572D5224C01F5217BBB087BB48BB8BE908909CF67408824AE2F7CC`, commit `c8a8579`), `BuildGuide-Fabric-0.4.8-scan-slices-wip.jar` (SHA-256 `A280A6440BB423878D6AAFA316709E852D63EF2EEBB3FF3F643E826C4724A067`, commit `7762309`), `BuildGuide-Fabric-0.4.8-spikes2-wip.jar` (SHA-256 `89F6B80A37150060E598EF0988446699E8B43F5E050267E83A9398909BE5D87B`, commit `3e63cbd`), `BuildGuide-Fabric-0.4.8-spikes-wip.jar` (SHA-256 `C3564E26FD888E46E106724E051C27C19D74EE962365FD9BB90775E77DE03A6E`, commit `a6d1c23`), `BuildGuide-Fabric-0.4.8-live-apply-wip.jar` (SHA-256 `8DB5202C0AFEC1F4645D0E4052852B188BE4CA9CF35C9FC969DF5CC092994198`, commit `416b5e0`), `BuildGuide-Fabric-0.4.8-island-ux-wip.jar` (SHA-256 `DD5B7BD8ADF1714F0BC152A303B6ED3F2FB2EA5E9C8F79034B52BD27DAE76557`, commit `07d554c`), `BuildGuide-Fabric-0.4.8-island-wip.jar` (SHA-256 `556D80E49975B12802361D5CB8971EE632415A7E841C0EC71D8AF06826C92DE9`, commit `f7937be`), `BuildGuide-Fabric-0.4.8-area3-wip2.jar` (SHA-256 `B5AC963F068EFF59954521F29F24D994BBFE61CF9F55C2C1DE9256E055392A32`, commit `584674b`), `BuildGuide-Fabric-0.4.8-area3-wip.jar` (first Area 3 test) and `BuildGuide-Fabric-0.4.8-ghost-fix-wip.jar` (SHA-256 `1E2F5E96A659D474EF14D9CDDBF5930E6B695DF66F31C782A7C1E5654E55BDB6`, commit `9c3fbde`), kept as `.bak` |
+| Active jar in the mods folder | `BuildGuide-Fabric-0.4.8-polygon-wip.jar` (deployed 2026-10-18) |
+| SHA-256 | `8C9FBB5A6E40BD592E84F948DC2134EC6DF4C33B453E9DA04AAFEB9A52041503` |
+| Source | `wip/polygon` at `59b16d2` (on top of `wip/perf3` and the branches below it): the build output and the mods copy have the same SHA-256; `ShapePolygonBuilding` and `SelectorListImpl` checked inside |
+| Tested | in game (2026-10-18): the polygon building passed; still heavier than Litematica, see performance step 4 |
+| Next jar | `perf4-wip` (`wip/perf4`): the relief and parts of the polygon building, Farming land and performance step 4 |
+| Previous jars | `BuildGuide-Fabric-0.4.8-perf2-wip.jar` (SHA-256 `F12384911780D9CC4EF0FEA0493CFFCF58E423BE12D82E820C12C7FEB0125B04`, commit `a4758b6`), `BuildGuide-Fabric-0.4.8-fill-wip.jar` (SHA-256 `4828F694FD843595F17B1A3522B171A5E6920012C7345D8C20660B202A54E58F`, commit `c502556`), `BuildGuide-Fabric-0.4.8-terrain-wip.jar` (SHA-256 `8F8720A6C522676F562DEBBCAC85DBA1CBD7F8C6ACF0C2CE75F97971D2E96638`, commit `2724d58`), `BuildGuide-Fabric-0.4.8-focus-wip.jar` (SHA-256 `6923FAB6A40E250901C68746389327DA9FF8573498C920B5D86621CB9132B09C`, commit `0ff9af7`), `BuildGuide-Fabric-0.4.8-palette-wip.jar` (SHA-256 `F0C0A242D361BB0E73BC4EF477EE274AA905C7ED8681154FF004227B438B26B0`, commit `e35fad3`), `BuildGuide-Fabric-0.4.8-leakfix-wip.jar` (SHA-256 `D0089DE876C5855AFF509974DFA2400037F1B5DCAD05E63B45A0E6C4095EDABF`, commit `481d42a`), `BuildGuide-Fabric-0.4.8-layers-wip.jar` (SHA-256 `14B66C4E9A572D5224C01F5217BBB087BB48BB8BE908909CF67408824AE2F7CC`, commit `c8a8579`), `BuildGuide-Fabric-0.4.8-scan-slices-wip.jar` (SHA-256 `A280A6440BB423878D6AAFA316709E852D63EF2EEBB3FF3F643E826C4724A067`, commit `7762309`), `BuildGuide-Fabric-0.4.8-spikes2-wip.jar` (SHA-256 `89F6B80A37150060E598EF0988446699E8B43F5E050267E83A9398909BE5D87B`, commit `3e63cbd`), `BuildGuide-Fabric-0.4.8-spikes-wip.jar` (SHA-256 `C3564E26FD888E46E106724E051C27C19D74EE962365FD9BB90775E77DE03A6E`, commit `a6d1c23`), `BuildGuide-Fabric-0.4.8-live-apply-wip.jar` (SHA-256 `8DB5202C0AFEC1F4645D0E4052852B188BE4CA9CF35C9FC969DF5CC092994198`, commit `416b5e0`), `BuildGuide-Fabric-0.4.8-island-ux-wip.jar` (SHA-256 `DD5B7BD8ADF1714F0BC152A303B6ED3F2FB2EA5E9C8F79034B52BD27DAE76557`, commit `07d554c`), `BuildGuide-Fabric-0.4.8-island-wip.jar` (SHA-256 `556D80E49975B12802361D5CB8971EE632415A7E841C0EC71D8AF06826C92DE9`, commit `f7937be`), `BuildGuide-Fabric-0.4.8-area3-wip2.jar` (SHA-256 `B5AC963F068EFF59954521F29F24D994BBFE61CF9F55C2C1DE9256E055392A32`, commit `584674b`), `BuildGuide-Fabric-0.4.8-area3-wip.jar` (first Area 3 test) and `BuildGuide-Fabric-0.4.8-ghost-fix-wip.jar` (SHA-256 `1E2F5E96A659D474EF14D9CDDBF5930E6B695DF66F31C782A7C1E5654E55BDB6`, commit `9c3fbde`), kept as `.bak` |
 
 - The file name still says `wip`: it was never renamed after the test. Renaming is a choice
   for Raphael (nothing depends on the name); a rebuild of `acf4904` gives the same classes.

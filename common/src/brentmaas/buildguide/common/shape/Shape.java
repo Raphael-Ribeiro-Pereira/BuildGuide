@@ -70,8 +70,9 @@ public abstract class Shape implements IValidatable, IFocusParts {
 	private volatile long generation = 0;
 	
 	// Validation (all shapes): every block emitted through addShapeCube is recorded here as a
-	// packed local position; the render handler scans it and the GUI reads the state
-	protected final Set<Long> expectedBlocks = new HashSet<Long>();
+	// packed local position; the render handler scans it and the GUI reads the state. Primitive (LongHashSet,
+	// performance step 4): no Long and no node per block, in the order the blocks were emitted
+	protected final LongHashSet expectedBlocks = new LongHashSet();
 	private transient ValidationState validationState = new ValidationState();
 	private transient boolean validateNextRender = false;
 	// World overlay of validation errors (coloured cubes), rebuilt by the render handler when the
@@ -260,7 +261,8 @@ public abstract class Shape implements IValidatable, IFocusParts {
 	private int fillWorldBuffer(IShapeBuffer buffer, FocusFilter f) throws InterruptedException {
 		int count = 0;
 		double s = shapeSet.getShapeCubeSize(), o = 0.5 - s / 2;
-		for(long pos: expectedBlocks) {
+		for(int k = 0, n = expectedBlocks.size();k < n;++k) {
+			long pos = expectedBlocks.get(k);
 			int x = LocalPos.unpackX(pos), y = LocalPos.unpackY(pos), z = LocalPos.unpackZ(pos);
 			if(!isInFocus(f, x, y, z)) continue;
 			colourCube(buffer, x, y, z);

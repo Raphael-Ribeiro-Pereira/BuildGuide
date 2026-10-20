@@ -25,6 +25,7 @@ import brentmaas.buildguide.common.RenderStats;
 import brentmaas.buildguide.common.TimingLog;
 import brentmaas.buildguide.common.shape.GuidelinePicker;
 import brentmaas.buildguide.common.shape.LayerPalette;
+import brentmaas.buildguide.common.shape.LongHashSet;
 import brentmaas.buildguide.common.shape.SectionedBuffer;
 import brentmaas.buildguide.common.shape.Shape;
 import brentmaas.buildguide.common.shape.ShapeLayers;
@@ -263,7 +264,10 @@ public class RenderHandler extends AbstractRenderHandler {
 			if(scan == null) return;
 		}
 		WorldProbe probe = new WorldProbe(world);
-		if(!scan.step(probe, BuildGuide.config.scanSpeed.value.budgetMillis * 1000000L, System::nanoTime)) {
+		if(!scan.isDone()) {
+			// Performance step 4: the result is published on the next frame, never in the frame that also spent the
+			// budget on the last layers (that frame was the budget plus the publish, up to 20 ms)
+			scan.step(probe, BuildGuide.config.scanSpeed.value.budgetMillis * 1000000L, System::nanoTime);
 			state.setScanPercent(scan.percent());
 			return;
 		}
@@ -328,12 +332,19 @@ public class RenderHandler extends AbstractRenderHandler {
 		// taken draws the shape as during a generation). Should a newer generation be there by then, the scan is
 		// stale (its epoch and generation are this frame's) and is dropped
 		Future<SliceScan> future = scanPreparation.submit(() -> {
-			List<Long> expected;
+			List<Long> expected = null;
+			long[] raw = null;
 			validatable.lock.lock();
 			try {
-				expected = Arrays.asList(validatable.getExpectedBlocks().toArray(new Long[0]));
+				// The shape's own set (LongHashSet): one array copy while the lock is held (performance step 4)
+				if(validatable.getExpectedBlocks() instanceof LongHashSet set) raw = set.toLongArray();
+				else expected = Arrays.asList(validatable.getExpectedBlocks().toArray(new Long[0]));
 			}finally {
 				validatable.lock.unlock();
+			}
+			if(raw != null) {
+				expected = new ArrayList<Long>(raw.length);
+				for(long pos: raw) expected.add(pos);
 			}
 			return SliceScan.prepare(state, expected, ox, oy, oz, generation, epoch, palette, boxes);
 		});
@@ -473,9 +484,28 @@ public class RenderHandler extends AbstractRenderHandler {
 		RenderSystem.getModelViewStack().popMatrix();
 	}
 
-	// Block ids the user chose to ignore (Configuration screen), resolved through the registry here so common stays Minecraft-free
+	// Block ids the user chose to ignore (Configuration screen), resolved through the registry here so common stays
+	// Minecraft-free. Performance step 4: resolved to the blocks once per change of the setting and compared by
+	// identity; the scan asks this for every solid block it reads, and building "namespace:path" each time made a
+	// String per block (hundreds of thousands per scan over terrain)
+	private record IgnoredBlocks(String source, Block[] blocks) {}
+	private static volatile IgnoredBlocks ignored = new IgnoredBlocks(null, new Block[0]);
+
 	public static boolean isIgnored(BlockState state) {
-		return BuildGuide.config.ignoredBlocks.contains(BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString());
+		IgnoredBlocks current = ignored;
+		String source = BuildGuide.config.ignoredBlocks.value;
+		if(current.source() != source) current = resolveIgnored(source);
+		Block block = state.getBlock();
+		for(Block b: current.blocks()) if(b == block) return true;
+		return false;
+	}
+
+	private static IgnoredBlocks resolveIgnored(String source) {
+		List<Block> found = new ArrayList<Block>();
+		for(Block block: BuiltInRegistries.BLOCK) if(BuildGuide.config.ignoredBlocks.contains(BuiltInRegistries.BLOCK.getKey(block).toString())) found.add(block);
+		IgnoredBlocks resolved = new IgnoredBlocks(source, found.toArray(new Block[0]));
+		ignored = resolved;
+		return resolved;
 	}
 	
 	// One-line chat summary read from the state; positions will be shown in the GUI (2.4), not logged

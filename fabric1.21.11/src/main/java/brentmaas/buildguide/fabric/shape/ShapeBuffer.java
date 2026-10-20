@@ -116,15 +116,20 @@ public class ShapeBuffer implements IShapeBuffer {
 	 * model-view and vanilla's shared index buffer, grown once for the largest, then one draw per buffer.
 	 */
 	public static void renderAll(List<ShapeBuffer> buffers) {
+		RenderTarget renderTarget = Minecraft.getInstance().getMainRenderTarget();
+		renderAll(buffers, renderTarget.getColorTextureView(), renderTarget.getDepthTextureView(), RenderSystem.getModelViewMatrix(), RenderHandler.getRenderPipeline());
+	}
+
+	// The same into any target with an explicit model-view and pipeline (the 3D preview's sections)
+	public static void renderAll(List<ShapeBuffer> buffers, GpuTextureView colourTexture, GpuTextureView depthTexture, Matrix4fc modelView, RenderPipeline pipeline) {
 		int maxIndexCount = 0;
 		for(ShapeBuffer buffer: buffers) if(buffer.vertexBuffer != null) maxIndexCount = Math.max(maxIndexCount, buffer.indexCount);
 		if(maxIndexCount == 0) return;
 		RenderSystem.AutoStorageIndexBuffer sequential = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
 		GpuBuffer indices = sequential.getBuffer(maxIndexCount);
-		RenderTarget renderTarget = Minecraft.getInstance().getMainRenderTarget();
-		GpuBufferSlice dynamicTransforms = RenderSystem.getDynamicUniforms().writeTransform(RenderSystem.getModelViewMatrix(), new Vector4f(1.0f), new Vector3f(), new Matrix4f());
-		try (RenderPass renderPass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "Build Guide", renderTarget.getColorTextureView(), OptionalInt.empty(), renderTarget.getDepthTextureView(), OptionalDouble.empty())) {
-			renderPass.setPipeline(RenderHandler.getRenderPipeline());
+		GpuBufferSlice dynamicTransforms = RenderSystem.getDynamicUniforms().writeTransform(modelView, new Vector4f(1.0f), new Vector3f(), new Matrix4f());
+		try (RenderPass renderPass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "Build Guide", colourTexture, OptionalInt.empty(), depthTexture, OptionalDouble.empty())) {
+			renderPass.setPipeline(pipeline);
 			RenderSystem.bindDefaultUniforms(renderPass);
 			renderPass.setUniform("DynamicTransforms", dynamicTransforms);
 			renderPass.setIndexBuffer(indices, sequential.type());

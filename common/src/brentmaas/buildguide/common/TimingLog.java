@@ -49,9 +49,19 @@ public final class TimingLog {
 	 * ms + build pass the threshold.
 	 */
 	public static synchronized void recordPreview(long renderMillis, long buildMillis, long waitMillis, int blocks, String reason) {
+		recordPreview(renderMillis, buildMillis, waitMillis, blocks, reason, 0, 0);
+	}
+
+	/**
+	 * Performance step 4: the mesh is sent to the GPU over several frames (in sections, WorldUpload's budget), so ms
+	 * is the sending summed over them, then " frames=<n> maxframe=<longest frame of sending, ms>". frames 0: one
+	 * buffer in one frame, the line above.
+	 */
+	public static synchronized void recordPreview(long renderMillis, long buildMillis, long waitMillis, int blocks, String reason, int frames, long maxFrameNanos) {
 		if(renderMillis + buildMillis <= thresholdMillis || written >= maxLines) return;
 		++written;
-		String line = "[Build Guide] timing: phase=" + PREVIEW_REBUILD + " ms=" + renderMillis + " build=" + buildMillis + " wait=" + waitMillis + " blocks=" + blocks + " reason=" + reason + " native=" + VertexMemory.liveMegabytes();
+		String line = "[Build Guide] timing: phase=" + PREVIEW_REBUILD + " ms=" + renderMillis + " build=" + buildMillis + " wait=" + waitMillis + " blocks=" + blocks + " reason=" + reason + " native=" + VertexMemory.liveMegabytes()
+				+ (frames <= 0 ? "" : " frames=" + frames + " maxframe=" + tenths(maxFrameNanos));
 		if(written == maxLines) line += " (limit of " + maxLines + " timing lines reached, no more this session)";
 		sink.accept(line);
 	}

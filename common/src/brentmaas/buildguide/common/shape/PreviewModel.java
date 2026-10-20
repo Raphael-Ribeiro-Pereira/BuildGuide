@@ -71,9 +71,15 @@ public final class PreviewModel {
 	}
 
 	public static PreviewModel of(Collection<Long> positions, long generation, ShapeLayers layers) {
-		long[] copy = new long[positions.size()];
-		int i = 0;
-		for(long pos: positions) copy[i++] = pos;
+		long[] copy;
+		if(positions instanceof LongHashSet) {
+			// The shape's own set: one array copy instead of a walk over boxed Longs (performance step 4)
+			copy = ((LongHashSet) positions).toLongArray();
+		}else {
+			copy = new long[positions.size()];
+			int i = 0;
+			for(long pos: positions) copy[i++] = pos;
+		}
 		return new PreviewModel(copy, bounds(copy), null, new long[0], -1, generation, PreviewFilter.ALL, SLICE_OFF, 0, layers, ColourMode.STATUS);
 	}
 

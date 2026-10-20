@@ -103,7 +103,7 @@ public class SliceScanTest {
 		System.out.println("-- totals kept until the end; cancellation");
 		Case c = randomCase(7); ValidationState s = fresh(c); legacy(s, c.shape, c.tracked, c.ox, c.oy, c.oz, c.world); String before = snapshot(s); long v = s.getVersion();
 		s.requestScan(0); s.consumeScanRequest(); SliceScan job = new SliceScan(s, c.shape, c.tracked, c.ox, c.oy, c.oz, 4);
-		job.step(c.world, 1, () -> nanos); job.step(c.world, 1, () -> nanos);
+		for(int k = 0; k < 100000 && job.percent() == 0; k++) job.step(c.world, 1, () -> nanos); job.step(c.world, 1, () -> nanos);
 		check(s.getVersion() == v && s.isValidated() && job.percent() > 0 && job.percent() < 100, "during the scan the state keeps the previous totals (version " + v + " unchanged), progress " + job.percent() + " %");
 		check(!job.isStale(s, 4), "not stale while nothing changed");
 		s.setStatus(c.tracked.get(0), ValidationState.MISSING, null); s.updateBlock(c.tracked.get(1), true, false, false, null);
@@ -115,9 +115,10 @@ public class SliceScanTest {
 
 		System.out.println("-- time budget (fake clock: 1 us per block read)");
 		Case big = randomCase(8); ValidationState sb = fresh(big); sb.consumeScanRequest(); SliceScan bj = new SliceScan(sb, big.shape, big.tracked, big.ox, big.oy, big.oz, 1);
-		int layers = 0; { int mn = Integer.MAX_VALUE, mx = Integer.MIN_VALUE; for(long p: big.tracked){ mn = Math.min(mn, LocalPos.unpackY(p)); mx = Math.max(mx, LocalPos.unpackY(p)); } layers = mx - mn + 1 + 4; }
+		// Performance step 4: the unit is a chunk of a layer's positions or one x row of its near sweep, not a layer
+		int layers = 0, units = 0; { int mn = Integer.MAX_VALUE, mx = Integer.MIN_VALUE, mnx = Integer.MAX_VALUE, mxx = Integer.MIN_VALUE; Map<Integer, Integer> perY = new HashMap<>(); for(long p: big.tracked){ int y = LocalPos.unpackY(p); mn = Math.min(mn, y); mx = Math.max(mx, y); mnx = Math.min(mnx, LocalPos.unpackX(p)); mxx = Math.max(mxx, LocalPos.unpackX(p)); perY.merge(y, 1, Integer::sum); } layers = mx - mn + 1 + 4; int rows = mxx - mnx + 1 + 4; for(int y = mn - 2; y <= mx + 2; y++) units += rows + (perY.getOrDefault(y, 0) + SliceScan.classifyChunk - 1) / SliceScan.classifyChunk; }
 		int steps = 0; while(!bj.step(big.world, 1, () -> nanos)) steps++; steps++;
-		check(steps == layers, "a 1 ns budget still makes progress: exactly 1 layer per frame (" + steps + " frames for " + layers + " layers)");
+		check(steps == units, "a 1 ns budget still makes progress: exactly 1 unit per frame, a chunk of positions or a row (" + steps + " frames for " + units + " units in " + layers + " layers)");
 		ValidationState sc = fresh(big); sc.consumeScanRequest(); SliceScan cj = new SliceScan(sc, big.shape, big.tracked, big.ox, big.oy, big.oz, 1);
 		// The most one layer can cost here: every cell of the expanded box plus the expected positions of the busiest layer, 1 us each
 		int bx0 = Integer.MAX_VALUE, bx1 = Integer.MIN_VALUE, bz0 = Integer.MAX_VALUE, bz1 = Integer.MIN_VALUE; Map<Integer, Integer> perY = new HashMap<>();
