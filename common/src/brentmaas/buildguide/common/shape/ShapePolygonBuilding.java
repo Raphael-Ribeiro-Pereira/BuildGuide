@@ -16,6 +16,10 @@ import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
  * standing out of the walls, and the roof's pattern repeated under the floor (its skylight optional). Each
  * position is decided once (Geometry.partAt), so no block is emitted twice; the same function gives the
  * build focus parts (Walls, Floor, Roof, Details, Pillars).
+ *
+ * Shown as "Geometric capsule" since 2026-10-22 (the class and its registry key keep the old name, so saved
+ * shapes and presets still load). Inner depth (2026-10-22): the roof's pattern copied to the inner ceiling,
+ * hanging that many layers down from under the roof.
  */
 public class ShapePolygonBuilding extends Shape {
 	private static final String[] focusPartNames = {"All", "Cap", "Body", "Spikes", "Hidden", "Walls", "Floor", "Roof", "Details", "Pillars"};
@@ -51,6 +55,8 @@ public class ShapePolygonBuilding extends Shape {
 	private PropertyBoolean propertyBands = new PropertyBoolean(true, new Translatable("property.buildguide.bands"), () -> update());
 	private PropertyBoolean propertyFloorPattern = new PropertyBoolean(false, new Translatable("property.buildguide.floorpattern"), () -> update());
 	private PropertyBoolean propertyFloorSkylight = new PropertyBoolean(false, new Translatable("property.buildguide.floorskylight"), () -> update());
+	// Persisted last (2026-10-22): the roof's pattern under the roof, inside, this many layers deep (0 = none)
+	private PropertyMinimumInt propertyInnerDepth = new PropertyMinimumInt(0, new Translatable("property.buildguide.innerdepth"), () -> update(), 0);
 	private PropertyEnum<FocusFilter.Part> propertyFocusPart = new PropertyEnum<FocusFilter.Part>(FocusFilter.Part.ALL, new Translatable("screen.buildguide.focus.part"), null, focusPartNames);
 	private PropertyInt propertyFocusLayer = new PropertyInt(FocusFilter.LAYER_ALL, new Translatable("screen.buildguide.focus.layer"), null);
 
@@ -64,12 +70,13 @@ public class ShapePolygonBuilding extends Shape {
 		Property<?>[] wallRows = {propertyHeight, propertyThickness, propertyFloor};
 		Property<?>[] windowRows = {propertyWindows, propertyWindowBottom, propertyWindowHeight, propertyWindowWidth, propertyWindowGap};
 		Property<?>[] roofRows = {propertyRoof, propertyRimWidth, propertyRimHeight, propertyRing, propertySpokes, propertySkylight};
-		Property<?>[] reliefRows = {propertyRelief, propertyColumns, propertyBands, propertyFloorPattern, propertyFloorSkylight};
+		Property<?>[] reliefRows = {propertyRelief, propertyInnerDepth, propertyColumns, propertyBands, propertyFloorPattern, propertyFloorSkylight};
 		Property<?>[] pillarRows = {propertyPillarHeight, propertyPillarWidth};
 		// The order saved: the first values as they were, the newer ones after them
 		Property<?>[] saved = {propertySides, propertyRadius, propertyAngle, propertyEvenMode, propertyHeight, propertyThickness, propertyFloor, propertyWindowBottom, propertyWindowHeight, propertyWindowWidth, propertyWindowGap,
 				propertyRoof, propertyRimWidth, propertyRimHeight, propertyRing, propertySpokes, propertySkylight, propertyPillarHeight, propertyPillarWidth,
-				propertyWindows, propertyRelief, propertyColumns, propertyBands, propertyFloorPattern, propertyFloorSkylight, propertyFocusPart, propertyFocusLayer};
+				propertyWindows, propertyRelief, propertyColumns, propertyBands, propertyFloorPattern, propertyFloorSkylight, propertyFocusPart, propertyFocusLayer,
+				propertyInnerDepth};
 		for(Property<?> p: saved) properties.add(p);
 		hideFromGui(propertyFocusPart);
 		hideFromGui(propertyFocusLayer);
@@ -87,7 +94,7 @@ public class ShapePolygonBuilding extends Shape {
 		Property<?>[] order = {propertySides, propertyRadius, propertyAngle, propertyEvenMode,
 				propertyHeight, propertyThickness, propertyFloor, propertyWindows, propertyWindowBottom, propertyWindowHeight, propertyWindowWidth, propertyWindowGap,
 				propertyRoof, propertyRimWidth, propertyRimHeight, propertyRing, propertySpokes, propertySkylight,
-				propertyRelief, propertyColumns, propertyBands, propertyFloorPattern, propertyFloorSkylight,
+				propertyRelief, propertyInnerDepth, propertyColumns, propertyBands, propertyFloorPattern, propertyFloorSkylight,
 				propertyPillarHeight, propertyPillarWidth};
 		int row = 0;
 		for(Property<?> p: order) {
@@ -122,6 +129,7 @@ public class ShapePolygonBuilding extends Shape {
 		g.bands = propertyBands.value;
 		g.floorPattern = propertyFloorPattern.value;
 		g.floorSkylight = propertyFloorSkylight.value;
+		g.innerDepth = propertyInnerDepth.value;
 		g.pillarHeight = propertyPillarHeight.value;
 		g.pillarWidth = propertyPillarWidth.value;
 		g.prepare();
@@ -198,6 +206,7 @@ public class ShapePolygonBuilding extends Shape {
 		double skylight;
 		int relief;
 		boolean columns, bands, floorPattern, floorSkylight;
+		int innerDepth;
 		int pillarHeight, pillarWidth;
 
 		int maxR, minY, maxY;
@@ -266,7 +275,13 @@ public class ShapePolygonBuilding extends Shape {
 				if(floor && !(floorSkylight && hole(d))) return FocusFilter.Part.FLOOR;
 				return wall ? FocusFilter.Part.WALLS : null;
 			}
-			if(y < height) return wall && !isWindow(px, pz, i, y) ? FocusFilter.Part.WALLS : null;
+			if(y < height) {
+				if(wall) return isWindow(px, pz, i, y) ? null : FocusFilter.Part.WALLS;
+				// Inner depth: the roof's pattern under the roof, inside the walls, from the layer below it down
+				// (never into the floor); open where the skylight is, as on top
+				if(roof && innerDepth > 0 && y >= Math.max(1, height - innerDepth) && pattern(px, pz, d, dr, true)) return FocusFilter.Part.DETAILS;
+				return null;
+			}
 			if(y == height) return roof && !hole(d) ? FocusFilter.Part.ROOF : null;
 			// Above the roof: the rim on the outline, then (first layer only) the ring and the spokes
 			int above = y - height;

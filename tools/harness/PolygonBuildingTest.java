@@ -108,9 +108,27 @@ public class PolygonBuildingTest {
 		ShapePolygonBuilding re = new ShapePolygonBuilding(); re.restorePersistence(rel.toPersistence());
 		check(re.getFocusPart() == FocusFilter.Part.ROOF, "the focus saved: " + re.getFocusPart());
 
+		System.out.println("-- inner depth: the roof's pattern under the roof");
+		ShapePolygonBuilding plain = make("propertyRelief", 0), in1 = make("propertyRelief", 0, "propertyInnerDepth", 1), in2 = make("propertyRelief", 0, "propertyInnerDepth", 2), in9 = make("propertyRelief", 0, "propertyInnerDepth", 9);
+		Set<Long> pc = plain.getExpectedBlocks();
+		Set<Long> added4 = new HashSet<>(layer(in1.getExpectedBlocks(), 4)); added4.removeAll(layer(pc, 4));
+		Set<Long> roofPattern = new HashSet<>(); for(long p: layer(pc, 6)){ long below = LocalPos.pack(LocalPos.unpackX(p), 4, LocalPos.unpackZ(p)); if(!pc.contains(below)) roofPattern.add(below); }
+		if(show) print(in1.getExpectedBlocks(), 4, 12);
+		check(!added4.isEmpty() && added4.equals(roofPattern), "depth 1: the layer under the roof gets the roof's pattern inside the walls (" + added4.size() + " blocks)");
+		check(!in1.getExpectedBlocks().contains(LocalPos.pack(0, 4, 0)) && layer(in1.getExpectedBlocks(), 3).equals(layer(pc, 3)), "the skylight stays open under it too, nothing deeper than 1 layer");
+		Set<Long> added3 = new HashSet<>(layer(in2.getExpectedBlocks(), 3)); added3.removeAll(layer(pc, 3)); Set<Long> moved = new HashSet<>(); for(long p: added4) moved.add(LocalPos.pack(LocalPos.unpackX(p), 3, LocalPos.unpackZ(p)));
+		check(added3.equals(moved), "depth 2: the window band layer too, the windows still open");
+		check(layer(in9.getExpectedBlocks(), 0).equals(layer(pc, 0)) && in9.getNumberOfBlocks() == in9.getExpectedBlocks().size(), "a depth beyond the walls stops above the floor, every block once");
+		boolean details = true; for(long p: added4) if(in1.partOf(LocalPos.unpackX(p), 4, LocalPos.unpackZ(p)) != FocusFilter.Part.DETAILS) details = false;
+		check(details, "its part is Details");
+		ShapePolygonBuilding noRoof = make("propertyRelief", 0, "propertyInnerDepth", 2, "propertyRoof", false);
+		check(noRoof.getExpectedBlocks().equals(make("propertyRelief", 0, "propertyRoof", false).getExpectedBlocks()), "no roof: no inner pattern either");
+
 		System.out.println("-- persistence");
 		String data = fresh.toPersistence();
-		check(data.split(",").length == 27, "27 values: " + data);
+		check(data.split(",").length == 28 && data.endsWith(",ALL,0,0"), "28 values, Inner depth last: " + data);
+		ShapePolygonBuilding v2 = new ShapePolygonBuilding(); v2.restorePersistence("6,10.0,0,false,5,1,true,2,2,2,2,true,1,1,5.0,true,2.0,0,2,true,1,true,true,false,false,ROOF,0");
+		check(!v2.error && v2.toPersistence().endsWith(",ROOF,0,0"), "a save of the second version (27 values) loads with Inner depth 0: " + v2.toPersistence());
 		ShapePolygonBuilding old = new ShapePolygonBuilding(); old.restorePersistence("6,10.0,0,false,5,1,true,2,2,2,2,true,1,1,5.0,true,2.0,0,2");
 		check(!old.error && old.toPersistence().startsWith("6,10.0,0,false,5,1,true,2,2,2,2,true,1,1,5.0,true,2.0,0,2,true,1,true,true,false,false"), "a save of the first version (19 values) loads: " + old.toPersistence());
 		ShapePolygonBuilding back = new ShapePolygonBuilding(); back.restorePersistence(data.replace("6,10.0", "8,12.0"));

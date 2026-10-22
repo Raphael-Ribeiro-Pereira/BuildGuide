@@ -283,7 +283,7 @@
 	"shape.buildguide.paraboloid": "Paraboloid",
 	"shape.buildguide.polygon": "Polygon",
 	"shape.buildguide.polygonalpyramid": "Polygonal pyramid",
-	"shape.buildguide.polygonbuilding": "Polygon building",
+	"shape.buildguide.polygonbuilding": "Geometric capsule",
 	"shape.buildguide.farmingland": "Farming land",
 	"property.buildguide.section.outline": "Outline",
 	"property.buildguide.section.farm": "Farm",
@@ -314,6 +314,7 @@
 	"property.buildguide.bands": "Edge bands",
 	"property.buildguide.floorpattern": "Floor pattern",
 	"property.buildguide.floorskylight": "Floor skylight",
+	"property.buildguide.innerdepth": "Inner depth",
 	"shape.buildguide.sphere": "Sphere",
 	"shape.buildguide.spline": "Spline",
 	"shape.buildguide.torus": "Torus"
