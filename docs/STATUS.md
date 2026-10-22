@@ -537,6 +537,33 @@ E6 (after two fixes), E7, P4 and E8 passed their in-game checklists before being
 `ghost-fix-wip` test; the result of that test was not reported to the session that wrote this
 file, so it is not claimed here (see the backlog).
 
+### Geometric capsule, Check errors and Find blocks (on `wip/visual`, on top of `wip/perf4`, waiting for the in-game test; not merged)
+
+Raphael (2026-10-22): rename the polygon building to Geometric capsule and give its depth options an inner
+depth that copies the outer roof's pattern to the inner ceiling; the structure errors get in the way, so a
+checkbox to turn them on; the coordinates of the missing / wrong / ignored blocks are not wanted all the time,
+so the preview goes down to the bottom with only the missing count under it, and the list becomes a topic of
+Visualisation.
+
+| What | Change |
+|---|---|
+| Geometric capsule | the new display name (class and saved key unchanged); Relief has Inner depth: the roof's pattern under the roof, inside the walls, that many layers down (part Details, persisted last) |
+| Check errors | a checkbox in Visualisation > Display, under Highlight errors, **off by default**: no structure errors (solid blocks around the shape); the scan then reads only the shape's own positions (no box around it), block events around the shape do nothing. Turning it on rescans validated shapes. Saved with the world (last key) when persistence is on |
+| Shape tab | the preview reaches the bottom row (40..236 at 270, it ended at 175); under it one line: the progress and "Missing N   built ok / total (p%)" (errors and wrong layer only when there are any) |
+| Find blocks | Visualisation has two topics (buttons on the right): Display (as before) and Find blocks: the tabs Errors / Missing / Ignored / Wrong layer with counts and the list by coordinate; clicking a row marks it in the world. The Errors tab says when errors are not checked |
+
+In-game checklist for `visual-wip`:
+1. The shape list shows Geometric capsule; an old polygon building (preset or world) still loads.
+2. Capsule > Relief > Inner depth 1 and 2: the roof's pattern appears under the roof inside; the skylight
+   stays open; windows stay open.
+3. Visualisation > Display: Check errors off (new default): no red cubes, the error count is gone, a
+   scan of a big shape is faster; on: the errors come back after the rescan.
+4. Shape tab: the preview fills the right side down to the line "Missing N ..."; no tabs or list there.
+5. Visualisation > Find blocks: the tabs with counts, the list of coordinates, a click marks the block
+   (white), Display goes back.
+
+Offline harness after this stage: 1408 asserts, 0 failures; Bridge 466 / 159 / 360.
+
 ## 2. Final jars
 
 Build output: `fabric1.21.11/build/libs/BuildGuide-Fabric-0.4.8.jar` (mod version is still 0.4.8).

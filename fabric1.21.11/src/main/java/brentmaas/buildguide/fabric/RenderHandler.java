@@ -240,6 +240,8 @@ public class RenderHandler extends AbstractRenderHandler {
 	protected void validateShape(ShapeSet shapeSet) {
 		Shape validatable = shapeSet.getShape(); // every Shape is IValidatable
 		ValidationState state = validatable.getValidationState();
+		// Check errors (Visualisation): a change makes a scan asked for or running stale
+		state.setCheckErrors(BuildGuide.stateManager.getState().isCheckErrors());
 		boolean manual = validatable.consumeValidateRequest();
 		SliceScan scan = state.getActiveScan();
 		if(scan != null && (manual || scan.isStale(state, validatable.getGeneration()))) {
@@ -327,6 +329,7 @@ public class RenderHandler extends AbstractRenderHandler {
 		long epoch = state.getScanEpoch(), generation = validatable.getGeneration();
 		LayerPalette palette = state.getPalette();
 		List<int[]> boxes = state.getExclusionBoxes();
+		boolean nearErrors = state.isCheckErrors();
 		int ox = shapeSet.getOriginX(), oy = shapeSet.getOriginY(), oz = shapeSet.getOriginZ();
 		// The copy of the expected set too runs on the worker, under the shape's lock (a frame that finds the lock
 		// taken draws the shape as during a generation). Should a newer generation be there by then, the scan is
@@ -346,7 +349,7 @@ public class RenderHandler extends AbstractRenderHandler {
 				expected = new ArrayList<Long>(raw.length);
 				for(long pos: raw) expected.add(pos);
 			}
-			return SliceScan.prepare(state, expected, ox, oy, oz, generation, epoch, palette, boxes);
+			return SliceScan.prepare(state, expected, ox, oy, oz, generation, epoch, palette, boxes, nearErrors);
 		});
 		preparing.put(state, new PendingScan(future, epoch, generation, manual, System.nanoTime() - started));
 	}

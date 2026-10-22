@@ -229,7 +229,8 @@ public class ValidationListComponent {
 			positions.add(-1L);
 		}
 		if(titles.isEmpty()) {
-			titles.add(new Translatable("screen.buildguide.errors.none"));
+			// Check errors off: no structure error is looked for, so say so instead of "None"
+			titles.add(new Translatable(category == Category.ERRORS && !state.isCheckErrors() ? "screen.buildguide.errors.off" : "screen.buildguide.errors.none"));
 			positions.add(-1L);
 		}
 		return new Entries(titles, positions, state.getVersion());

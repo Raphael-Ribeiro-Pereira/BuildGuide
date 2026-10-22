@@ -172,6 +172,28 @@ public abstract class Shape {
   last unit; the scan preparation copies the expected set with `toLongArray()` under the lock and
   boxes it after.
 
+### Geometric capsule, Check errors and Find blocks (`wip/visual`)
+
+- `ShapePolygonBuilding` is shown as "Geometric capsule" (`shape.buildguide.polygonbuilding`); class and registry
+  key unchanged. `propertyInnerDepth` (Relief, persisted last, 28 values): the roof's pattern under the roof,
+  inside the walls, from `height - 1` down that many layers, never below y 1; part Details.
+- `ValidationState.isCheckErrors()` / `setCheckErrors(on)` (true by default in a state): off drops the
+  structure errors (version++), `updateBlock` ignores blocks around the shape, and a scan asked for or running
+  is made stale (`requestScan`); on, a validated state asks for a scan.
+- `SliceScan(..., exclusionBoxes, nearErrors)` and `SliceScan.prepare(..., exclusionBoxes, nearErrors)`: without
+  structure errors the scan classifies the shape's positions only (layers `minY..maxY`, no near sweep, no
+  bitmap); the old signatures mean `nearErrors = true`; the 7-argument constructor reads the state's switch.
+- `State.isCheckErrors()` / `setCheckErrors(on)` (default **false**, key `checkErrors=` written last): hands the
+  switch to every shape that exists; the Fabric `RenderHandler` copies it to each state before its scan.
+  `State.findBlocksOpen` (transient): Visualisation shows Find blocks.
+- `ShapeLayout`: `previewBottom` (236 at 270, all extra height), `progressTop`, `statusTextY`, `bottomRowY`,
+  `legendY`, `accordionBottom`; the list bands (`tabsTop`, `tabsBottom`, `listBottom`) are gone with the list.
+- `ShapeScreen`: no list; a status line under the preview ("Missing N   built ok / total (p%)", errors and wrong
+  layer when any). `VisualisationScreen`: topic buttons at `topicX` (Display, Find blocks); Find blocks has the
+  tabs (`findTabsTop..findTabsBottom`) and a `ValidationListComponent` from `findListTop` to the bottom bar.
+  `ValidationListComponent.buildEntries`: the Errors tab of a state with Check errors off reads
+  `screen.buildguide.errors.off` instead of "None".
+
 ### ValidationState (Etapa 2.1)
 
 `common/shape/ValidationState` — live, **mutable, per-position, `synchronized`** state

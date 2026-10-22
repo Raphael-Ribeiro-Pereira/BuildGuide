@@ -65,6 +65,11 @@ public class SliceScan {
 	// The state's next status map: the shape's order, UNKNOWN until classified
 	private final HashMap<Long, Byte> statusMap;
 	private final int[][] boxes;
+	// Structure errors looked for (ValidationState.isCheckErrors, 2026-10-22). Off: the layers classify the shape's
+	// own positions only, no near sweep and no layer above or below the shape, so the world reads are the shape
+	// itself; firstY..lastY are the layers scanned
+	private final boolean nearErrors;
+	private final int firstY, lastY;
 	private final int minX, minY, minZ, maxX, maxY, maxZ;
 	// Bounds of the positions the state tracks, for publishScan (beginScan's bounding box)
 	private final int[] trackedBounds;
@@ -94,16 +99,22 @@ public class SliceScan {
 	 * @param tracked the expected positions that are not excluded (local), in the loader's order
 	 */
 	public SliceScan(ValidationState state, Collection<Long> shapeExpected, List<Long> tracked, int ox, int oy, int oz, long generation) {
-		this(state, shapeExpected, tracked, ox, oy, oz, generation, state.getScanEpoch(), state.getPalette(), state.getExclusionBoxes());
+		this(state, shapeExpected, tracked, ox, oy, oz, generation, state.getScanEpoch(), state.getPalette(), state.getExclusionBoxes(), state.isCheckErrors());
+	}
+
+	// The loader's inputs with structure errors looked for (as every scan did before 2026-10-22)
+	public SliceScan(ValidationState state, Collection<Long> shapeExpected, List<Long> tracked, int ox, int oy, int oz, long generation, long epoch, LayerPalette palette, List<int[]> exclusionBoxes) {
+		this(state, shapeExpected, tracked, ox, oy, oz, generation, epoch, palette, exclusionBoxes, true);
 	}
 
 	/**
 	 * The same with what the loader read from the state on the render thread when it asked for the scan (its scan
 	 * epoch, palette and exclusion boxes): the constructor may then run on another thread, reading nothing else of
-	 * the state.
+	 * the state. nearErrors: whether structure errors are looked for (read with the rest on the render thread).
 	 */
-	public SliceScan(ValidationState state, Collection<Long> shapeExpected, List<Long> tracked, int ox, int oy, int oz, long generation, long epoch, LayerPalette palette, List<int[]> exclusionBoxes) {
+	public SliceScan(ValidationState state, Collection<Long> shapeExpected, List<Long> tracked, int ox, int oy, int oz, long generation, long epoch, LayerPalette palette, List<int[]> exclusionBoxes, boolean nearErrors) {
 		this.state = state;
+		this.nearErrors = nearErrors;
 		this.epoch = epoch;
 		this.palette = palette;
 		this.generation = generation;
@@ -135,7 +146,10 @@ public class SliceScan {
 		maxX = b[3];
 		maxY = b[4];
 		maxZ = b[5];
-		nextY = minY - ValidationState.nearRadius;
+		int reach = nearErrors ? ValidationState.nearRadius : 0;
+		firstY = minY - reach;
+		lastY = maxY + reach;
+		nextY = firstY;
 		int r = ValidationState.nearRadius;
 		bx0 = minX - r;
 		by0 = minY - r;
@@ -144,7 +158,7 @@ public class SliceScan {
 		bh = n == 0 ? 0 : maxY - minY + 1 + 2 * r;
 		bd = n == 0 ? 0 : maxZ - minZ + 1 + 2 * r;
 		long bits = (long) bw * bh * bd;
-		if(n > 0 && bits <= maxBitmapBits) {
+		if(n > 0 && nearErrors && bits <= maxBitmapBits) {
 			bitmap = new long[(int) ((bits + 63) >>> 6)];
 			for(int i = 0;i < n;++i) {
 				long pos = order.get(i);
@@ -198,6 +212,11 @@ public class SliceScan {
 	 * state besides what is passed, so it runs on a worker thread.
 	 */
 	public static SliceScan prepare(ValidationState state, List<Long> shapeExpected, int ox, int oy, int oz, long generation, long epoch, LayerPalette palette, List<int[]> exclusionBoxes) {
+		return prepare(state, shapeExpected, ox, oy, oz, generation, epoch, palette, exclusionBoxes, true);
+	}
+
+	// The same choosing whether structure errors are looked for
+	public static SliceScan prepare(ValidationState state, List<Long> shapeExpected, int ox, int oy, int oz, long generation, long epoch, LayerPalette palette, List<int[]> exclusionBoxes, boolean nearErrors) {
 		long started = System.nanoTime();
 		int[][] boxes = exclusionBoxes.toArray(new int[0][]);
 		List<Long> tracked = new ArrayList<Long>(shapeExpected.size());
@@ -205,7 +224,7 @@ public class SliceScan {
 			if(!excluded(boxes, LocalPos.unpackX(pos), LocalPos.unpackY(pos), LocalPos.unpackZ(pos))) tracked.add(pos);
 		}
 		if(tracked.isEmpty()) return null;
-		SliceScan scan = new SliceScan(state, shapeExpected, tracked, ox, oy, oz, generation, epoch, palette, exclusionBoxes);
+		SliceScan scan = new SliceScan(state, shapeExpected, tracked, ox, oy, oz, generation, epoch, palette, exclusionBoxes, nearErrors);
 		scan.prepNanos = System.nanoTime() - started;
 		return scan;
 	}
@@ -235,13 +254,13 @@ public class SliceScan {
 	}
 
 	public boolean isDone() {
-		return nextY > maxY + ValidationState.nearRadius;
+		return nextY > lastY;
 	}
 
 	// Layers done, 0..100
 	public int percent() {
-		int total = maxY - minY + 1 + 2 * ValidationState.nearRadius;
-		int done = nextY - (minY - ValidationState.nearRadius);
+		int total = lastY - firstY + 1;
+		int done = nextY - firstY;
 		return (int) Math.min(100, Math.max(0, 100L * done / Math.max(1, total)));
 	}
 
@@ -275,18 +294,27 @@ public class SliceScan {
 				int end = Math.min(layer.length, nextClassify + classifyChunk);
 				for(int k = nextClassify;k < end;++k) classify(probe, layer[k]);
 				nextClassify = end;
-				if(nextClassify == layer.length) nextRow = minX - r;
+				if(nextClassify == layer.length) {
+					if(nearErrors) nextRow = minX - r;
+					else nextLayer();
+				}
+				return;
+			}
+			if(!nearErrors) {
+				nextLayer(); // nothing to classify and no near sweep
 				return;
 			}
 			nextRow = minX - r; // nothing to classify: the first row is this unit
 		}
 		int x = nextRow;
 		for(int z = minZ - r;z <= maxZ + r;++z) nearCell(probe, x, nextY, z, false);
-		if(++nextRow > maxX + r) {
-			++nextY;
-			nextRow = Integer.MIN_VALUE;
-			nextClassify = 0;
-		}
+		if(++nextRow > maxX + r) nextLayer();
+	}
+
+	private void nextLayer() {
+		++nextY;
+		nextRow = Integer.MIN_VALUE;
+		nextClassify = 0;
 	}
 
 	// An expected position (its number), by LayerPalette.classify (the rule every path shares; without a palette:
@@ -352,7 +380,7 @@ public class SliceScan {
 			if(y >= nextY) continue; // not scanned yet: impossible once done, kept for safety
 			int i = index.indexOf(pos);
 			if(i >= 0) classify(probe, i);
-			else nearCell(probe, x, y, z, true);
+			else if(nearErrors) nearCell(probe, x, y, z, true);
 		}
 		dirty.clear();
 		// The order an instantaneous scan finds them in: x, then y, then z (a primitive sort of shifted keys)

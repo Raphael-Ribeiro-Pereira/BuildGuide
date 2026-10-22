@@ -71,6 +71,10 @@ public class ValidationState {
 	// inside them are never tracked: not ok, not missing, not near, and out of the total
 	private List<int[]> exclusionBoxes = new ArrayList<int[]>();
 	private boolean validated = false;
+	// Structure errors looked for (2026-10-22, "Check errors" in Visualisation, which the render handler copies
+	// here every frame): off, there are none, the scan reads only the shape's positions and block events around
+	// the shape change nothing. True by default, as before the switch
+	private boolean checkErrors = true;
 	// A full scan was requested by the shape itself (after regeneration); the render handler
 	// runs it once the shape has been idle for a moment and its chunks are loaded
 	private boolean scanRequested = false;
@@ -459,6 +463,7 @@ public class ValidationState {
 			return;
 		}
 		if(isExcluded(LocalPos.unpackX(local), LocalPos.unpackY(local), LocalPos.unpackZ(local))) return;
+		if(!checkErrors) return; // structure errors off: a block around the shape is nothing
 		if(air || !solid || ignoredType) {
 			if(nearBlocks.remove(local) != null) ++version;
 			return;
@@ -485,6 +490,24 @@ public class ValidationState {
 			nearBlocks.put(local, new NearBlock(local, blockName, (float) best));
 			++version;
 		}else if(nearBlocks.remove(local) != null) ++version;
+	}
+
+	public synchronized boolean isCheckErrors() {
+		return checkErrors;
+	}
+
+	/**
+	 * Turns the structure errors on or off. Off: the ones found are dropped at once. Either way a scan asked for
+	 * or running is made stale (it was looking for them or not), and turned on, a validated state asks for a scan
+	 * to find them; the totals of the shape's own positions do not change.
+	 */
+	public synchronized void setCheckErrors(boolean on) {
+		if(checkErrors == on) return;
+		checkErrors = on;
+		if(!on && !nearBlocks.isEmpty()) nearBlocks = new LinkedHashMap<Long, NearBlock>();
+		++version;
+		// A scan asked for (being prepared) or running was built with the old setting: a new request makes it stale
+		if(activeScan != null || scanRequested || (on && validated)) requestScan(System.currentTimeMillis());
 	}
 
 	public synchronized boolean isValidated() {

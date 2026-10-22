@@ -2,32 +2,31 @@ package brentmaas.buildguide.common.screen;
 
 /**
  * Vertical bands of the Shape tab for a GUI height (GUI redesign E7, R13). Pure: no widgets, no
- * loader, so the harness checks it. At the minimum height (270) every band is exactly the E6 one;
- * above it the bottom row, the legend and the accordion's lower limit follow the bottom edge, the
- * preview gets 60% of the extra height and the error list the other 40%.
- * The accordion's top and its rows do not move (ShapeScreen.accordionTop, basePropertiesY): it
- * grows down from y 42, only its lower limit, i.e. its capacity, depends on the height.
+ * loader, so the harness checks it. The bottom row, the legend and the accordion's lower limit follow
+ * the bottom edge. The accordion's top and its rows do not move (ShapeScreen.accordionTop,
+ * basePropertiesY): it grows down from y 42, only its lower limit, i.e. its capacity, depends on the height.
+ *
+ * 2026-10-22: the list of positions moved to Visualisation ("Find blocks"). The preview reaches down to one
+ * status line (a 2-px progress line, then the missing count) right above the bottom row, and gets all the
+ * extra height of a taller window. Below the minimum height the bands stay those of the minimum.
  */
 public final class ShapeLayout {
 	public static final int minWidth = 480, minHeight = 270;
-	// E6 values at the minimum height
-	private static final int previewBottomMin = 175, progressHeight = 2, tabsHeight = 16, bottomRowHeight = 20;
+	private static final int statusHeight = 14, progressHeight = 2, bottomRowHeight = 20;
 
 	public final int height;
-	public final int previewBottom, progressTop, tabsTop, tabsBottom, listBottom;
+	// Preview 40..previewBottom; the status line previewBottom..bottomRowY: progress from progressTop, text at statusTextY
+	public final int previewBottom, progressTop, statusTextY;
 	public final int bottomRowY, legendY, accordionBottom;
 
 	public ShapeLayout(int height) {
 		this.height = height;
-		int extra = Math.max(0, height - minHeight);
 		bottomRowY = height - bottomRowHeight;
 		legendY = bottomRowY + 6;
 		accordionBottom = bottomRowY - 2;
-		previewBottom = previewBottomMin + (6 * extra + 5) / 10;
+		previewBottom = Math.max(height, minHeight) - bottomRowHeight - statusHeight;
 		progressTop = previewBottom;
-		tabsTop = progressTop + progressHeight;
-		tabsBottom = tabsTop + tabsHeight;
-		listBottom = bottomRowY;
+		statusTextY = progressTop + progressHeight + 3;
 	}
 
 	// Height available to the accordion's headers and rows (206 at the minimum height)

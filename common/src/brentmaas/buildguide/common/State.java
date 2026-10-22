@@ -30,6 +30,7 @@ public class State {
 	private static final String PERSISTENCE_SHAPESET = "shapeSet";
 	private static final String PERSISTENCE_ISHAPESET = "iShapeSet";
 	private static final String PERSISTENCE_ISHAPENEW = "iShapeNew";
+	private static final String PERSISTENCE_CHECKERRORS = "checkErrors";
 	
 	private boolean initialised = false;
 	public ArrayList<ShapeSet> shapeSets = new ArrayList<ShapeSet>();
@@ -39,6 +40,9 @@ public class State {
 	private boolean depthTest = true;
 	// Draw the validation overlay (red/yellow/orange cubes on problems); toggled in the Visualisation screen
 	private boolean highlightErrors = true;
+	// Look for structure errors (solid blocks around a shape) at all; Visualisation, "Check errors" (2026-10-22).
+	// Off by default: they were in the way, and without them a scan reads only the shape's own positions
+	private boolean checkErrors = false;
 	public ActiveScreen currentScreen = ActiveScreen.Shape;
 	// 3D preview model, shared camera and input, for every view of the preview in this world and
 	// dimension. Not persisted (not among the keys written by savePersistence)
@@ -46,9 +50,11 @@ public class State {
 	// Origin section of the Shape tab's accordion is open (GUI redesign E5). Transient, here because
 	// ShapeScreen is rebuilt on every tab switch; the shapes keep their own open section
 	public boolean originOpen = false;
-	// Tab of the Shape screen's error list the user picked (transient); null = automatic: Errors when
-	// there are structure errors, Missing otherwise
+	// Tab of the position list the user picked (transient); null = automatic: Errors when there are structure
+	// errors, Missing otherwise. The list is Visualisation's "Find blocks" topic since 2026-10-22
 	public ValidationListComponent.Category listTab = null;
+	// Visualisation shows its "Find blocks" topic (the positions by coordinate) instead of "Display" (transient)
+	public boolean findBlocksOpen = false;
 	// Area 3: a right click fills the guideline cell aimed at (toggled by a key, default G). In memory only:
 	// not written by savePersistence
 	public boolean placeMode = false;
@@ -241,6 +247,19 @@ public class State {
 		BaseScreen.shouldUpdatePersistence = true;
 	}
 	
+	public boolean isCheckErrors() {
+		return checkErrors;
+	}
+
+	// Every shape that exists gets it at once; the render handler also copies it before each scan
+	public void setCheckErrors(boolean checkErrors) {
+		this.checkErrors = checkErrors;
+		BaseScreen.shouldUpdatePersistence = true;
+		for(ShapeSet set: shapeSets) {
+			for(Shape shape: set.shapes) if(shape != null) shape.getValidationState().setCheckErrors(checkErrors);
+		}
+	}
+
 	public void setDepthTest(boolean depthTest) {
 		this.depthTest = depthTest;
 		BaseScreen.shouldUpdatePersistence = true;
@@ -273,6 +292,8 @@ public class State {
 					iShapeSet = Integer.parseInt(value);
 				}else if(key.equals(PERSISTENCE_ISHAPENEW)) {
 					iShapeNew = Integer.parseInt(value);
+				}else if(key.equals(PERSISTENCE_CHECKERRORS)) {
+					checkErrors = Boolean.parseBoolean(value);
 				}
 			}
 		}
@@ -291,6 +312,7 @@ public class State {
 		}
 		persistenceData += PERSISTENCE_ISHAPESET + "=" + iShapeSet + "\n";
 		persistenceData += PERSISTENCE_ISHAPENEW + "=" + iShapeNew + "\n";
+		persistenceData += PERSISTENCE_CHECKERRORS + "=" + checkErrors + "\n";
 		
 		persistenceFile.createNewFile();
 		FileOutputStream fileStream = new FileOutputStream(persistenceFile);

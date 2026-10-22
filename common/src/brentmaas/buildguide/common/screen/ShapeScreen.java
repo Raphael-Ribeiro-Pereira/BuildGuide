@@ -91,11 +91,11 @@ public class ShapeScreen extends BaseScreen{
 	private static final int fillWidth = 72;
 	private IButton buttonFill;
 	private String fillTitle = null;
-	// Under the preview: a 2-px validation progress line, three tabs and the error list of the selected
-	// tab (at the minimum height 175..177, 177..193, 193..250). Replaces the bottom bar's progress on this
-	// screen. Vertical bands from the GUI height (E7): computed in init, 270 until then
+	// Under the preview: a 2-px validation progress line and one line of text, the missing blocks first (at the
+	// minimum height 236..250). The list of positions by coordinate is Visualisation's "Find blocks" topic since
+	// 2026-10-22, so the preview reaches down to here. Vertical bands from the GUI height (E7): computed in init,
+	// 270 until then
 	private ShapeLayout bands = new ShapeLayout(ShapeLayout.minHeight);
-	private final ValidationListComponent errorList = new ValidationListComponent();
 	private Translatable textPreviewHint = new Translatable("screen.buildguide.previewhintinline");
 	private Translatable textGenerating = new Translatable("screen.buildguide.previewgenerating");
 	private Translatable textEmpty = new Translatable("screen.buildguide.previewempty");
@@ -163,10 +163,6 @@ public class ShapeScreen extends BaseScreen{
 		buttonPreviewExpand.setActive(BuildGuide.stateManager.getState().isShapeAvailable());
 		addWidget(buttonPreviewExpand);
 		initPreviewControls();
-		// The tab first, then one build of its rows by init (setCategory would build them for the old list too)
-		errorList.selectCategory(initialTab());
-		errorList.init(rightX, bands.tabsBottom, wrapper.getWidth(), bands.listBottom, currentShapeOrNull());
-		addWidget(errorList.getList());
 		preview.attach();
 		
 		if(BuildGuide.stateManager.getState().isShapeAvailable()) {
@@ -186,7 +182,7 @@ public class ShapeScreen extends BaseScreen{
 
 		renderShapeHeader();
 		renderPreview();
-		renderListPanel();
+		renderStatusLine();
 		renderLegend();
 
 		if(!BuildGuide.stateManager.getState().isShapeAvailable()) return;
@@ -361,35 +357,29 @@ public class ShapeScreen extends BaseScreen{
 		sliderSlice.updateText();
 	}
 	
-	private ValidationListComponent.Category initialTab() {
-		if(BuildGuide.stateManager.getState().listTab != null) return BuildGuide.stateManager.getState().listTab;
-		int[] counts = ValidationListComponent.counts(currentShapeOrNull());
-		return counts != null && counts[0] > 0 ? ValidationListComponent.Category.ERRORS : ValidationListComponent.Category.MISSING;
-	}
-	
-	// Progress line, the three tabs with live counts, then the list rows (the list widget draws itself)
-	private void renderListPanel() {
-		int x1 = rightX, x2 = wrapper.getWidth();
+	// Under the preview (2026-10-22): the progress line and "Missing N   built ok / total (p%)", then the errors and
+	// the wrong layer when there are any. Which positions those are: Visualisation, "Find blocks"
+	private void renderStatusLine() {
+		int x1 = rightX, x2 = wrapper.getWidth(), progressBottom = bands.progressTop + 2;
 		Shape shape = currentShapeOrNull();
-		fillRect(x1, bands.progressTop, x2, bands.tabsTop, 0xFF303030);
-		if(shape != null && shape.getValidationState().isValidated()) {
-			ValidationState state = shape.getValidationState();
-			int fill = x1 + (int) Math.round((x2 - x1) * state.getProgress());
-			if(fill > x1) fillRect(x1, bands.progressTop, fill, bands.tabsTop, state.getOk() == state.getTotal() ? 0xFF40C040 : 0xFF40A0FF);
+		fillRect(x1, bands.progressTop, x2, progressBottom, 0xFF303030);
+		if(shape == null) {
+			drawShadowLeft("-", x1 + 3, bands.statusTextY, 0x888888);
+			return;
 		}
+		ValidationState state = shape.getValidationState();
 		int[] counts = ValidationListComponent.counts(shape);
-		ValidationListComponent.Category[] tabs = ValidationListComponent.tabs(shape);
-		// The wrong-layer tab went with the palette: back to the errors
-		if(!java.util.Arrays.asList(tabs).contains(errorList.getCategory())) errorList.setCategory(ValidationListComponent.Category.ERRORS);
-		for(int i = 0;i < tabs.length;++i) {
-			int tx1 = tabX(i, tabs.length), tx2 = tabX(i + 1, tabs.length);
-			boolean selected = tabs[i] == errorList.getCategory();
-			fillRect(tx1, bands.tabsTop, tx2 - 1, bands.tabsBottom, selected ? 0xC0505050 : 0xC0202020);
-			// Four tabs share the width with shorter labels (4D): "Err 3", "Miss 120", "Ign 0", "Layer 5"
-			String label = new Translatable(tabs.length > 3 ? tabs[i].shortKey : tabs[i].translationKey, counts == null ? "-" : "" + counts[tabs[i].ordinal()]).toString();
-			drawShadowCentred(label, (tx1 + tx2) / 2, bands.tabsTop + 4, selected ? 0xFFFFFF : 0xAAAAAA);
+		if(counts == null) {
+			drawShadowLeft(fit(new Translatable("screen.buildguide.status.notvalidated", "" + shape.getExpectedBlocks().size()).toString(), x2 - x1 - 6), x1 + 3, bands.statusTextY, 0xAAAAAA);
+			return;
 		}
-		errorList.update(shape);
+		int fill = x1 + (int) Math.round((x2 - x1) * state.getProgress());
+		if(fill > x1) fillRect(x1, bands.progressTop, fill, progressBottom, state.getOk() == state.getTotal() ? 0xFF40C040 : 0xFF40A0FF);
+		String percent = String.format(java.util.Locale.ROOT, "%.1f%%", 100.0 * state.getProgress());
+		String text = new Translatable("screen.buildguide.status.missing", "" + counts[1]) + "   " + new Translatable("screen.buildguide.status.built", "" + state.getOk(), "" + state.getTotal(), percent);
+		if(counts[0] > 0) text += "   " + new Translatable("screen.buildguide.status.errors", "" + counts[0]);
+		if(counts[3] > 0) text += "   " + new Translatable("screen.buildguide.status.wronglayer", "" + counts[3]);
+		drawShadowLeft(fit(text, x2 - x1 - 6), x1 + 3, bands.statusTextY, counts[0] > 0 ? 0xFF8080 : 0xFFFFFF);
 	}
 	
 	// Colour legend of the preview (E6), right of the bottom row: four 72-px entries, a swatch and a label.
@@ -424,17 +414,13 @@ public class ShapeScreen extends BaseScreen{
 		return range[0] == range[1] ? "" + range[0] : range[0] + "-" + range[1];
 	}
 	
-	private int tabX(int i, int count) {
-		return rightX + i * (wrapper.getWidth() - rightX) / count;
-	}
-	
 	private Shape currentShapeOrNull() {
 		return BuildGuide.stateManager.getState().isShapeAvailable() ? BuildGuide.stateManager.getState().getCurrentShape() : null;
 	}
 	
 	@Override
 	protected boolean hasBottomBar() {
-		return false; // progress is the line above the tabs; the legend takes the right of the bar (E6)
+		return false; // progress is the status line under the preview; the legend takes the right of the bar (E6)
 	}
 	
 	private int previewAreaTop() {
@@ -566,16 +552,6 @@ public class ShapeScreen extends BaseScreen{
 			textFieldName.setVisibility(true);
 			editingName = true;
 			return true;
-		}
-		if(button == MOUSE_LEFT && x >= rightX && y >= bands.tabsTop && y < bands.tabsBottom) {
-			ValidationListComponent.Category[] tabs = ValidationListComponent.tabs(currentShapeOrNull());
-			for(int i = 0;i < tabs.length;++i) {
-				if(x >= tabX(i, tabs.length) && x < tabX(i + 1, tabs.length)) {
-					BuildGuide.stateManager.getState().listTab = tabs[i];
-					errorList.setCategory(tabs[i]);
-					return true;
-				}
-			}
 		}
 		if(x >= rightX && y >= previewTop && y < bands.previewBottom) {
 			return preview.mouseClicked(inPreviewArea(x, y), button, doubleClick);
