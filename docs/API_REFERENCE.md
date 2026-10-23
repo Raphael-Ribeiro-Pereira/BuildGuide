@@ -172,6 +172,26 @@ public abstract class Shape {
   last unit; the scan preparation copies the expected set with `toLongArray()` under the lock and
   boxes it after.
 
+### Smart fill and one filter (`wip/smartfill`)
+
+- `SmartFill` (common, replaces `FillTask`): `prepare(ShapeSet)` gives a `Plan` (cells in build order, the
+  group of each, the groups; or a `message` key: singleplayer only, generating, nothing to fill);
+  `fitToStock(plan, stock, held)`, `toggle(plan, group, block)`, `clear(plan, group)` (choices kept by colour
+  while the game runs); `start(plan)`, `tick()` (one batch of `blocksPerTick` = 32 in flight), `stop()`,
+  `title()`, `isRunning()`. Results per cell: `PLACED`, `NO_BLOCKS` (the group is out: its other cells are
+  dropped), `TAKEN`, `UNLOADED`.
+- `SmartFillPlan` (pure): `sortForBuilding(cells, ox, oy, oz)` (chunk section by section, bands bottom up,
+  bottom up in a section), `groups(cells, rgbOf, groupOf)` (by colour, at most `maxGroups` = 8),
+  `candidates(pos, blocks)` (a mix from a start the position picks), `firstAvailable`, `coverage`.
+- `Shape.cubeRgb(x, y, z)`: the colour the world draws a cube with (`colourCube`, else the shape's).
+- `IShapeHandler`: `canSmartFill()`, `carriedBlocks()`, `blockName(id)`, `placeBlocks(xyz, candidates, done)`;
+  `mayRunCommands` and `sendCommand` are gone. Fabric: `SmartFillServer` (integrated server thread:
+  inventory, worn and carried Traveler's Backpack by reflection, shulker boxes; `getStateForPlacement`,
+  `setPlacedBy`, one place sound per batch). `FillPlan` keeps `cells` only.
+- `FillScreen`: the panel (colour buttons with swatches, the carried blocks list, Clear, Back, Start).
+- `PreviewModel.focusMask` / `withFocus(mask)`, `meshChange` reason "focus"; `PreviewController` builds the
+  mask from `Shape.getWorldFocus()`. `ShapeScreen`: no status filter button.
+
 ### Farming land: Cane layout (`wip/cane`)
 
 - `ShapeFarmingLand.CaneLayout { LINES, CROSS }`, property `propertyCaneLayout` (default CROSS), saved **last**

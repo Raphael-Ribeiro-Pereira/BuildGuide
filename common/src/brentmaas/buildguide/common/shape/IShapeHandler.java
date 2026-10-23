@@ -18,9 +18,8 @@ public interface IShapeHandler {
 		return null;
 	}
 
-	// Fill (FillTask): the client world as a probe (null without one), the player's box in world coordinates
-	// {minX, minY, minZ, maxX, maxY, maxZ} (null: none), whether the player may run /fill (cheats or op), and one
-	// command sent to the server as if typed, without the slash (false: no connection). Defaults: no world
+	// Fill (SmartFill): the client world as a probe (null without one) and the player's box in world coordinates
+	// {minX, minY, minZ, maxX, maxY, maxZ} (null: none). Defaults: no world
 	public default IBlockProbe worldProbe() {
 		return null;
 	}
@@ -29,11 +28,29 @@ public interface IShapeHandler {
 		return null;
 	}
 
-	public default boolean mayRunCommands() {
+	// Smart fill (2026-10-22): whether this game runs the world itself (singleplayer, or the host of a LAN world),
+	// the only place blocks can be taken out of what the player carries and placed as in survival
+	public default boolean canSmartFill() {
 		return false;
 	}
 
-	public default boolean sendCommand(String command) {
+	// The blocks the player carries, by block id, counting what the shulker boxes and backpacks among them hold;
+	// null when they cannot be read. Never the boxes or backpacks themselves
+	public default java.util.Map<String, Integer> carriedBlocks() {
+		return null;
+	}
+
+	// A block's name to show; the id when it is unknown
+	public default String blockName(String blockId) {
+		return blockId;
+	}
+
+	/**
+	 * Places one block per cell (world x, y, z triples): the first of the cell's candidates the player still has,
+	 * taken out of what they carry (none in creative). done gets one SmartFill result per cell, on the thread that
+	 * placed them. False when nothing could be sent (no world of this game).
+	 */
+	public default boolean placeBlocks(int[] xyz, String[][] candidates, java.util.function.Consumer<byte[]> done) {
 		return false;
 	}
 }

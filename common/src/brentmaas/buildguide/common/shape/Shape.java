@@ -253,6 +253,24 @@ public abstract class Shape implements IValidatable, IFocusParts {
 	// shape's colour, already set, by default; shapes that colour cubes one by one set it here
 	protected void colourCube(IShapeBuffer buffer, int x, int y, int z) {}
 
+	// Smart fill (2026-10-22): the colour (0xRRGGBB) the world draws the cube at this local position with: the
+	// shape's colour, or the one colourCube sets for shapes that colour cubes one by one (layers, parts)
+	public int cubeRgb(int x, int y, int z) {
+		final int[] rgb = {((int) (255 * shapeSet.getShapeColourR()) << 16) | ((int) (255 * shapeSet.getShapeColourG()) << 8) | (int) (255 * shapeSet.getShapeColourB())};
+		colourCube(new IShapeBuffer() {
+			public void setColour(int r, int g, int b, int a) {
+				rgb[0] = (r << 16) | (g << 8) | b;
+			}
+
+			public void pushVertex(double px, double py, double pz) {}
+
+			public void end() {}
+
+			public void close() {}
+		}, x, y, z);
+		return rgb[0];
+	}
+
 	/**
 	 * Build focus: the world buffer from the last generation's expected set, only the blocks in focus f (null:
 	 * all), without generating anything again. Returns how many cubes it holds (the origin cube not counted,

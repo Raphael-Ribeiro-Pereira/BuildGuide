@@ -2,19 +2,26 @@ import java.io.File;
 import java.lang.reflect.*;
 import java.nio.file.Files;
 import java.util.*;
+import java.util.function.Consumer;
 import brentmaas.buildguide.common.BuildGuide;
 import brentmaas.buildguide.common.Config;
-import brentmaas.buildguide.common.FillTask;
 import brentmaas.buildguide.common.ILogHandler;
+import brentmaas.buildguide.common.SmartFill;
 import brentmaas.buildguide.common.TimingLog;
+import brentmaas.buildguide.common.property.Property;
 import brentmaas.buildguide.common.screen.AbstractScreenHandler;
 import brentmaas.buildguide.common.screen.IScreenWrapper;
+import brentmaas.buildguide.common.screen.PreviewController;
+import brentmaas.buildguide.common.screen.ShapeScreen;
 import brentmaas.buildguide.common.shape.*;
-// Fill with the block in hand (2026-10-16, wip/fill): the cells (what Area 3 could target: shown, not excluded,
-// loaded, empty, not inside the player; inside the build height), the boxes (an exact cover, at most 32768
-// blocks each, few commands for solid shapes), the command text, and FillTask: two clicks, the refusals (no
-// block, no commands, generating, nothing to fill), 20 commands per tick, the answers counted and kept out of
-// the chat, the summary, Stop, the confirmation running out.
+import brentmaas.buildguide.common.shape.SmartFillPlan.Group;
+// Fill (2026-10-16, wip/fill; smart fill 2026-10-22, wip/smartfill). FillPlan.cells: what Area 3 could target
+// (shown, not excluded, loaded, empty, not inside the player; inside the build height). SmartFillPlan: build
+// order section by section and bottom up, groups by the colour the world draws (at most 8), a mix spread evenly
+// and the same block first for the same cell, the first block the player has, what the stock covers. SmartFill:
+// the plan's refusals (another kind of world, generating, nothing), the choice fitted to what is carried and
+// remembered by colour, the batches (32 a tick, one in flight), a group out of blocks, Stop, a stopped fill's
+// late answer. Shape.cubeRgb. The one filter: the preview shows what the world's Part and Layer show.
 public class FillTest {
 	static int fails = 0;
 	static void check(boolean c, String m){ System.out.println((c?"OK   ":"FAIL ")+m); if(!c) ++fails; }
@@ -29,20 +36,30 @@ public class FillTest {
 		@Override public boolean isInBuildHeight(int y){ return y >= minY && y <= maxY; }
 	}
 	static Set<Long> cuboid(int x1, int y1, int z1, int x2, int y2, int z2){ Set<Long> s = new HashSet<>(); for(int x = x1; x <= x2; x++) for(int y = y1; y <= y2; y++) for(int z = z1; z <= z2; z++) s.add(LocalPos.pack(x, y, z)); return s; }
-	// The boxes cover exactly the cells, without overlap, none above the limit
-	static String cover(List<Long> cells, List<int[]> boxes, int max){
-		Set<Long> want = new HashSet<>(cells), got = new HashSet<>();
-		for(int[] b: boxes){
-			if(FillPlan.volume(b) > max) return "a box of " + FillPlan.volume(b);
-			for(int x = b[0]; x <= b[3]; x++) for(int y = b[1]; y <= b[4]; y++) for(int z = b[2]; z <= b[5]; z++) if(!got.add(LocalPos.pack(x, y, z))) return "overlap at " + x + "," + y + "," + z;
+
+	static List<String> chat = new ArrayList<>();
+	static String held = "minecraft:stone"; static boolean singleplayer = true; static World world = new World();
+	// The loader's side of a fill: what the player carries, the batches it got, and whether it answers at once
+	static Map<String, Integer> stock = new HashMap<>(); static List<String[][]> batches = new ArrayList<>(); static List<int[]> batchCells = new ArrayList<>();
+	static boolean answerNow = true; static Consumer<byte[]> pending = null; static byte[] pendingCodes = null;
+	static byte[] place(String[][] candidates){
+		byte[] codes = new byte[candidates.length];
+		for(int i = 0; i < candidates.length; i++){
+			String b = SmartFillPlan.firstAvailable(candidates[i], id -> stock.getOrDefault(id, 0) > 0);
+			if(b == null){ codes[i] = SmartFill.NO_BLOCKS; continue; }
+			stock.merge(b, -1, Integer::sum); codes[i] = SmartFill.PLACED;
 		}
-		return got.equals(want) ? "" : "covers " + got.size() + " of " + want.size() + (got.containsAll(want) ? " (extra cells)" : " (missing cells)");
+		return codes;
 	}
+	static ShapeSet setOf(Shape s) throws Exception {
+		Field setField = Shape.class.getDeclaredField("shapeSet"); setField.setAccessible(true); ShapeSet set = (ShapeSet) setField.get(s);
+		// The set is made without its constructor (OriginScanTest.newSet): no exclusion boxes, as a new set has none enabled
+		Field boxesField = ShapeSet.class.getDeclaredField("exclusionBoxes"); boxesField.setAccessible(true); boxesField.set(set, Array.newInstance(boxesField.getType().getComponentType(), 0));
+		return set;
+	}
+	@SuppressWarnings("unchecked") static void set(Shape s, String f, Object v) throws Exception { Field x = s.getClass().getDeclaredField(f); x.setAccessible(true); ((Property<Object>) x.get(s)).value = v; }
+	static void runToEnd(){ for(int i = 0; i < 100000 && SmartFill.isRunning(); i++) SmartFill.tick(); }
 
-	static List<String> chat = new ArrayList<>(), sentCommands = new ArrayList<>();
-	static String held = "minecraft:stone"; static boolean mayRun = true, connected = true; static World world = new World(); static double[] player = null;
-
-	@SuppressWarnings("unchecked")
 	public static void main(String[] a) throws Exception {
 		System.out.println("-- FillPlan.cells: what Area 3 could target, inside the build height");
 		World w = new World();
@@ -61,39 +78,39 @@ public class FillTest {
 		check(FillPlan.cells(expected, 100, 64, 100, new ArrayList<>(), null, w, null).isEmpty(), "above the build height: nothing");
 		w.maxY = 319;
 
-		System.out.println("-- FillPlan.boxes: an exact cover, few commands");
-		List<Long> solid = new ArrayList<>(cuboid(0, 0, 0, 9, 9, 9));
-		List<int[]> boxes = FillPlan.boxes(solid, FillPlan.maxVolume);
-		check(cover(solid, boxes, FillPlan.maxVolume).isEmpty() && boxes.size() == 1, "a 10^3 cuboid: one box (" + boxes.size() + ")");
-		List<Long> big = new ArrayList<>(cuboid(0, 0, 0, 39, 39, 39));
-		boxes = FillPlan.boxes(big, FillPlan.maxVolume);
-		check(cover(big, boxes, FillPlan.maxVolume).isEmpty() && boxes.size() <= 4, "a 40^3 cuboid (64000 blocks): within the 32768 limit, " + boxes.size() + " boxes " + cover(big, boxes, FillPlan.maxVolume));
+		System.out.println("-- SmartFillPlan: build order, groups, mix, stock");
 		List<Long> sphere = new ArrayList<>(); for(int x = -20; x <= 20; x++) for(int y = -20; y <= 20; y++) for(int z = -20; z <= 20; z++) if(x * x + y * y + z * z <= 400) sphere.add(LocalPos.pack(x, y, z));
-		boxes = FillPlan.boxes(sphere, FillPlan.maxVolume);
-		check(cover(sphere, boxes, FillPlan.maxVolume).isEmpty() && boxes.size() * 20 < sphere.size(), "a solid sphere r = 20 (" + sphere.size() + " blocks): " + boxes.size() + " boxes");
-		Random r = new Random(7); List<Long> scattered = new ArrayList<>(); Set<Long> seen = new HashSet<>();
-		for(int i = 0; i < 3000; i++){ long p = LocalPos.pack(r.nextInt(30) - 15, r.nextInt(12) - 6, r.nextInt(30) - 15); if(seen.add(p)) scattered.add(p); }
-		boxes = FillPlan.boxes(scattered, FillPlan.maxVolume);
-		check(cover(scattered, boxes, FillPlan.maxVolume).isEmpty(), "random cells (" + scattered.size() + "): still an exact cover, " + boxes.size() + " boxes");
-		boxes = FillPlan.boxes(big, 100);
-		check(cover(big, boxes, 100).isEmpty(), "a small limit (100): no box above it, still exact (" + boxes.size() + " boxes)");
-		check(FillPlan.boxes(new ArrayList<>(), FillPlan.maxVolume).isEmpty(), "no cells: no box");
-		// One chunk section at a time (world coordinates): an exact cover, no box across a section's edge, each
-		// section's boxes together, sections in ascending Y, Z, X
-		for(int[] origin: new int[][]{{0, 0, 0}, {-7, 61, 13}}){
-			List<int[]> bySection = FillPlan.boxesBySection(sphere, origin[0], origin[1], origin[2], FillPlan.maxVolume);
-			boolean inside = true, together = true, ascending = true; Set<String> done = new HashSet<>(); String last = null; long lastKey = Long.MIN_VALUE;
-			for(int[] bx: bySection){
-				int sx = Math.floorDiv(origin[0] + bx[0], 16), sy = Math.floorDiv(origin[1] + bx[1], 16), sz = Math.floorDiv(origin[2] + bx[2], 16);
-				inside &= Math.floorDiv(origin[0] + bx[3], 16) == sx && Math.floorDiv(origin[1] + bx[4], 16) == sy && Math.floorDiv(origin[2] + bx[5], 16) == sz;
-				String sec = sx + "," + sy + "," + sz;
-				if(!sec.equals(last)){ together &= done.add(sec); long key = ((long) sy << 40) + ((long) sz << 20) + sx; ascending &= key > lastKey; lastKey = key; last = sec; }
-			}
-			check(cover(sphere, bySection, FillPlan.maxVolume).isEmpty() && inside && together && ascending, "by chunk section, origin " + Arrays.toString(origin) + ": exact cover, no box crosses a section, each section's boxes together, Y then Z then X (" + done.size() + " sections, " + bySection.size() + " boxes)");
+		Collections.shuffle(sphere, new Random(3));
+		SmartFillPlan.sortForBuilding(sphere, 7, 64, -3);
+		boolean bandsUp = true, sectionsTogether = true, upInSection = true; Set<String> done = new HashSet<>(); String lastSection = null; int lastBand = Integer.MIN_VALUE, lastY = 0;
+		for(long p: sphere){
+			int x = 7 + LocalPos.unpackX(p), y = 64 + LocalPos.unpackY(p), z = -3 + LocalPos.unpackZ(p);
+			String section = Math.floorDiv(x, 16) + "," + Math.floorDiv(y, 16) + "," + Math.floorDiv(z, 16);
+			if(Math.floorDiv(y, 16) < lastBand) bandsUp = false;
+			lastBand = Math.floorDiv(y, 16);
+			if(!section.equals(lastSection)){ if(!done.add(section)) sectionsTogether = false; lastSection = section; lastY = y; }
+			else { if(y < lastY) upInSection = false; lastY = y; }
 		}
-		check(FillPlan.command(new int[]{-2, 0, 3, 5, 1, 3}, 100, 64, -50, "minecraft:stone").equals("fill 98 64 -47 105 65 -47 minecraft:stone replace #minecraft:replaceable"), "the command: world coordinates, the block, replace only #minecraft:replaceable");
+		check(bandsUp && sectionsTogether && upInSection, "a shuffled sphere (" + sphere.size() + " cells) sorted: section by section (each once, " + done.size() + " sections), bands of 16 bottom up, bottom up in each section");
+		List<Long> row = new ArrayList<>(); for(int x = 0; x < 30; x++) row.add(LocalPos.pack(x, 0, 0));
+		int[] groupOf = new int[row.size()];
+		List<Group> two = SmartFillPlan.groups(row, p -> LocalPos.unpackX(p) % 3 == 0 ? 0x5B8DD9 : 0x123456, groupOf);
+		check(two.size() == 2 && two.get(0).rgb == 0x5B8DD9 && two.get(0).cells.size() == 10 && two.get(1).cells.size() == 20 && groupOf[0] == 0 && groupOf[1] == 1 && groupOf[3] == 0, "two colours: two groups in the order met, every cell's group");
+		List<Group> many = SmartFillPlan.groups(row, p -> LocalPos.unpackX(p), null);
+		check(many.size() == SmartFillPlan.maxGroups && many.get(SmartFillPlan.maxGroups - 1).cells.size() == 30 - (SmartFillPlan.maxGroups - 1), "30 colours: 8 groups, the last takes the rest (" + many.get(7).cells.size() + " cells)");
+		List<String> mix = Arrays.asList("a", "b", "c"); Map<String, Integer> firsts = new HashMap<>(); boolean same = true;
+		for(long p: sphere){ String[] c = SmartFillPlan.candidates(p, mix); firsts.merge(c[0], 1, Integer::sum); if(!Arrays.equals(c, SmartFillPlan.candidates(p, mix)) || new HashSet<>(Arrays.asList(c)).size() != 3) same = false; }
+		int minShare = Collections.min(firsts.values()), maxShare = Collections.max(firsts.values());
+		check(same && firsts.size() == 3 && maxShare - minShare < sphere.size() / 30, "a mix of 3: every cell tries all three, the same order each time, each first for about a third (" + firsts + ")");
+		check(SmartFillPlan.candidates(1L, new ArrayList<>()).length == 0 && SmartFillPlan.candidates(5L, Arrays.asList("x")).length == 1, "no block: no candidate; one block: that one");
+		check("b".equals(SmartFillPlan.firstAvailable(new String[]{"a", "b", "c"}, id -> !id.equals("a"))) && SmartFillPlan.firstAvailable(new String[]{"a"}, id -> false) == null, "the first one the player has; none: null");
+		List<Group> share = SmartFillPlan.groups(row, p -> LocalPos.unpackX(p) < 20 ? 1 : 2, null);
+		share.get(0).blocks.add("stone"); share.get(1).blocks.add("stone"); share.get(1).blocks.add("dirt");
+		Map<String, Integer> have = new HashMap<>(); have.put("stone", 25); have.put("dirt", 3);
+		int[] cov = SmartFillPlan.coverage(share, have);
+		check(cov[0] == 20 && cov[1] == 8, "coverage: 25 stone for 20 + 10 cells, the second group also has 3 dirt: 20 and 8 (" + Arrays.toString(cov) + ")");
 
-		System.out.println("-- FillTask: the button");
+		System.out.println("-- the colour of a cube (Shape.cubeRgb)");
 		BuildGuide.screenHandler = new AbstractScreenHandler(){ public IScreenWrapper createWrapper(Translatable t){ return null; } public void showNone(){} public String translate(String k){ return k; } public String translate(String k, Object... v){ return k + Arrays.toString(v); } };
 		BuildGuide.widgetHandler = new PresetTest.FakeWidgets();
 		BuildGuide.logHandler = (ILogHandler) Proxy.newProxyInstance(FillTest.class.getClassLoader(), new Class<?>[]{ILogHandler.class}, (p, m, x) -> { if(m.getName().equals("sendChatMessage")) chat.add((String) x[0]); return null; });
@@ -104,80 +121,116 @@ public class FillTest {
 			case "newBuffer": return new FocusWorldTest.RecBuffer();
 			case "getPlayerPosition": return new ShapeSet.Origin(0, 64, 0);
 			case "heldBlockId": return held;
-			case "mayRunCommands": return mayRun;
 			case "worldProbe": return world;
-			case "playerBox": return player;
-			case "sendCommand": if(!connected) return false; sentCommands.add((String) x[0]); return true;
+			case "canSmartFill": return singleplayer;
+			case "carriedBlocks": return new HashMap<>(stock);
+			case "placeBlocks": {
+				int[] xyz = (int[]) x[0]; String[][] cand = (String[][]) x[1]; @SuppressWarnings("unchecked") Consumer<byte[]> doneCb = (Consumer<byte[]>) x[2];
+				batches.add(cand); batchCells.add(xyz);
+				byte[] codes = place(cand);
+				if(answerNow) doneCb.accept(codes); else { pending = doneCb; pendingCodes = codes; }
+				return true;
+			}
 			default: return m.isDefault() ? InvocationHandler.invokeDefault(p, m, x) : null;
 			}
 		});
-		long[] now = {1000}; FillTask.clock = () -> now[0];
-		ShapeCuboid shape = FocusWorldTest.place(new ShapeCuboid());
-		shape.update(); FocusWorldTest.settle(shape);
-		Field setField = Shape.class.getDeclaredField("shapeSet"); setField.setAccessible(true); ShapeSet set = (ShapeSet) setField.get(shape);
-		// The set is made without its constructor (OriginScanTest.newSet): no exclusion boxes, as a new set has none enabled
-		Field boxesField = ShapeSet.class.getDeclaredField("exclusionBoxes"); boxesField.setAccessible(true); boxesField.set(set, Array.newInstance(boxesField.getType().getComponentType(), 0));
-		int total = shape.getNumberOfBlocks();
-		check(total > 0 && FillTask.title().equals("screen.buildguide.fill"), "a cuboid of " + total + " blocks; the title: Fill");
-		held = null; FillTask.click(set);
-		check(chat.size() == 1 && chat.get(0).contains("screen.buildguide.holdablock") && !FillTask.isRunning(), "no block in hand: the chat says so, nothing runs");
-		held = "minecraft:stone"; mayRun = false; chat.clear(); FillTask.click(set);
-		check(chat.size() == 1 && chat.get(0).contains("fill.nocommands"), "no right to run commands: the chat says so");
-		mayRun = true; chat.clear();
-		shape.lock.lock(); Thread t = new Thread(() -> FillTask.click(set)); t.start(); t.join(); shape.lock.unlock();
-		check(chat.size() == 1 && chat.get(0).contains("fill.generating"), "the shape generating (its lock taken): the chat says so");
-		chat.clear(); FillTask.click(set);
-		check(chat.isEmpty() && FillTask.title().equals("screen.buildguide.fill.confirm[" + total + "]") && sentCommands.isEmpty(), "first click: Fill " + total + "? and nothing sent");
-		now[0] += FillTask.confirmMillis;
-		check(FillTask.title().equals("screen.buildguide.fill"), "after 5 s the confirmation runs out: Fill again");
-		FillTask.click(set); now[0] += 1000; FillTask.click(set);
-		check(FillTask.isRunning() && FillTask.title().equals("screen.buildguide.fill.stop") && chat.size() == 1 && chat.get(0).startsWith("[Build Guide] screen.buildguide.fill.start[" + total + ", minecraft:stone, "), "a second click within 5 s starts: Stop, and the chat says how much: " + chat);
-		int commands = Integer.parseInt(chat.get(0).replaceAll(".*, (\\d+)\\]$", "$1"));
-		FillTask.tick();
-		check(sentCommands.size() == Math.min(commands, FillTask.commandsPerTick), "one tick: at most 20 commands (" + sentCommands.size() + " of " + commands + ")");
-		while(FillTask.isRunning() && sentCommands.size() < commands) FillTask.tick();
-		check(sentCommands.size() == commands && sentCommands.get(0).startsWith("fill ") && sentCommands.get(0).endsWith(" minecraft:stone replace #minecraft:replaceable"), "every command sent: " + sentCommands.get(0));
-		check(FillTask.isRunning(), "still running: waiting for the answers");
-		int sum = 0; boolean belongs = true;
-		for(int i = 0; i < commands; i++){ boolean ok = i > 0; int n = ok ? 10 : 0; sum += n; belongs &= FillTask.answer(ok, n); }
-		check(belongs, "every answer while the fill runs belongs to it (kept out of the chat)");
-		FillTask.tick();
-		check(!FillTask.isRunning() && chat.size() == 2 && chat.get(1).contains("fill.done[" + sum + ", " + total + ", minecraft:stone, " + commands + ", 1]"), "every answer in: the summary (placed, of, block, commands, failed): " + chat.get(1));
-		check(!FillTask.answer(true, 5), "an answer after the end is not the fill's: it reaches the chat");
+		ShapePolygonBuilding capsule = FocusWorldTest.place(new ShapePolygonBuilding());
+		set(capsule, "propertyRelief", 2); capsule.update(); FocusWorldTest.settle(capsule);
+		int blue = 0, plain = 0; for(long p: capsule.getExpectedBlocks()){ int rgb = capsule.cubeRgb(LocalPos.unpackX(p), LocalPos.unpackY(p), LocalPos.unpackZ(p)); if(rgb == ShapePolygonBuilding.reliefRgb) blue++; else if(rgb == 0) plain++; }
+		check(blue > 0 && plain > 0 && blue + plain == capsule.getExpectedBlocks().size(), "the capsule: the relief blue (" + blue + "), the rest the shape's colour (" + plain + ")");
+		ShapeCuboid cuboid = FocusWorldTest.place(new ShapeCuboid());
+		for(String f: new String[]{"propertyX", "propertyY", "propertyZ"}) set(cuboid, f, 8); // more than one batch
+		cuboid.update(); FocusWorldTest.settle(cuboid);
+		boolean allShape = true; for(long p: cuboid.getExpectedBlocks()) if(cuboid.cubeRgb(LocalPos.unpackX(p), LocalPos.unpackY(p), LocalPos.unpackZ(p)) != 0) allShape = false;
+		check(allShape, "a cuboid: every cube the shape's colour");
 
-		System.out.println("-- FillTask: Stop, no answers, connection lost, the focus, nothing to fill");
-		// Every other cell solid: one box per cell, more commands than one tick sends
-		ShapeCuboid large = FocusWorldTest.place(new ShapeCuboid());
-		for(String f: new String[]{"propertyX", "propertyY", "propertyZ"}){ Field pf = ShapeCuboid.class.getDeclaredField(f); pf.setAccessible(true); ((brentmaas.buildguide.common.property.Property<Object>) pf.get(large)).value = 8; }
-		large.update(); FocusWorldTest.settle(large);
-		ShapeSet bigSet = (ShapeSet) setField.get(large); boxesField.set(bigSet, Array.newInstance(boxesField.getType().getComponentType(), 0));
-		World checker = new World();
-		for(long p: large.getExpectedBlocks()){ int x = LocalPos.unpackX(p), y = LocalPos.unpackY(p), z = LocalPos.unpackZ(p); if(((x + y + z) & 1) == 0) checker.solid.add(World.k(x, 64 + y, z)); }
-		world = checker; chat.clear(); sentCommands.clear();
-		FillTask.click(bigSet); FillTask.click(bigSet);
-		int many = Integer.parseInt(chat.get(0).replaceAll(".*, (\\d+)\\]$", "$1"));
-		FillTask.tick(); FillTask.click(bigSet);
-		check(many > FillTask.commandsPerTick && !FillTask.isRunning() && chat.size() == 2 && chat.get(1).contains("fill.stopped[" + FillTask.commandsPerTick + ", " + many + "]") && sentCommands.size() == FillTask.commandsPerTick, "Stop after one tick: nothing more is sent, the chat says how far (" + chat.get(1) + ")");
-		FillTask.tick();
-		check(sentCommands.size() == FillTask.commandsPerTick, "and a tick after Stop sends nothing");
-		world = new World(); chat.clear(); sentCommands.clear();
-		FillTask.click(set); FillTask.click(set);
-		while(FillTask.isRunning() && sentCommands.size() < commands) FillTask.tick();
-		FillTask.tick();
-		check(FillTask.isRunning(), "all sent, no answer yet: still waiting");
-		now[0] += FillTask.answerMillis; FillTask.tick();
-		check(!FillTask.isRunning() && chat.get(chat.size() - 1).contains("fill.sent[" + commands + ", " + total + ", minecraft:stone]"), "no answers at all (command feedback off): ends 5 s after the last command and says what was sent: " + chat.get(chat.size() - 1));
-		chat.clear(); sentCommands.clear(); FillTask.click(set); FillTask.click(set); connected = false; FillTask.tick();
-		check(!FillTask.isRunning() && sentCommands.isEmpty() && chat.get(chat.size() - 1).contains("fill.stopped[0, "), "the connection gone: the fill stops");
-		connected = true;
+		System.out.println("-- SmartFill: the plan");
+		ShapeSet capsuleSet = setOf(capsule), cuboidSet = setOf(cuboid);
+		singleplayer = false;
+		check("screen.buildguide.smartfill.singleplayer".equals(SmartFill.prepare(capsuleSet).message), "not a world this game runs: the panel says singleplayer only");
+		singleplayer = true;
+		capsule.lock.lock(); SmartFill.Plan[] busy = new SmartFill.Plan[1]; Thread t = new Thread(() -> busy[0] = SmartFill.prepare(capsuleSet)); t.start(); t.join(); capsule.lock.unlock();
+		check("screen.buildguide.fill.generating".equals(busy[0].message), "the shape generating (its lock taken): try again");
+		SmartFill.Plan plan = SmartFill.prepare(capsuleSet);
+		check(plan.message == null && plan.cells.size() == capsule.getExpectedBlocks().size() && plan.groups.size() == 2 && plan.groups.get(0).cells.size() + plan.groups.get(1).cells.size() == plan.cells.size(), "the capsule in an empty world: every cell, two colours (" + plan.groups.get(0).cells.size() + " + " + plan.groups.get(1).cells.size() + ")");
+		int reliefGroup = plan.groups.get(0).rgb == ShapePolygonBuilding.reliefRgb ? 0 : 1, wallGroup = 1 - reliefGroup;
+		stock.clear(); stock.put("minecraft:stone", 100000); stock.put("minecraft:andesite", 50);
+		SmartFill.fitToStock(plan, stock, held);
+		check(plan.groups.get(0).blocks.equals(Arrays.asList("minecraft:stone")) && plan.groups.get(1).blocks.equals(Arrays.asList("minecraft:stone")), "nothing chosen yet: each colour takes the block in hand, which is carried");
+		SmartFill.toggle(plan, reliefGroup, "minecraft:andesite"); SmartFill.toggle(plan, reliefGroup, "minecraft:stone");
+		check(plan.groups.get(reliefGroup).blocks.equals(Arrays.asList("minecraft:andesite")), "a click adds a block, another takes the stone out: the relief in andesite");
+		SmartFill.toggle(plan, wallGroup, "minecraft:andesite");
+		check(plan.groups.get(wallGroup).blocks.size() == 2, "two blocks: a mix");
+		SmartFill.Plan again = SmartFill.prepare(capsuleSet);
+		check(again.groups.get(reliefGroup).blocks.equals(Arrays.asList("minecraft:andesite")) && again.groups.get(wallGroup).blocks.size() == 2, "opened again: the choices come back by colour");
+		Map<String, Integer> noAndesite = new HashMap<>(); noAndesite.put("minecraft:stone", 5);
+		SmartFill.fitToStock(again, noAndesite, "minecraft:dirt");
+		check(again.groups.get(reliefGroup).blocks.isEmpty() && again.groups.get(wallGroup).blocks.equals(Arrays.asList("minecraft:stone")), "andesite no longer carried: out of both, and the block in hand (dirt) is not carried: the relief has none");
+		SmartFill.clear(plan, wallGroup);
+		check(plan.groups.get(wallGroup).blocks.isEmpty(), "Clear empties a colour");
+
+		System.out.println("-- SmartFill: running");
+		chat.clear(); batches.clear(); batchCells.clear();
+		boolean started = SmartFill.start(plan);
+		check(started && SmartFill.isRunning() && chat.get(0).contains("smartfill.start[" + plan.groups.get(reliefGroup).cells.size() + "]"), "Start with only the relief chosen: only its cells go (" + chat + ")");
+		check(SmartFill.title().equals("screen.buildguide.smartfill.stop[0%]"), "the button reads Stop 0%");
+		SmartFill.tick();
+		boolean onlyAndesite = true; for(String[] c: batches.get(0)) if(!Arrays.equals(c, new String[]{"minecraft:andesite"})) onlyAndesite = false;
+		check(batches.size() == 1 && batches.get(0).length == Math.min(SmartFill.blocksPerTick, plan.groups.get(reliefGroup).cells.size()) && onlyAndesite, "one tick: one batch of at most " + SmartFill.blocksPerTick + ", andesite each");
+		runToEnd();
+		int reliefCells = plan.groups.get(reliefGroup).cells.size();
+		check(!SmartFill.isRunning() && stock.get("minecraft:andesite") == 0 && chat.get(chat.size() - 1).contains("smartfill.done[50, " + reliefCells + ", 0, 0, " + (reliefCells - 50) + "]"), "50 andesite for " + reliefCells + " cells: 50 placed, the rest without blocks left, and the end says so: " + chat.get(chat.size() - 1));
+		int sentAfterOut = 0; for(String[][] b: batches) sentAfterOut += b.length;
+		check(sentAfterOut < reliefCells, "once the colour ran out its other cells are not sent (" + sentAfterOut + " sent of " + reliefCells + ")");
+		int firstRelief = 0; while(plan.groupOf[firstRelief] != reliefGroup) firstRelief++;
+		long firstLocal = plan.cells.get(firstRelief); int[] first = batchCells.get(0);
+		check(first[0] == capsuleSet.getOriginX() + LocalPos.unpackX(firstLocal) && first[1] == capsuleSet.getOriginY() + LocalPos.unpackY(firstLocal) && first[2] == capsuleSet.getOriginZ() + LocalPos.unpackZ(firstLocal), "the cells go in world coordinates, in build order");
+		System.out.println("-- SmartFill: a mix, an answer that comes later, Stop, a late answer");
+		stock.put("minecraft:andesite", 100000); stock.put("minecraft:stone", 100000);
+		SmartFill.Plan both = SmartFill.prepare(cuboidSet); SmartFill.fitToStock(both, stock, held); SmartFill.toggle(both, 0, "minecraft:andesite");
+		batches.clear(); chat.clear(); answerNow = false;
+		SmartFill.start(both); SmartFill.tick(); SmartFill.tick(); SmartFill.tick();
+		check(batches.size() == 1, "while the batch waits for its answer, no other is sent");
+		pending.accept(pendingCodes); SmartFill.tick();
+		check(batches.size() == 2, "its answer read: the next batch goes");
+		Map<String, Integer> firstBlocks = new HashMap<>(); for(String[] c: batches.get(0)) firstBlocks.merge(c[0], 1, Integer::sum);
+		check(firstBlocks.size() == 2, "a mix: both blocks come first in the batch (" + firstBlocks + ")");
+		Consumer<byte[]> late = pending; byte[] lateCodes = pendingCodes;
+		SmartFill.stop();
+		check(!SmartFill.isRunning() && chat.get(chat.size() - 1).contains("smartfill.stopped["), "Stop: the chat says how far (" + chat.get(chat.size() - 1) + ")");
+		batches.clear();
+		SmartFill.start(both); SmartFill.tick(); Consumer<byte[]> mine = pending; byte[] mineCodes = pendingCodes;
+		late.accept(lateCodes); SmartFill.tick();
+		check(batches.size() == 1, "a new fill: the answer the stopped one left behind is not taken for its own batch's");
+		mine.accept(mineCodes); SmartFill.tick();
+		check(batches.size() == 2, "its own answer is");
+		answerNow = true; pending.accept(pendingCodes); // the batch still waiting, then the rest at once
+		runToEnd();
+		check(!SmartFill.isRunning() && chat.get(chat.size() - 1).contains("smartfill.done[" + both.cells.size() + ", " + both.cells.size() + ", 0, 0, 0]"), "the cuboid filled: " + chat.get(chat.size() - 1));
+		SmartFill.Plan none = SmartFill.prepare(cuboidSet); SmartFill.clear(none, 0); chat.clear();
+		check(!SmartFill.start(none) && chat.get(0).contains("smartfill.noblocks"), "no colour has a block: nothing starts, the chat says so");
+
+		System.out.println("-- one filter: the preview shows what the world shows");
 		BuildGuide.config.focusFrom.value = 0;
-		shape.setFocus(FocusFilter.Part.HIDDEN, 0); FocusWorldTest.settle(shape);
-		chat.clear(); FillTask.click(set);
-		check(chat.size() == 1 && chat.get(0).contains("fill.nothing"), "Part Hidden: the world shows nothing of the shape, so nothing to fill");
-		shape.setFocus(FocusFilter.Part.ALL, 0); FocusWorldTest.settle(shape);
-		for(long p: shape.getExpectedBlocks()) world.solid.add(World.k(LocalPos.unpackX(p), 64 + LocalPos.unpackY(p), LocalPos.unpackZ(p)));
-		chat.clear(); FillTask.click(set);
-		check(chat.size() == 1 && chat.get(0).contains("fill.nothing") && FillTask.title().equals("screen.buildguide.fill"), "every cell taken: nothing to fill, the chat says so");
+		PreviewController preview = new PreviewController(() -> 0L);
+		PreviewModel all = preview.update(capsule);
+		check(all != null && all.focusMask == null, "Part All: no mask, every block");
+		capsule.setFocus(FocusFilter.Part.ROOF, FocusFilter.LAYER_ALL); FocusWorldTest.settle(capsule);
+		PreviewModel roof = preview.update(capsule);
+		int shown = 0, roofBlocks = 0; for(int i = 0; i < roof.positions.length; i++){ if(roof.shows(i)) shown++; long p = roof.positions[i]; if(capsule.partOf(LocalPos.unpackX(p), LocalPos.unpackY(p), LocalPos.unpackZ(p)) == FocusFilter.Part.ROOF) roofBlocks++; }
+		check(roof.focusMask != null && shown == roofBlocks && shown > 0 && shown < roof.positions.length && "focus".equals(PreviewModel.meshChange(all, roof)), "Part Roof: the preview shows the roof only (" + shown + " of " + roof.positions.length + "), and its mesh is made again");
+		check(preview.update(capsule) == roof, "the next frame: the same view, nothing made again");
+		SmartFill.Plan roofPlan = SmartFill.prepare(capsuleSet);
+		check(roofPlan.cells.size() == roofBlocks, "and Fill fills the roof only (" + roofPlan.cells.size() + ")");
+		capsule.setFocus(FocusFilter.Part.ALL, FocusFilter.LAYER_ALL); FocusWorldTest.settle(capsule);
+		check(preview.update(capsule).focusMask == null, "Part All again: every block");
+		boolean noStatusFilter = false; try { ShapeScreen.class.getDeclaredField("buttonFilter"); } catch(NoSuchFieldException e){ noStatusFilter = true; }
+		check(noStatusFilter, "the Shape tab has no status filter button any more: Part and Layer are the one filter");
+
+		System.out.println("-- texts");
+		String lang = new String(Files.readAllBytes(new File("common/resources/assets/buildguide/lang/en_us.json").toPath()), "UTF-8");
+		boolean all2 = true; for(String key: new String[]{"title", "colours", "carried", "none", "mix", "enough", "nocarried", "hint", "clear", "back", "go", "singleplayer", "noinventory", "noblocks", "stop", "start", "stopped", "done"}) if(!lang.contains("\"screen.buildguide.smartfill." + key + "\"")) { all2 = false; System.out.println("   missing " + key); }
+		check(all2 && !lang.contains("fill.nocommands") && !lang.contains("fill.confirm"), "every smart fill text is there, the /fill ones are gone");
 
 		System.out.println(fails == 0 ? "ALL OK" : fails + " FAILED");
 		System.exit(fails == 0 ? 0 : 1);

@@ -1,19 +1,20 @@
 package brentmaas.buildguide.fabric.shape;
 
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 import brentmaas.buildguide.common.shape.IBlockProbe;
 import brentmaas.buildguide.common.shape.IShapeBuffer;
 import brentmaas.buildguide.common.shape.IShapeHandler;
 import brentmaas.buildguide.common.shape.SectionedBuffer;
 import brentmaas.buildguide.common.shape.ShapeSet.Origin;
+import brentmaas.buildguide.fabric.place.SmartFillServer;
 import brentmaas.buildguide.fabric.validation.WorldProbe;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
@@ -52,7 +53,7 @@ public class ShapeHandler implements IShapeHandler {
 		return block.defaultBlockState().isAir() ? null : BuiltInRegistries.BLOCK.getKey(block).toString();
 	}
 
-	// Fill (FillTask): the client world, as the scan reads it
+	// Fill (SmartFill): the client world, as the scan reads it
 	@Override
 	public IBlockProbe worldProbe() {
 		ClientLevel level = Minecraft.getInstance().level;
@@ -67,18 +68,26 @@ public class ShapeHandler implements IShapeHandler {
 		return new double[] {box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ};
 	}
 
-	// /fill needs the game master level (2): cheats on in singleplayer or on a LAN world, or op on a server
+	// Smart fill: on the server this game runs (SmartFillServer)
 	@Override
-	public boolean mayRunCommands() {
-		LocalPlayer player = Minecraft.getInstance().player;
-		return player != null && player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER);
+	public boolean canSmartFill() {
+		return SmartFillServer.available();
 	}
 
 	@Override
-	public boolean sendCommand(String command) {
-		ClientPacketListener connection = Minecraft.getInstance().getConnection();
-		if(connection == null) return false;
-		connection.sendCommand(command);
-		return true;
+	public Map<String, Integer> carriedBlocks() {
+		return SmartFillServer.carriedBlocks();
+	}
+
+	@Override
+	public String blockName(String blockId) {
+		Identifier key = Identifier.tryParse(blockId);
+		Optional<Block> block = key == null ? Optional.empty() : BuiltInRegistries.BLOCK.getOptional(key);
+		return block.isEmpty() ? blockId : block.get().getName().getString();
+	}
+
+	@Override
+	public boolean placeBlocks(int[] xyz, String[][] candidates, Consumer<byte[]> done) {
+		return SmartFillServer.placeBlocks(xyz, candidates, done);
 	}
 }

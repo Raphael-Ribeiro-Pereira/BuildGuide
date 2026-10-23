@@ -1,7 +1,7 @@
 package brentmaas.buildguide.common.screen;
 
 import brentmaas.buildguide.common.BuildGuide;
-import brentmaas.buildguide.common.FillTask;
+import brentmaas.buildguide.common.SmartFill;
 import brentmaas.buildguide.common.State.ActiveScreen;
 import brentmaas.buildguide.common.property.Property;
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
@@ -69,12 +69,13 @@ public class ShapeScreen extends BaseScreen{
 	public static final int rightX = 192, previewTop = 40, previewControlsHeight = 20, previewHintHeight = 12, expandSize = 12;
 	private final PreviewController preview = BuildGuide.stateManager.getState().preview;
 	private IButton buttonPreviewExpand;
-	// Preview controls (top row): filter (cycles on click), slice axis (Off, X, Y, Z) and, when an axis
-	// is set, a slider over the model's bounds on it. Changing filter or axis rebuilds the screen so the
-	// button texts and the slider range follow (ISlider has no callback and a fixed range)
-	private static final int controlsHeight = 16, filterWidth = 86, sliceWidth = 50, colourWidth = 80;
-	private IButton buttonFilter, buttonSliceAxis;
-	// Layers (4C): "Colour: Status | Layer" right of the filter, only while the shape's Layers is on (the slice
+	// Preview controls (top row): slice axis (Off, X, Y, Z) and, when an axis is set, a slider over the model's
+	// bounds on it. Changing the axis rebuilds the screen so the button text and the slider range follow (ISlider
+	// has no callback and a fixed range). The status filter (Missing, Built...) went on 2026-10-22: the Part and
+	// Layer buttons below are the one filter, of the world and the preview alike
+	private static final int controlsHeight = 16, sliceWidth = 50, colourWidth = 80;
+	private IButton buttonSliceAxis;
+	// Layers (4C): "Colour: Status | Layer" first in the row, only while the shape's Layers is on (the slice
 	// controls move right to make room). Whether it was laid out; a change rebuilds the screen (onMouseReleased)
 	private IButton buttonColour = null;
 	private boolean layerControls = false;
@@ -83,11 +84,12 @@ public class ShapeScreen extends BaseScreen{
 	private ISlider sliderSlice = null;
 	private static final String[] axisNames = {"X", "Y", "Z"};
 	// Build focus: a second row under the controls, "Part: ..." and, while the shape's Layers is on, "Layer: ...";
-	// they choose what the world shows (the preview always shows everything). The 3D area starts below it
+	// they choose what the world and the preview show (2026-10-22: one filter for both) and what Fill fills. The
+	// 3D area starts below it
 	public static final int focusRowY = previewTop + previewControlsHeight, focusRowHeight = 18, partWidth = 80, layerWidth = 64;
 	private IButton buttonFocusPart, buttonFocusLayer = null;
-	// Fill with the block in hand (FillTask) at the row's right end: it fills what the row selects. Its title
-	// follows the task ("Fill", "Fill N?", "Stop"), checked every frame
+	// Fill (SmartFill, 2026-10-22) at the row's right end: it opens FillScreen on what the row selects, to fill it
+	// with blocks the player carries. Its title follows the task ("Fill", "Stop (45%)"), checked every frame
 	private static final int fillWidth = 72;
 	private IButton buttonFill;
 	private String fillTitle = null;
@@ -220,7 +222,7 @@ public class ShapeScreen extends BaseScreen{
 		else if(model.isEmpty()) drawShadowCentred(textEmpty.toString(), (x1 + x2) / 2, midY, 0xAAAAAA);
 		else if(model.isViewEmpty()) drawShadowCentred(textNoMatch.toString(), (x1 + x2) / 2, midY, 0xAAAAAA);
 		else wrapper.drawShapePreview(x1 + 1, y1, x2 - 1, y2, model, preview.camera);
-		// Build focus: what the world shows (the preview above is always all of it)
+		// Build focus: what the world shows, and so the preview above
 		String focus = focusNotice(BuildGuide.stateManager.getState().getCurrentShape());
 		if(focus != null) drawShadowLeft(focus, x1 + 3, y1 + 3, 0x66CCFF);
 		// Live apply: the world still shows an older generation (Idle or On close mode)
@@ -237,36 +239,30 @@ public class ShapeScreen extends BaseScreen{
 	
 	private void initPreviewControls() {
 		int x = rightX + 2, y = previewTop + 2, axis = preview.getSliceAxis();
-		buttonFilter = BuildGuide.widgetHandler.createButton(x, y, filterWidth, controlsHeight, new Translatable(preview.getFilter().translationKey), () -> {
-			preview.setFilter(preview.getFilter().next(hasPalette()));
-			BuildGuide.screenHandler.showScreen(this);
-		});
 		Shape shape = currentShapeOrNull();
 		layerControls = shape != null && shape.hasLayers();
 		buttonColour = null;
 		int colourSpace = 0;
 		if(layerControls) {
-			buttonColour = BuildGuide.widgetHandler.createButton(x + filterWidth + 2, y, colourWidth, controlsHeight, new Translatable(preview.getColourMode() == ColourMode.LAYER ? "screen.buildguide.colour.layer" : "screen.buildguide.colour.status"), () -> {
+			buttonColour = BuildGuide.widgetHandler.createButton(x, y, colourWidth, controlsHeight, new Translatable(preview.getColourMode() == ColourMode.LAYER ? "screen.buildguide.colour.layer" : "screen.buildguide.colour.status"), () -> {
 				preview.setColourMode(preview.getColourMode() == ColourMode.LAYER ? ColourMode.STATUS : ColourMode.LAYER);
 				BuildGuide.screenHandler.showScreen(this);
 			});
 			colourSpace = colourWidth + 2;
 		}
 		String axisName = axis == PreviewModel.SLICE_OFF ? new Translatable("screen.buildguide.slice.off").toString() : axisNames[axis];
-		buttonSliceAxis = BuildGuide.widgetHandler.createButton(x + filterWidth + 2 + colourSpace, y, sliceWidth, controlsHeight, new Translatable("screen.buildguide.slice", axisName), () -> cycleSliceAxis());
-		addWidget(buttonFilter);
+		buttonSliceAxis = BuildGuide.widgetHandler.createButton(x + colourSpace, y, sliceWidth, controlsHeight, new Translatable("screen.buildguide.slice", axisName), () -> cycleSliceAxis());
 		if(buttonColour != null) addWidget(buttonColour);
 		addWidget(buttonSliceAxis);
 		sliderSlice = null;
 		PreviewModel model = preview.getModel();
 		if(axis != PreviewModel.SLICE_OFF && model != null && !model.isEmpty()) {
-			int sliderX = x + filterWidth + sliceWidth + 4 + colourSpace;
+			int sliderX = x + sliceWidth + 2 + colourSpace;
 			// A one-block-thick shape on this axis still gets a working range (the value is clamped)
 			sliderSlice = BuildGuide.widgetHandler.createSlider(sliderX, y, wrapper.getWidth() - expandSize - 4 - sliderX, controlsHeight, new Translatable(axisNames[axis]), model.min(axis), Math.max(model.max(axis), model.min(axis) + 1), preview.getSliceValue());
 			addWidget(sliderSlice);
 		}
 		boolean available = BuildGuide.stateManager.getState().isShapeAvailable();
-		buttonFilter.setActive(available);
 		buttonSliceAxis.setActive(available);
 		buttonFocusPart = BuildGuide.widgetHandler.createButton(x, focusRowY, partWidth, controlsHeight, partTitle(shape), () -> {
 			Shape s = currentShapeOrNull();
@@ -286,9 +282,10 @@ public class ShapeScreen extends BaseScreen{
 			});
 			addWidget(buttonFocusLayer);
 		}
-		fillTitle = FillTask.title();
+		fillTitle = SmartFill.title();
 		buttonFill = BuildGuide.widgetHandler.createButton(wrapper.getWidth() - fillWidth - 2, focusRowY, fillWidth, controlsHeight, new Translatable(fillTitle), () -> {
-			FillTask.click(BuildGuide.stateManager.getState().isShapeAvailable() ? BuildGuide.stateManager.getState().getCurrentShapeSet() : null);
+			if(SmartFill.isRunning()) SmartFill.stop();
+			else BuildGuide.screenHandler.showScreen(new FillScreen(this));
 			updateFillTitle();
 		});
 		buttonFill.setActive(available);
@@ -296,7 +293,7 @@ public class ShapeScreen extends BaseScreen{
 	}
 
 	private void updateFillTitle() {
-		String title = FillTask.title();
+		String title = SmartFill.title();
 		if(buttonFill == null || title.equals(fillTitle)) return;
 		fillTitle = title;
 		buttonFill.setTitle(new Translatable(title));

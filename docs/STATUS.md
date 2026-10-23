@@ -579,6 +579,27 @@ In-game checklist: Farming land > Crop Sugar cane: the Cane layout row; Cross: a
 (Show field on); cane beside water everywhere, also in a hexagon or circle; Lines as before (Rows along back); an
 old save of Farming land still opens.
 
+### Smart fill and one filter (on `wip/smartfill`, on top of `wip/relief`, waiting for the in-game test; not merged)
+
+Raphael (2026-10-22): one filter for the world and the preview, and a fill for survival by that filter: it
+reads the inventory, the backpacks and the shulker boxes and completes the shape with those blocks, one block
+or a mix per part, split by the colours.
+
+| What | Change |
+|---|---|
+| One filter | The Shape tab's Part and Layer buttons choose what the world **and** the preview show (the preview had a status filter of its own: gone; the colours still show missing / built, the list is Visualisation > Find blocks) |
+| Fill | Opens "Fill with your blocks": left, the colours of what the filter shows and is still empty (a button each beside its colour, how many blocks, what is chosen); right, the blocks you carry, counted with what the shulker boxes and the Traveler's Backpack (worn or carried) hold. A click puts a block in the selected colour or takes it out; two or more mix (evenly, each cell always the same). "You carry enough for N of M". Start: 32 blocks per tick, section by section, bottom up; the button reads Stop (p%) |
+| As in survival | Each block is taken out of the inventory, then the worn backpack, carried backpacks, shulker boxes (creative: nothing taken). Placed as the player would: facing like a click on the top, doors / beds / tall flowers whole, nothing where the block cannot stand or something is in the way. A colour out of blocks stops there; the chat sums up |
+| Singleplayer only | The blocks are taken on the world's own server; on another server the panel says so |
+| /fill | The fill of the block in hand with /fill commands is gone |
+
+In-game checklist for `smartfill-wip`:
+1. Part Roof (or a Layer): the world and the preview both show only that; Part All: everything.
+2. Fill: the panel lists your colours and blocks; shulker contents and the backpack's are counted in.
+3. Choose one block, Start: the roof fills from the bottom, the inventory goes down, then the shulker box.
+4. Two blocks: a mix. Run out: it stops, the chat says how many had no block.
+5. Stop mid-way; the button shows Stop (p%) while it runs.
+
 ### Geometric capsule: blue relief (on `wip/relief`, on top of `wip/cane`, waiting for the in-game test; not merged)
 
 Raphael (2026-10-22): the relief in a simple blue, like the parts of Farming land. The cubes outside the walls

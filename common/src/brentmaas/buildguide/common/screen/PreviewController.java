@@ -4,6 +4,8 @@ import java.util.function.LongSupplier;
 
 import brentmaas.buildguide.common.TimingLog;
 
+import brentmaas.buildguide.common.shape.FocusFilter;
+import brentmaas.buildguide.common.shape.LocalPos;
 import brentmaas.buildguide.common.shape.PreviewCamera;
 import brentmaas.buildguide.common.shape.PreviewFilter;
 import brentmaas.buildguide.common.shape.PreviewModel;
@@ -45,6 +47,11 @@ public class PreviewController {
 	// Colour: Status | Layer (4C), for models with layers; a model without them is always coloured by status
 	private ColourMode colourMode = ColourMode.STATUS;
 	private PreviewModel viewed = null;
+	// Build focus (2026-10-22): the preview shows what the world shows. The mask of the focus the world's buffer
+	// was last made with (Shape.getWorldFocus, a new object per refocus or generation) over these positions
+	private FocusFilter maskFocus = null;
+	private long[] maskPositions = null;
+	private boolean[] mask = null;
 
 	public PreviewController() {
 		this(System::currentTimeMillis);
@@ -90,17 +97,46 @@ public class PreviewController {
 			model = model.withValidation(state);
 			lastColour = now;
 		}
-		return view(model);
+		return view(model, current);
 	}
 
-	private PreviewModel view(PreviewModel base) {
+	private PreviewModel view(PreviewModel base, Shape current) {
 		if(base == null) return null;
+		boolean[] focus = focusMask(base, current);
 		ColourMode mode = base.layers == null ? ColourMode.STATUS : colourMode;
-		if(filter == PreviewFilter.ALL && sliceAxis == PreviewModel.SLICE_OFF && mode == ColourMode.STATUS) return base;
-		if(viewed == null || viewed.positions != base.positions || viewed.stateVersion != base.stateVersion || viewed.generation != base.generation || viewed.filter != filter || viewed.sliceAxis != sliceAxis || viewed.sliceValue != sliceValue || viewed.colourMode != mode || viewed.layers != base.layers) {
-			viewed = base.withView(filter, sliceAxis, sliceValue, mode);
+		if(filter == PreviewFilter.ALL && sliceAxis == PreviewModel.SLICE_OFF && mode == ColourMode.STATUS && focus == null) return base;
+		if(viewed == null || viewed.positions != base.positions || viewed.stateVersion != base.stateVersion || viewed.generation != base.generation || viewed.filter != filter || viewed.sliceAxis != sliceAxis || viewed.sliceValue != sliceValue || viewed.colourMode != mode || viewed.layers != base.layers || viewed.focusMask != focus) {
+			viewed = base.withView(filter, sliceAxis, sliceValue, mode).withFocus(focus);
 		}
 		return viewed;
+	}
+
+	// The world's focus over the model's positions, made again only when either changes. Shape.isInFocus reads
+	// the last generation's parts and layers, so under the lock; while it is busy the previous mask stays (when
+	// it is for these positions) or every position shows until a later frame
+	private boolean[] focusMask(PreviewModel base, Shape current) {
+		FocusFilter focus = current.getWorldFocus();
+		if(focus == null) {
+			maskFocus = null;
+			maskPositions = null;
+			mask = null;
+			return null;
+		}
+		if(focus == maskFocus && base.positions == maskPositions) return mask;
+		if(!current.lock.tryLock()) return base.positions == maskPositions ? mask : null;
+		try {
+			boolean[] next = new boolean[base.positions.length];
+			for(int i = 0;i < next.length;++i) {
+				long pos = base.positions[i];
+				next[i] = current.isInFocus(focus, LocalPos.unpackX(pos), LocalPos.unpackY(pos), LocalPos.unpackZ(pos));
+			}
+			maskFocus = focus;
+			maskPositions = base.positions;
+			mask = next;
+			return mask;
+		}finally {
+			current.lock.unlock();
+		}
 	}
 
 	// Latest model before the view is applied (bounds for the slice range); null when none
