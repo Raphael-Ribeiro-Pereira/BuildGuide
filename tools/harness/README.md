@@ -48,7 +48,7 @@ java  -cp "$CLASSES;$OUT" SectionTest       # world buffer in 16-block sections:
 java  -cp "$CLASSES;$OUT" FillTest          # Fill with the block in hand: the cells (Area 3's rule, build height), exact box cover under 32768, by chunk section, the command, two clicks, refusals, 20 per tick, answers, Stop
 java  -cp "$CLASSES;$OUT" PolygonRoomTest   # Polygon Floor / Ceiling: off = the old loop (40 random cases), floor and ceiling layers full, depth 1 and negative, persistence
 java  -cp "$CLASSES;$OUT" PolygonBuildingTest # Polygon building: walls, windows, floor, roof, rim, ring, spokes, skylight, pillars, 90-degree symmetry of a square, persistence ("print" draws the layers)
-java  -cp "$CLASSES;$OUT" FarmingLandTest   # Farming land: crops all within 4 of water (random outlines, every spacing, least water over grid offsets), sugar cane rows, parts, colours, persistence ("print" draws maps)
+java  -cp "$CLASSES;$OUT" FarmingLandTest   # Farming land (cane layout Cross, 2026-10-22): crops all within 4 of water (random outlines, every spacing, least water over grid offsets), sugar cane rows, parts, colours, persistence ("print" draws maps)
 java  -cp "$CLASSES;$OUT" PerfStep4Test     # performance step 4: LongHashSet against a HashSet, the shape's set and the preview snapshot, the scan stopping inside a layer (same result, budget kept), the overlay's nearest cubes (same choice and order), the preview's frames= line
 java  -cp "$CLASSES;$OUT" PerfStep2Test     # performance step 2: LongIndex, SliceScan.prepare and the bitmap/index paths equal to the scan as it was, getStatuses, same exclusion boxes, preview rebuild only on colour changes, prep=/build=/wait= lines
 ```

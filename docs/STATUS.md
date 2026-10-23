@@ -564,6 +564,21 @@ In-game checklist for `visual-wip`:
 
 Offline harness after this stage: 1408 asserts, 0 failures; Bridge 466 / 159 / 360.
 
+### Farming land: Cane layout (on `wip/cane`, on top of `wip/visual`, waiting for the in-game test; not merged)
+
+Raphael (2026-10-22): the sugar cane had only straight rows of water; one water with four canes around it
+should fit more cane in the same space.
+
+| What | Change |
+|---|---|
+| Cane layout | Farming land > Farm > Cane layout: **Cross** (new, default) or Lines (as before). Cross: a water block with a cane on each of its four sides, repeated so every cane touches one water: 4 cane in 5 (80 %) against 2 in 3 (67 %) for Lines. It is the densest pattern there can be: a water block serves four cells at most and the diagonal does not count |
+| At the outline | The pattern is cut by the outline (a hexagon, a circle): both mirror images and all 5 offsets are tried and the one with the most cane kept; cells left dry get a water of their own where it wins cane. A square of 60 x 60 gets 78.7 % cane (722 water); a 5 x 5 gets 7 water and 18 cane (the fewest water that reach every cell) |
+| Rows along | only used by Lines now (hidden for Cross) |
+
+In-game checklist: Farming land > Crop Sugar cane: the Cane layout row; Cross: a plus of 4 cane around each water
+(Show field on); cane beside water everywhere, also in a hexagon or circle; Lines as before (Rows along back); an
+old save of Farming land still opens.
+
 ## 2. Final jars
 
 Build output: `fabric1.21.11/build/libs/BuildGuide-Fabric-0.4.8.jar` (mod version is still 0.4.8).

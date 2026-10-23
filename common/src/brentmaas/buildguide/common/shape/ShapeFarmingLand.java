@@ -12,8 +12,11 @@ import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
 /**
  * Farming land (2026-10-18): where the water goes in a farm of any outline (rectangle, polygon, circle), one
  * layer at ground level (y = 0). Crops: water on a grid (a water block hydrates farmland up to 4 blocks away,
- * squares of 9 by 9), then more water wherever the outline leaves farmland out of reach. Sugar cane: rows of
- * water every third line, the cane on both sides of each. The water is blue, the edge of the field in the
+ * squares of 9 by 9), then more water wherever the outline leaves farmland out of reach. Sugar cane (cane
+ * must touch water on one of its four sides): Lines, a row of water every third line (2 cane in 3), or Cross,
+ * one water with a cane on each of its four sides (water where x + 2z, or x + 3z, is a multiple of 5): 4 cane
+ * in 5, the most any pattern can give since a water block serves four cells at most; at the outline every
+ * offset of both mirror images is tried and the one with the most cane kept. The water is blue, the edge of the field in the
  * shape's colour and, optionally, the field (the farmland or the cane) green. Build focus parts: Water,
  * Field, Edge.
  */
@@ -27,6 +30,10 @@ public class ShapeFarmingLand extends Shape {
 		CROPS,
 		SUGAR_CANE
 	}
+	public enum CaneLayout {
+		LINES,
+		CROSS
+	}
 	public enum Rows {
 		X,
 		Z
@@ -34,6 +41,7 @@ public class ShapeFarmingLand extends Shape {
 	private static final String[] outlineNames = {"Rectangle", "Polygon", "Circle"};
 	private static final String[] cropNames = {"Crops", "Sugar cane"};
 	private static final String[] rowNames = {"X", "Z"};
+	private static final String[] caneLayoutNames = {"Lines", "Cross"};
 	private static final String[] focusPartNames = {"All", "Cap", "Body", "Spikes", "Hidden", "Walls", "Floor", "Roof", "Details", "Pillars", "Water", "Field", "Edge"};
 	private static final FocusFilter.Part[] farmParts = {FocusFilter.Part.WATER, FocusFilter.Part.FIELD, FocusFilter.Part.EDGE};
 	// A water block hydrates farmland up to this many blocks away on both axes (vanilla FarmBlock)
@@ -50,6 +58,7 @@ public class ShapeFarmingLand extends Shape {
 	private PropertyInt propertyAngle = new PropertyInt(0, new Translatable("property.buildguide.angle"), () -> update());
 	// Farm
 	private PropertyEnum<Crop> propertyCrop = new PropertyEnum<Crop>(Crop.CROPS, new Translatable("property.buildguide.crop"), () -> onLayoutChanged(), cropNames);
+	private PropertyEnum<CaneLayout> propertyCaneLayout = new PropertyEnum<CaneLayout>(CaneLayout.CROSS, new Translatable("property.buildguide.canelayout"), () -> onLayoutChanged(), caneLayoutNames);
 	private PropertyRangeInt propertySpacing = new PropertyRangeInt(9, new Translatable("property.buildguide.waterspacing"), () -> update(), 2, 2 * hydration + 1);
 	private PropertyEnum<Rows> propertyRows = new PropertyEnum<Rows>(Rows.X, new Translatable("property.buildguide.rows"), () -> update(), rowNames);
 	private PropertyBoolean propertyShowField = new PropertyBoolean(false, new Translatable("property.buildguide.showfield"), () -> update());
@@ -58,7 +67,7 @@ public class ShapeFarmingLand extends Shape {
 	private PropertyInt propertyFocusLayer = new PropertyInt(FocusFilter.LAYER_ALL, new Translatable("screen.buildguide.focus.layer"), null);
 
 	private Property<?>[] outlineRows = {propertyOutline, propertyWidthX, propertyWidthZ, propertySides, propertyRadius, propertyAngle};
-	private Property<?>[] farmRows = {propertyCrop, propertySpacing, propertyRows, propertyShowField, propertyShowEdge};
+	private Property<?>[] farmRows = {propertyCrop, propertyCaneLayout, propertySpacing, propertyRows, propertyShowField, propertyShowEdge};
 
 	// The last generation's layout (parts and colours), set before its first block
 	private volatile Layout generated = null;
@@ -67,9 +76,12 @@ public class ShapeFarmingLand extends Shape {
 		super();
 
 		for(Property<?> p: outlineRows) properties.add(p);
-		for(Property<?> p: farmRows) properties.add(p);
+		for(Property<?> p: farmRows) {
+			if(p != propertyCaneLayout) properties.add(p); // saved after the focus rows: what is saved only grows at the end
+		}
 		properties.add(propertyFocusPart);
 		properties.add(propertyFocusLayer);
+		properties.add(propertyCaneLayout);
 		hideFromGui(propertyFocusPart);
 		hideFromGui(propertyFocusLayer);
 		assignSection(declareSection(new Translatable("property.buildguide.section.outline")), outlineRows);
@@ -81,8 +93,8 @@ public class ShapeFarmingLand extends Shape {
 	public void onSelectedInGUI() {
 		Outline o = propertyOutline.value;
 		boolean cane = propertyCrop.value == Crop.SUGAR_CANE;
-		Property<?>[] rows = {propertyOutline, propertyWidthX, propertyWidthZ, propertySides, propertyRadius, propertyAngle, propertyCrop, propertySpacing, propertyRows, propertyShowField, propertyShowEdge};
-		boolean[] used = {true, o == Outline.RECTANGLE, o == Outline.RECTANGLE, o == Outline.POLYGON, o != Outline.RECTANGLE, o == Outline.POLYGON, true, !cane, cane, true, true};
+		Property<?>[] rows = {propertyOutline, propertyWidthX, propertyWidthZ, propertySides, propertyRadius, propertyAngle, propertyCrop, propertyCaneLayout, propertySpacing, propertyRows, propertyShowField, propertyShowEdge};
+		boolean[] used = {true, o == Outline.RECTANGLE, o == Outline.RECTANGLE, o == Outline.POLYGON, o != Outline.RECTANGLE, o == Outline.POLYGON, true, cane, !cane, cane && propertyCaneLayout.value == CaneLayout.LINES, true, true};
 		int row = 0;
 		for(int i = 0;i < rows.length;++i) {
 			if(used[i] && isShown(rows[i])) row = placeRow(row, rows[i]);
@@ -105,6 +117,7 @@ public class ShapeFarmingLand extends Shape {
 		l.radius = Math.min(propertyRadius.value, maxSize / 2);
 		l.angle = Math.toRadians(propertyAngle.value);
 		l.crop = propertyCrop.value;
+		l.caneLayout = propertyCaneLayout.value;
 		l.spacing = propertySpacing.value;
 		l.rows = propertyRows.value;
 		l.showField = propertyShowField.value;
@@ -189,6 +202,7 @@ public class ShapeFarmingLand extends Shape {
 		int widthX, widthZ, sides;
 		double radius, angle;
 		Crop crop;
+		CaneLayout caneLayout;
 		int spacing;
 		Rows rows;
 		boolean showField, showEdge;
@@ -326,9 +340,84 @@ public class ShapeFarmingLand extends Shape {
 			return new int[] {bx, bz};
 		}
 
-		// Sugar cane: a row of water every third line across the rows' axis (cane, water, cane), the first
-		// one on the second line so the edge lines are cane
+		// Sugar cane. Cross: water where x + k z is a multiple of 5 (k = 2 or 3, the two mirror images), so each
+		// water has a cane on its four sides and each cane touches exactly one water. The outline cuts the
+		// pattern: every k and offset is tried, the cells left dry get water where that wins cane, and the
+		// version with the most cane is kept
 		private void placeCaneWater() {
+			if(caneLayout == CaneLayout.CROSS) {
+				placeCrossWater();
+				return;
+			}
+			placeLineWater();
+		}
+
+		private void placeCrossWater() {
+			boolean[] best = null;
+			int bestCane = -1;
+			for(int k = 2;k <= 3;++k) {
+				for(int o = 0;o < 5;++o) {
+					java.util.Arrays.fill(water, false);
+					for(int x = minX;x <= maxX;++x) {
+						for(int z = minZ;z <= maxZ;++z) {
+							if(inside[index(x, z)] && Math.floorMod(x - minX + k * (z - minZ) + o, 5) == 0) water[index(x, z)] = true;
+						}
+					}
+					waterForDryCane();
+					int cane = countCane();
+					if(cane > bestCane) {
+						bestCane = cane;
+						best = water.clone();
+					}
+				}
+			}
+			System.arraycopy(best, 0, water, 0, water.length);
+		}
+
+		private boolean dry(int x, int z) {
+			return isInside(x, z) && !isWater(x, z) && !isWater(x + 1, z) && !isWater(x - 1, z) && !isWater(x, z + 1) && !isWater(x, z - 1);
+		}
+
+		// Dry cells beside the cut outline: water on the cell or on one of its neighbours when that puts cane
+		// beside it that would not have been (a neighbour that was cane is lost: it must win at least one more)
+		private void waterForDryCane() {
+			int[][] around = {{0, 0}, {1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+			for(int x = minX;x <= maxX;++x) {
+				for(int z = minZ;z <= maxZ;++z) {
+					if(!dry(x, z)) continue;
+					int bx = 0, bz = 0, bestGain = 0;
+					for(int[] d: around) {
+						int cx = x + d[0], cz = z + d[1];
+						if(!isInside(cx, cz) || isWater(cx, cz)) continue;
+						int gain = dry(cx, cz) ? 0 : -1;
+						for(int[] e: around) {
+							if(e[0] == 0 && e[1] == 0) continue;
+							if(dry(cx + e[0], cz + e[1])) ++gain;
+						}
+						if(gain > bestGain) {
+							bestGain = gain;
+							bx = cx;
+							bz = cz;
+						}
+					}
+					if(bestGain > 0) water[index(bx, bz)] = true;
+				}
+			}
+		}
+
+		int countCane() {
+			int n = 0;
+			for(int x = minX;x <= maxX;++x) {
+				for(int z = minZ;z <= maxZ;++z) {
+					if(isField(x, z)) ++n;
+				}
+			}
+			return n;
+		}
+
+		// Lines: a row of water every third line across the rows' axis (cane, water, cane), the first
+		// one on the second line so the edge lines are cane
+		private void placeLineWater() {
 			for(int x = minX;x <= maxX;++x) {
 				for(int z = minZ;z <= maxZ;++z) {
 					int line = rows == Rows.X ? z - minZ : x - minX;

@@ -172,6 +172,15 @@ public abstract class Shape {
   last unit; the scan preparation copies the expected set with `toLongArray()` under the lock and
   boxes it after.
 
+### Farming land: Cane layout (`wip/cane`)
+
+- `ShapeFarmingLand.CaneLayout { LINES, CROSS }`, property `propertyCaneLayout` (default CROSS), saved **last**
+  (14 values; a save of 13 still loads). Sugar cane only; the Rows property now applies to Lines only.
+- Cross: water where `x + k z` is a multiple of 5 (k = 2 or 3, the two mirror images, any offset 0..4), so each
+  water has cane on its four sides and each cane touches one water: 4 cane in 5, the most a pattern can
+  give. The outline cuts it: the 10 versions are tried, cells left dry get water where that wins cane
+  (`waterForDryCane`), the one with the most cane (`countCane`) is kept.
+
 ### Geometric capsule, Check errors and Find blocks (`wip/visual`)
 
 - `ShapePolygonBuilding` is shown as "Geometric capsule" (`shape.buildguide.polygonbuilding`); class and registry

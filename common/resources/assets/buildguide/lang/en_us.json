@@ -300,6 +300,7 @@
 	"property.buildguide.crop": "Crop",
 	"property.buildguide.waterspacing": "Water spacing",
 	"property.buildguide.rows": "Rows along",
+	"property.buildguide.canelayout": "Cane layout",
 	"property.buildguide.showfield": "Show field",
 	"property.buildguide.showedge": "Show edge",
 	"property.buildguide.angle": "Angle",

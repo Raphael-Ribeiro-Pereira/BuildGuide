@@ -79,22 +79,48 @@ public class FarmingLandTest {
 		long t0 = System.nanoTime(); ShapeFarmingLand big = make("propertyWidthX", 257, "propertyWidthZ", 257); long ms = (System.nanoTime() - t0) / 1000000;
 		check(ms < 3000 && dry(big) == 0, "257 x 257 (every grid offset tried): " + ms + " ms, " + cells(big, FocusFilter.Part.WATER).size() + " water");
 		System.out.println("-- sugar cane");
-		ShapeFarmingLand cane = make("propertyCrop", CANE, "propertyWidthX", 12, "propertyWidthZ", 9, "propertyShowField", true);
+		ShapeFarmingLand cane = make("propertyCrop", CANE, "propertyCaneLayout", ShapeFarmingLand.CaneLayout.LINES, "propertyWidthX", 12, "propertyWidthZ", 9, "propertyShowField", true);
 		if(show) print(cane, 7);
 		List<int[]> cw = cells(cane, FocusFilter.Part.WATER);
 		check(cw.size() == 3 * 12, "12 x 9, rows along X: three water rows of 12: " + cw.size());
 		boolean nextTo = true; for(long p: cane.getExpectedBlocks()){ int x = LocalPos.unpackX(p), z = LocalPos.unpackZ(p); if(cane.partOf(x, 0, z) == FocusFilter.Part.WATER) continue; boolean ok = false; for(int[] w: cw) if(Math.abs(w[0] - x) + Math.abs(w[1] - z) == 1) ok = true; if(!ok) nextTo = false; }
 		check(nextTo, "every cane cell beside water");
 		check(cane.getExpectedBlocks().size() == 12 * 9, "12 x 9: every line cane or water");
-		ShapeFarmingLand caneZ = make("propertyCrop", CANE, "propertyRows", ShapeFarmingLand.Rows.Z, "propertyWidthX", 9, "propertyWidthZ", 12);
+		ShapeFarmingLand caneZ = make("propertyCrop", CANE, "propertyCaneLayout", ShapeFarmingLand.CaneLayout.LINES, "propertyRows", ShapeFarmingLand.Rows.Z, "propertyWidthX", 9, "propertyWidthZ", 12);
 		check(cells(caneZ, FocusFilter.Part.WATER).size() == 3 * 12, "rows along Z: the same turned");
+
+		System.out.println("-- sugar cane, cross: a water with a cane on each of its four sides");
+		ShapeFarmingLand cross = make("propertyCrop", CANE, "propertyWidthX", 60, "propertyWidthZ", 60, "propertyShowField", true, "propertyShowEdge", false);
+		int cwn = cells(cross, FocusFilter.Part.WATER).size(), ccn = cells(cross, FocusFilter.Part.FIELD).size();
+		check(ccn >= 0.77 * 3600 && cwn <= 0.22 * 3600, "60 x 60: " + ccn + " cane (" + (100 * ccn / 3600) + " %), " + cwn + " water; lines give 66 %");
+		ShapeFarmingLand small = make("propertyCrop", CANE, "propertyWidthX", 5, "propertyWidthZ", 5, "propertyShowField", true, "propertyShowEdge", false);
+		if(show) print(small, 3);
+		check(cells(small, FocusFilter.Part.WATER).size() == 7 && cells(small, FocusFilter.Part.FIELD).size() == 18, "5 x 5: 7 water and 18 cane (7 is the fewest that reach every cell of a 5 x 5 square: the cells at the border have no cane outside)");
+		boolean sides = true; int fewer = 0, caseCount = 0;
+		Random rnd = new Random(5);
+		for(int i = 0; i < 12; i++){
+			Object o = i % 3 == 0 ? ShapeFarmingLand.Outline.CIRCLE : i % 3 == 1 ? ShapeFarmingLand.Outline.POLYGON : ShapeFarmingLand.Outline.RECTANGLE;
+			Object[] kv = {"propertyCrop", CANE, "propertyOutline", o, "propertyRadius", 6f + rnd.nextInt(25), "propertySides", 5 + rnd.nextInt(5), "propertyAngle", rnd.nextInt(60), "propertyWidthX", 8 + rnd.nextInt(30), "propertyWidthZ", 8 + rnd.nextInt(30), "propertyShowField", true, "propertyShowEdge", false};
+			ShapeFarmingLand c = make(kv);
+			Object[] kl = Arrays.copyOf(kv, kv.length + 2); kl[kv.length] = "propertyCaneLayout"; kl[kv.length + 1] = ShapeFarmingLand.CaneLayout.LINES;
+			ShapeFarmingLand l = make(kl);
+			List<int[]> cwa = cells(c, FocusFilter.Part.WATER);
+			for(long p: c.getExpectedBlocks()){ int x = LocalPos.unpackX(p), z = LocalPos.unpackZ(p); if(c.partOf(x, 0, z) == FocusFilter.Part.WATER) continue; boolean ok = false; for(int[] w: cwa) if(Math.abs(w[0] - x) + Math.abs(w[1] - z) == 1) ok = true; if(!ok) sides = false; }
+			caseCount++; if(cells(c, FocusFilter.Part.FIELD).size() > cells(l, FocusFilter.Part.FIELD).size()) fewer++;
+		}
+		check(sides, "12 random outlines: every cane cell beside water");
+		check(fewer == caseCount, "12 random outlines: more cane than the lines in each (" + fewer + " of " + caseCount + ")");
+		ShapeFarmingLand hexCane = make("propertyCrop", CANE, "propertyOutline", ShapeFarmingLand.Outline.POLYGON, "propertySides", 6, "propertyRadius", 12f, "propertyShowField", true, "propertyShowEdge", false);
+		if(show) print(hexCane, 14);
 
 		System.out.println("-- parts and persistence");
 		FocusFilter.Part q = FocusFilter.Part.ALL; StringBuilder seq = new StringBuilder(); for(int k = 0; k < 5; k++){ q = FocusFilter.nextPart(q, eighteen.focusParts()); seq.append(q).append(' '); }
 		check(seq.toString().equals("WATER FIELD EDGE HIDDEN ALL "), "Part button: All, Water, Field, Edge, Hidden: " + seq);
 		RecBufferColours.check(eighteen);
 		String data = new ShapeFarmingLand().toPersistence();
-		check(data.split(",").length == 13, "13 values: " + data);
+		check(data.split(",").length == 14 && data.endsWith(",CROSS"), "14 values, the cane layout last: " + data);
+		ShapeFarmingLand old = new ShapeFarmingLand(); old.restorePersistence(data.substring(0, data.lastIndexOf(',')));
+		check(!old.error, "a save of 13 values still loads (the layout stays at its default)");
 		ShapeFarmingLand back = new ShapeFarmingLand(); back.restorePersistence(data.replace("RECTANGLE,18,18", "CIRCLE,30,18"));
 		check(!back.error && back.toPersistence().startsWith("CIRCLE,30,18"), "saved and loaded: " + back.toPersistence());
 
