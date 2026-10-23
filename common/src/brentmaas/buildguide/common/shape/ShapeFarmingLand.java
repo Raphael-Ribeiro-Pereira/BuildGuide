@@ -149,6 +149,15 @@ public class ShapeFarmingLand extends Shape {
 		buffer.setColour((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF, alpha);
 	}
 
+	// Water (2026-10-22): the water cells want water, so they count as built once they hold it (a water block, or a
+	// waterlogged slab or stairs) and Fill puts water in them. The layout is never changed once built
+	@Override
+	public java.util.function.LongPredicate waterTest() {
+		Layout l = generated;
+		if(l == null) return null;
+		return pos -> LocalPos.unpackY(pos) == 0 && l.isWater(LocalPos.unpackX(pos), LocalPos.unpackZ(pos));
+	}
+
 	// A world buffer made again for the focus keeps the colours
 	@Override
 	protected void colourCube(IShapeBuffer buffer, int x, int y, int z) {

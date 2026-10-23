@@ -12,6 +12,10 @@ public interface IBlockProbe {
 	public static final int FLAG_IGNORED = 4;
 	// The block can be replaced by placing another one into it (air, water, tall grass): Block.canBeReplaced()
 	public static final int FLAG_REPLACEABLE = 8;
+	// Water (2026-10-22): the block holds a water source, a water block or a waterlogged one (slab, stairs, leaves)
+	public static final int FLAG_WATER = 16;
+	// Water: the block can take water in and is dry (a slab, stairs or leaves that are not waterlogged)
+	public static final int FLAG_WATERLOGGABLE = 32;
 
 	// The chunk holding this position is loaded. An unloaded chunk reads as air, which is not evidence
 	public boolean isLoaded(int x, int y, int z);

@@ -21,17 +21,22 @@ import brentmaas.buildguide.common.shape.SmartFillPlan.Group;
 // and the same block first for the same cell, the first block the player has, what the stock covers. SmartFill:
 // the plan's refusals (another kind of world, generating, nothing), the choice fitted to what is carried and
 // remembered by colour, the batches (32 a tick, one in flight), a group out of blocks, Stop, a stopped fill's
-// late answer. Shape.cubeRgb. The one filter: the preview shows what the world's Part and Layer show.
+// late answer. Shape.cubeRgb. The one filter: the preview shows what the world's Part and Layer show. Water
+// (2026-10-22): the farm's holes validate as built with a water source in them (a water block or a waterlogged
+// one), Fill puts water in them (also into a dry slab), from a stock of WATER; and nothing goes to the chat: the
+// Shape tab shows SmartFill.status().
+
 public class FillTest {
 	static int fails = 0;
 	static void check(boolean c, String m){ System.out.println((c?"OK   ":"FAIL ")+m); if(!c) ++fails; }
 
 	// A world: solid, replaceable and air cells by position, an unloaded region and a build height
+	// water: flowing water (replaceable, not a source); sources: water blocks; slabs: dry, can take water; wetSlabs: waterlogged
 	static class World implements IBlockProbe {
-		final Set<String> solid = new HashSet<>(), water = new HashSet<>(); int unloadedFromX = Integer.MAX_VALUE, minY = -64, maxY = 319;
+		final Set<String> solid = new HashSet<>(), water = new HashSet<>(), sources = new HashSet<>(), slabs = new HashSet<>(), wetSlabs = new HashSet<>(); int unloadedFromX = Integer.MAX_VALUE, minY = -64, maxY = 319;
 		static String k(int x, int y, int z){ return x + "," + y + "," + z; }
 		public boolean isLoaded(int x, int y, int z){ return x < unloadedFromX; }
-		public int flags(int x, int y, int z){ String p = k(x, y, z); if(solid.contains(p)) return FLAG_SOLID; if(water.contains(p)) return FLAG_REPLACEABLE; return FLAG_AIR; }
+		public int flags(int x, int y, int z){ String p = k(x, y, z); if(solid.contains(p)) return FLAG_SOLID; if(slabs.contains(p)) return FLAG_SOLID | FLAG_WATERLOGGABLE; if(wetSlabs.contains(p)) return FLAG_SOLID | FLAG_WATER; if(sources.contains(p)) return FLAG_REPLACEABLE | FLAG_WATER; if(water.contains(p)) return FLAG_REPLACEABLE; return FLAG_AIR; }
 		public String name(int x, int y, int z){ return "test"; }
 		@Override public boolean isInBuildHeight(int y){ return y >= minY && y <= maxY; }
 	}
@@ -113,7 +118,9 @@ public class FillTest {
 		System.out.println("-- the colour of a cube (Shape.cubeRgb)");
 		BuildGuide.screenHandler = new AbstractScreenHandler(){ public IScreenWrapper createWrapper(Translatable t){ return null; } public void showNone(){} public String translate(String k){ return k; } public String translate(String k, Object... v){ return k + Arrays.toString(v); } };
 		BuildGuide.widgetHandler = new PresetTest.FakeWidgets();
-		BuildGuide.logHandler = (ILogHandler) Proxy.newProxyInstance(FillTest.class.getClassLoader(), new Class<?>[]{ILogHandler.class}, (p, m, x) -> { if(m.getName().equals("sendChatMessage")) chat.add((String) x[0]); return null; });
+		BuildGuide.logHandler = (ILogHandler) Proxy.newProxyInstance(FillTest.class.getClassLoader(), new Class<?>[]{ILogHandler.class}, (p, m, x) -> { if(m.getName().contains("Chat")) chat.add(String.valueOf(x[0])); return null; });
+		check(Arrays.stream(ILogHandler.class.getMethods()).noneMatch(m -> m.getName().toLowerCase().contains("chat")), "the log handler has no way to the chat any more");
+		long[] now = {1000}; SmartFill.clock = () -> now[0];
 		File dir = Files.createTempDirectory("bgfill").toFile(); BuildGuide.config = new Config(dir);
 		TimingLog.sink = line -> {};
 		BuildGuide.shapeHandler = (IShapeHandler) Proxy.newProxyInstance(FillTest.class.getClassLoader(), new Class<?>[]{IShapeHandler.class}, (p, m, x) -> {
@@ -172,14 +179,16 @@ public class FillTest {
 		System.out.println("-- SmartFill: running");
 		chat.clear(); batches.clear(); batchCells.clear();
 		boolean started = SmartFill.start(plan);
-		check(started && SmartFill.isRunning() && chat.get(0).contains("smartfill.start[" + plan.groups.get(reliefGroup).cells.size() + "]"), "Start with only the relief chosen: only its cells go (" + chat + ")");
+		check(started && SmartFill.isRunning() && SmartFill.status().equals("screen.buildguide.smartfill.running[0%, 0, " + plan.groups.get(reliefGroup).cells.size() + "]"), "Start with only the relief chosen: only its cells go; the Shape tab reads " + SmartFill.status());
 		check(SmartFill.title().equals("screen.buildguide.smartfill.stop[0%]"), "the button reads Stop 0%");
 		SmartFill.tick();
 		boolean onlyAndesite = true; for(String[] c: batches.get(0)) if(!Arrays.equals(c, new String[]{"minecraft:andesite"})) onlyAndesite = false;
 		check(batches.size() == 1 && batches.get(0).length == Math.min(SmartFill.blocksPerTick, plan.groups.get(reliefGroup).cells.size()) && onlyAndesite, "one tick: one batch of at most " + SmartFill.blocksPerTick + ", andesite each");
 		runToEnd();
 		int reliefCells = plan.groups.get(reliefGroup).cells.size();
-		check(!SmartFill.isRunning() && stock.get("minecraft:andesite") == 0 && chat.get(chat.size() - 1).contains("smartfill.done[50, " + reliefCells + ", 0, 0, " + (reliefCells - 50) + "]"), "50 andesite for " + reliefCells + " cells: 50 placed, the rest without blocks left, and the end says so: " + chat.get(chat.size() - 1));
+		check(!SmartFill.isRunning() && stock.get("minecraft:andesite") == 0 && SmartFill.status().startsWith("screen.buildguide.smartfill.done[50, " + reliefCells + ", ") && SmartFill.status().contains("smartfill.short[" + (reliefCells - 50) + "]") && !SmartFill.status().contains("taken"), "50 andesite for " + reliefCells + " cells: 50 placed, the rest ran out, only that said: " + SmartFill.status());
+		now[0] += SmartFill.resultMillis;
+		check(SmartFill.status() == null && SmartFill.lastResult() != null && chat.isEmpty(), "20 s later the Shape tab says nothing more; nothing ever went to the chat");
 		int sentAfterOut = 0; for(String[][] b: batches) sentAfterOut += b.length;
 		check(sentAfterOut < reliefCells, "once the colour ran out its other cells are not sent (" + sentAfterOut + " sent of " + reliefCells + ")");
 		int firstRelief = 0; while(plan.groupOf[firstRelief] != reliefGroup) firstRelief++;
@@ -197,7 +206,7 @@ public class FillTest {
 		check(firstBlocks.size() == 2, "a mix: both blocks come first in the batch (" + firstBlocks + ")");
 		Consumer<byte[]> late = pending; byte[] lateCodes = pendingCodes;
 		SmartFill.stop();
-		check(!SmartFill.isRunning() && chat.get(chat.size() - 1).contains("smartfill.stopped["), "Stop: the chat says how far (" + chat.get(chat.size() - 1) + ")");
+		check(!SmartFill.isRunning() && SmartFill.status().startsWith("screen.buildguide.smartfill.stopped["), "Stop: the Shape tab says how far (" + SmartFill.status() + ")");
 		batches.clear();
 		SmartFill.start(both); SmartFill.tick(); Consumer<byte[]> mine = pending; byte[] mineCodes = pendingCodes;
 		late.accept(lateCodes); SmartFill.tick();
@@ -206,9 +215,53 @@ public class FillTest {
 		check(batches.size() == 2, "its own answer is");
 		answerNow = true; pending.accept(pendingCodes); // the batch still waiting, then the rest at once
 		runToEnd();
-		check(!SmartFill.isRunning() && chat.get(chat.size() - 1).contains("smartfill.done[" + both.cells.size() + ", " + both.cells.size() + ", 0, 0, 0]"), "the cuboid filled: " + chat.get(chat.size() - 1));
-		SmartFill.Plan none = SmartFill.prepare(cuboidSet); SmartFill.clear(none, 0); chat.clear();
-		check(!SmartFill.start(none) && chat.get(0).contains("smartfill.noblocks"), "no colour has a block: nothing starts, the chat says so");
+		check(!SmartFill.isRunning() && SmartFill.status().equals("screen.buildguide.smartfill.done[" + both.cells.size() + ", " + both.cells.size() + ", ]"), "the cuboid filled: " + SmartFill.status());
+		SmartFill.Plan none = SmartFill.prepare(cuboidSet); SmartFill.clear(none, 0);
+		check(!SmartFill.start(none) && !SmartFill.isRunning() && chat.isEmpty(), "no colour has a block: nothing starts (the panel says so)");
+
+		System.out.println("-- water: the farm's holes");
+		ShapeFarmingLand farm = FocusWorldTest.place(new ShapeFarmingLand());
+		set(farm, "propertyCrop", ShapeFarmingLand.Crop.SUGAR_CANE); set(farm, "propertyWidthX", 9); set(farm, "propertyWidthZ", 9);
+		farm.update(); FocusWorldTest.settle(farm);
+		java.util.function.LongPredicate wet = farm.waterTest();
+		List<Long> holes = new ArrayList<>(); boolean sameAsParts = true;
+		for(long p: farm.getExpectedBlocks()){ boolean isHole = farm.partOf(LocalPos.unpackX(p), LocalPos.unpackY(p), LocalPos.unpackZ(p)) == FocusFilter.Part.WATER; if(isHole) holes.add(p); if(wet.test(p) != isHole) sameAsParts = false; }
+		check(holes.size() >= 4 && sameAsParts && new ShapeCuboid().waterTest() == null, "the farm wants water exactly in its water cells (" + holes.size() + "); other shapes want none");
+		check(LayerPalette.classify(null, wet, LocalPos.unpackX(holes.get(0)), 0, LocalPos.unpackZ(holes.get(0)), IBlockProbe.FLAG_REPLACEABLE | IBlockProbe.FLAG_WATER, LayerPalette.NONE) == ValidationState.OK
+			&& LayerPalette.classify(null, wet, LocalPos.unpackX(holes.get(0)), 0, LocalPos.unpackZ(holes.get(0)), IBlockProbe.FLAG_SOLID | IBlockProbe.FLAG_WATER, LayerPalette.NONE) == ValidationState.OK
+			&& LayerPalette.classify(null, wet, LocalPos.unpackX(holes.get(0)), 0, LocalPos.unpackZ(holes.get(0)), IBlockProbe.FLAG_SOLID, LayerPalette.NONE) == ValidationState.MISSING
+			&& LayerPalette.classify(null, wet, LocalPos.unpackX(holes.get(0)), 0, LocalPos.unpackZ(holes.get(0)), IBlockProbe.FLAG_AIR, LayerPalette.NONE) == ValidationState.MISSING, "a hole: built with a water block or a waterlogged slab; missing while dry, also under dirt");
+		long edge = -1; for(long p: farm.getExpectedBlocks()) if(!wet.test(p)){ edge = p; break; }
+		check(LayerPalette.classify(null, wet, LocalPos.unpackX(edge), LocalPos.unpackY(edge), LocalPos.unpackZ(edge), IBlockProbe.FLAG_SOLID, LayerPalette.NONE) == ValidationState.OK && LayerPalette.classify(null, wet, LocalPos.unpackX(edge), LocalPos.unpackY(edge), LocalPos.unpackZ(edge), IBlockProbe.FLAG_REPLACEABLE | IBlockProbe.FLAG_WATER, LayerPalette.NONE) == ValidationState.MISSING, "the edge: a solid block as before; water there is still missing");
+		World pond = new World(); long h0 = holes.get(0), h1 = holes.get(1), h2 = holes.get(2), h3 = holes.get(3);
+		pond.sources.add(World.k(LocalPos.unpackX(h0), 64, LocalPos.unpackZ(h0))); pond.slabs.add(World.k(LocalPos.unpackX(h1), 64, LocalPos.unpackZ(h1))); pond.solid.add(World.k(LocalPos.unpackX(h2), 64, LocalPos.unpackZ(h2))); pond.wetSlabs.add(World.k(LocalPos.unpackX(h3), 64, LocalPos.unpackZ(h3)));
+		for(long p: farm.getExpectedBlocks()) if(!wet.test(p)) pond.solid.add(World.k(LocalPos.unpackX(p), 64 + LocalPos.unpackY(p), LocalPos.unpackZ(p)));
+		ValidationState vs = new ValidationState(); vs.setWater(wet); vs.requestScan(0); vs.consumeScanRequest();
+		SliceScan scan = SliceScan.prepare(vs, new ArrayList<>(farm.getExpectedBlocks()), 0, 64, 0, 1, vs.getScanEpoch(), null, new ArrayList<>(), false); scan.step(pond, 0, () -> 0L); scan.publish(pond);
+		check(vs.getStatus(h0) == ValidationState.OK && vs.getStatus(h3) == ValidationState.OK && vs.getStatus(h1) == ValidationState.MISSING && vs.getStatus(h2) == ValidationState.MISSING && vs.getMissing() == holes.size() - 2 && vs.getStatus(edge) == ValidationState.OK, "a scan: the water block and the wet slab built, the dry slab and the dirt missing, every other hole missing, the edge built (missing " + vs.getMissing() + ")");
+		vs.updateBlock(h1, false, true, false, true, LayerPalette.NONE, "Oak Slab");
+		check(vs.getStatus(h1) == ValidationState.OK, "the slab waterlogged (a block event with water): built");
+		vs.updateBlock(h0, true, false, false, false, LayerPalette.NONE, null);
+		check(vs.getStatus(h0) == ValidationState.MISSING, "the water picked up: missing again");
+		List<Long> waterCells = FillPlan.cells(farm.getExpectedBlocks(), 0, 64, 0, new ArrayList<>(), null, pond, new double[]{LocalPos.unpackX(h1) + 0.2, 64, LocalPos.unpackZ(h1) + 0.2, LocalPos.unpackX(h1) + 0.8, 65.8, LocalPos.unpackZ(h1) + 0.8}, wet);
+		check(waterCells.size() == holes.size() - 3 && waterCells.contains(h1) && !waterCells.contains(h0) && !waterCells.contains(h2) && !waterCells.contains(h3), "Fill's holes: the dry ones and the dry slab (even with the player in it), not the water, the wet slab or the dirt (" + waterCells.size() + ")");
+		List<Group> wetGroups = SmartFillPlan.groups(new ArrayList<>(farm.getExpectedBlocks()), p -> 0x3F76E4, wet, null);
+		check(wetGroups.size() == 2 && wetGroups.stream().filter(g -> g.water).count() == 1 && wetGroups.stream().filter(g -> g.water).findFirst().get().cells.size() == holes.size(), "the same colour with and without water: two groups, the water one of its own");
+
+		System.out.println("-- water: Fill");
+		world = pond; ShapeSet farmSet = setOf(farm);
+		SmartFill.Plan farmPlan = SmartFill.prepare(farmSet);
+		Group waterGroup = farmPlan.groups.stream().filter(g -> g.water).findFirst().orElse(null);
+		check(farmPlan.message == null && waterGroup != null && waterGroup.cells.size() == holes.size() - 3 && waterGroup.blocks.equals(Arrays.asList(SmartFill.WATER)), "the farm's plan: a water group (" + (waterGroup == null ? 0 : waterGroup.cells.size()) + " holes) filled with water");
+		int wi = farmPlan.groups.indexOf(waterGroup);
+		SmartFill.toggle(farmPlan, wi, "minecraft:stone"); SmartFill.clear(farmPlan, wi); SmartFill.fitToStock(farmPlan, new HashMap<>(), held);
+		check(waterGroup.blocks.equals(Arrays.asList(SmartFill.WATER)), "no block can be chosen for it, Clear and the stock leave the water");
+		stock.clear(); stock.put(SmartFill.WATER, 2); batches.clear();
+		for(Group g: farmPlan.groups) if(!g.water) SmartFill.clear(farmPlan, farmPlan.groups.indexOf(g));
+		SmartFill.start(farmPlan); runToEnd();
+		boolean onlyWater = true; for(String[][] b: batches) for(String[] c: b) if(!Arrays.equals(c, new String[]{SmartFill.WATER})) onlyWater = false;
+		check(onlyWater && stock.get(SmartFill.WATER) == 0 && SmartFill.lastResult().startsWith("screen.buildguide.smartfill.done[2, " + waterGroup.cells.size() + ", ") && SmartFill.lastResult().contains("short[" + (waterGroup.cells.size() - 2) + "]"), "two buckets' worth for " + waterGroup.cells.size() + " holes: each asks for water, 2 filled, the rest ran out: " + SmartFill.lastResult());
+		world = new World();
 
 		System.out.println("-- one filter: the preview shows what the world shows");
 		BuildGuide.config.focusFrom.value = 0;
@@ -229,7 +282,8 @@ public class FillTest {
 
 		System.out.println("-- texts");
 		String lang = new String(Files.readAllBytes(new File("common/resources/assets/buildguide/lang/en_us.json").toPath()), "UTF-8");
-		boolean all2 = true; for(String key: new String[]{"title", "colours", "carried", "none", "mix", "enough", "nocarried", "hint", "clear", "back", "go", "singleplayer", "noinventory", "noblocks", "stop", "start", "stopped", "done"}) if(!lang.contains("\"screen.buildguide.smartfill." + key + "\"")) { all2 = false; System.out.println("   missing " + key); }
+		boolean all2 = true; for(String key: new String[]{"title", "colours", "carried", "none", "mix", "enough", "nocarried", "hint", "clear", "back", "go", "singleplayer", "noinventory", "noblocks", "stop", "running", "stopped", "done", "taken", "unloaded", "short", "water", "waterendless", "watercarried", "nowater", "nowaterhint"}) if(!lang.contains("\"screen.buildguide.smartfill." + key + "\"")) { all2 = false; System.out.println("   missing " + key); }
+		check(lang.contains("\"screen.buildguide.preset.notwritten\"") && !lang.contains("\"screen.buildguide.smartfill.start\""), "the preset's problem is a text of the screen; the chat's start line is gone");
 		check(all2 && !lang.contains("fill.nocommands") && !lang.contains("fill.confirm"), "every smart fill text is there, the /fill ones are gone");
 
 		System.out.println(fails == 0 ? "ALL OK" : fails + " FAILED");

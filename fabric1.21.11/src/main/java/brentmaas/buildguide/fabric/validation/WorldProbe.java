@@ -6,6 +6,8 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.material.Fluids;
 
 /**
  * IBlockProbe over the client world, for StateReconciler and SliceScan (render thread only: one reused mutable
@@ -46,6 +48,9 @@ public class WorldProbe implements IBlockProbe {
 		if(state.blocksMotion()) flags |= FLAG_SOLID;
 		if(RenderHandler.isIgnored(state)) flags |= FLAG_IGNORED;
 		if(state.canBeReplaced()) flags |= FLAG_REPLACEABLE; // water, tall grass: a placed block takes their place (area 3)
+		// Water (2026-10-22): a water source, as a block or waterlogged; or a dry block that can take it in
+		if(state.getFluidState().isSourceOfType(Fluids.WATER)) flags |= FLAG_WATER;
+		else if(state.hasProperty(BlockStateProperties.WATERLOGGED)) flags |= FLAG_WATERLOGGABLE;
 		return flags;
 	}
 	

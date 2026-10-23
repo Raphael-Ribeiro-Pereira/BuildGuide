@@ -225,6 +225,9 @@ public class ShapeScreen extends BaseScreen{
 		// Build focus: what the world shows, and so the preview above
 		String focus = focusNotice(BuildGuide.stateManager.getState().getCurrentShape());
 		if(focus != null) drawShadowLeft(focus, x1 + 3, y1 + 3, 0x66CCFF);
+		// Fill (2026-10-22, instead of the chat): its progress, then for a while how it ended
+		String fillStatus = SmartFill.status();
+		if(fillStatus != null) drawShadowLeft(fit(fillStatus, x2 - x1 - 6), x1 + 3, y2 - 20, SmartFill.isRunning() ? 0x80FF80 : 0xAAAAAA);
 		// Live apply: the world still shows an older generation (Idle or On close mode)
 		if(BuildGuide.stateManager.getState().getCurrentShape().worldGate.isPending()) drawShadowLeft(textWorldPending.toString(), x1 + 3, y2 - 10, 0xFFCC66);
 		else {

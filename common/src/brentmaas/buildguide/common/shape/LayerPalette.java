@@ -14,6 +14,8 @@ package brentmaas.buildguide.common.shape;
  *  - otherwise (no block chosen for the layer): OK.
  *
  * Without a palette (null) the rule is the one of before. Only the block's id is compared, never its state.
+ * Water (2026-10-22): a position the shape wants water in (the farm's holes) is OK when it holds a water source
+ * (a water block, or a waterlogged slab, stairs, leaves...) and MISSING otherwise, whatever the palette.
  * Only primitives: no net.minecraft.
  */
 public final class LayerPalette {
@@ -54,8 +56,14 @@ public final class LayerPalette {
 		return byWanted(palette, palette == null ? NONE : palette.idOf(palette.layers.layerOf(y)), flags, blockId);
 	}
 
+	// The same with the positions that want water (local, null: none). Every validation path calls this one
+	public static byte classify(LayerPalette palette, java.util.function.LongPredicate water, int x, int y, int z, int flags, int blockId) {
+		if(water != null && water.test(LocalPos.pack(x, y, z))) return (flags & IBlockProbe.FLAG_WATER) != 0 ? ValidationState.OK : ValidationState.MISSING;
+		return classify(palette, x, y, z, flags, blockId);
+	}
+
 	// The same at a local position: the layer is the layers' layerAt (by y for the Island, by column for the
-	// Terrain). Every validation path calls this one
+	// Terrain)
 	public static byte classify(LayerPalette palette, int x, int y, int z, int flags, int blockId) {
 		return byWanted(palette, palette == null ? NONE : palette.idOf(palette.layers.layerAt(x, y, z)), flags, blockId);
 	}

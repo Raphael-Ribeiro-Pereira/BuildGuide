@@ -70,7 +70,7 @@ public class PaletteIslandTest {
 		held = "minecraft:stone"; chat.clear();
 		check(b1.fromHand() && b1.value.equals("minecraft:stone") && chat.isEmpty(), "Hand with a block in the main hand: its id is applied");
 		held = null;
-		check(!b1.fromHand() && b1.value.equals("minecraft:stone") && chat.equals(Arrays.asList("screen.buildguide.holdablock")), "Hand with no block (empty hand, or an item that is not a block): \"Hold a block\" in the chat, nothing changes");
+		check(!b1.fromHand() && b1.value.equals("minecraft:stone") && chat.isEmpty() && field.text.equals("screen.buildguide.holdablock") && field.colour == 0xFF0000, "Hand with no block (empty hand, or an item that is not a block): \"Hold a block\" in red in the field, nothing in the chat, nothing applied");
 
 		System.out.println("-- the palette travels with the generation");
 		TestIsland g = new TestIsland(); IslandLayersTest.set(g); block(g, 2).apply("dirt");

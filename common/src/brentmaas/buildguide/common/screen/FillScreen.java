@@ -19,6 +19,8 @@ import brentmaas.buildguide.common.shape.SmartFillPlan.Group;
  * it): one button each, beside its colour, with how many blocks and the blocks chosen. Right, the blocks the
  * player carries, the shulker boxes and backpacks among them counted in: a click puts one in the selected
  * colour's choice or takes it out, and two or more mix. Start places them (SmartFill) and goes back.
+ * A colour that wants water (the farm's holes) is filled with water: no blocks to choose, the panel says where
+ * the water comes from (the endless pool the player stands in, or how many buckets' worth they carry).
  *
  * The plan and the inventory are read once, when the panel opens; opening it again reads them again.
  */
@@ -39,6 +41,8 @@ public class FillScreen extends BaseScreen {
 	private IButton[] groupButtons = new IButton[0];
 	private ISelectorList list = null;
 	private IButton buttonStart = null;
+	// Start found nothing to place (no colour with a block): said under the colours
+	private boolean startRefused = false;
 
 	public FillScreen(BaseScreen parent) {
 		this.parent = parent;
@@ -48,7 +52,7 @@ public class FillScreen extends BaseScreen {
 		if(message == null && carried == null) message = "screen.buildguide.smartfill.noinventory";
 		stock = carried;
 		if(stock != null) {
-			stockIds.addAll(stock.keySet());
+			for(String id: stock.keySet()) if(!id.equals(SmartFill.WATER)) stockIds.add(id);
 			stockIds.sort((a, b) -> stock.get(a).equals(stock.get(b)) ? name(a).compareTo(name(b)) : Integer.compare(stock.get(b), stock.get(a)));
 			SmartFill.fitToStock(plan, stock, BuildGuide.shapeHandler.heldBlockId());
 		}
@@ -75,6 +79,7 @@ public class FillScreen extends BaseScreen {
 		}));
 		buttonStart = BuildGuide.widgetHandler.createButton(w - panelX1 - bottomButtonWidth - 2, bottomY, bottomButtonWidth, 20, new Translatable("screen.buildguide.smartfill.go"), () -> {
 			if(SmartFill.start(plan)) back();
+			else startRefused = true;
 		});
 		addWidget(buttonStart);
 		if(!stockIds.isEmpty()) {
@@ -121,12 +126,21 @@ public class FillScreen extends BaseScreen {
 		int summaryY = groupsTop + plan.groups.size() * groupRowHeight + 4;
 		Group group = plan.groups.get(selected);
 		int[] covered = SmartFillPlan.coverage(plan.groups, stock);
-		String choice = group.blocks.isEmpty() ? new Translatable("screen.buildguide.smartfill.none").toString() : String.join(", ", namesOf(group.blocks));
-		drawShadowLeft(fit(choice, listX1 - swatchX - 6), swatchX, summaryY, 0xFFFFFF);
-		if(!group.blocks.isEmpty()) {
-			boolean enough = covered[selected] >= group.cells.size();
-			drawShadowLeft(new Translatable("screen.buildguide.smartfill.enough", "" + covered[selected], "" + group.cells.size()).toString(), swatchX, summaryY + 10, enough ? 0x80FF80 : 0xFF8080);
+		if(group.water) {
+			// Where the water comes from: endless while the player stands in an endless pool, else what they carry
+			int water = stock.getOrDefault(SmartFill.WATER, 0);
+			String text = water == Integer.MAX_VALUE ? new Translatable("screen.buildguide.smartfill.waterendless").toString() : water > 0 ? new Translatable("screen.buildguide.smartfill.watercarried", "" + Math.min(water, group.cells.size()), "" + group.cells.size()).toString() : new Translatable("screen.buildguide.smartfill.nowater").toString();
+			drawShadowLeft(fit(text, listX1 - swatchX - 6), swatchX, summaryY, water == Integer.MAX_VALUE || water >= group.cells.size() ? 0x80FF80 : water > 0 ? 0xFFCC66 : 0xFF8080);
+			if(water <= 0) drawShadowLeft(fit(new Translatable("screen.buildguide.smartfill.nowaterhint").toString(), listX1 - swatchX - 6), swatchX, summaryY + 10, 0xAAAAAA);
+		}else {
+			String choice = group.blocks.isEmpty() ? new Translatable("screen.buildguide.smartfill.none").toString() : String.join(", ", namesOf(group.blocks));
+			drawShadowLeft(fit(choice, listX1 - swatchX - 6), swatchX, summaryY, 0xFFFFFF);
+			if(!group.blocks.isEmpty()) {
+				boolean enough = covered[selected] >= group.cells.size();
+				drawShadowLeft(new Translatable("screen.buildguide.smartfill.enough", "" + covered[selected], "" + group.cells.size()).toString(), swatchX, summaryY + 10, enough ? 0x80FF80 : 0xFF8080);
+			}
 		}
+		if(startRefused) drawShadowLeft(fit(new Translatable("screen.buildguide.smartfill.noblocks").toString(), listX1 - swatchX - 6), swatchX, summaryY + 20, 0xFF8080);
 		// Between Clear and Back: where the blocks come from
 		int hintX = swatchX + bottomButtonWidth + 6, backX = w - panelX1 - 2 * bottomButtonWidth - 6;
 		drawShadowLeft(fit(new Translatable("screen.buildguide.smartfill.hint").toString(), backX - hintX - 4), hintX, h - bottomRowFromBottom + 6, 0x888888);
@@ -136,16 +150,17 @@ public class FillScreen extends BaseScreen {
 		for(int i = 0;i < groupButtons.length;++i) groupButtons[i].setTitle(new Translatable(groupTitle(i)));
 		if(list != null) list.setEntries(rows());
 		if(buttonStart != null) {
+			// Something to place: a colour whose blocks (or water) the player has
 			boolean any = false;
-			for(Group g: plan.groups) any |= !g.blocks.isEmpty();
+			for(int covered: SmartFillPlan.coverage(plan.groups, stock)) any |= covered > 0;
 			buttonStart.setActive(any);
 		}
 	}
 
-	// "> 1234: Stone", "1234: Mix of 3", "1234: none"
+	// "> 1234: Stone", "1234: Mix of 3", "1234: none", "12: Water"
 	private String groupTitle(int i) {
 		Group g = plan.groups.get(i);
-		String what = g.blocks.isEmpty() ? new Translatable("screen.buildguide.smartfill.none").toString() : g.blocks.size() == 1 ? name(g.blocks.get(0)) : new Translatable("screen.buildguide.smartfill.mix", "" + g.blocks.size()).toString();
+		String what = g.water ? new Translatable("screen.buildguide.smartfill.water").toString() : g.blocks.isEmpty() ? new Translatable("screen.buildguide.smartfill.none").toString() : g.blocks.size() == 1 ? name(g.blocks.get(0)) : new Translatable("screen.buildguide.smartfill.mix", "" + g.blocks.size()).toString();
 		return fit((i == selected ? "> " : "") + g.cells.size() + ": " + what, groupWidth - 8);
 	}
 

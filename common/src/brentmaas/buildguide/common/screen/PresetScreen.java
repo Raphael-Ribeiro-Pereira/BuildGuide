@@ -28,6 +28,9 @@ public class PresetScreen extends BaseScreen {
 	// Title key each button shows, so setTitle only runs when it changes
 	private final String[][] shownKeys = new String[PresetStore.numSlots][actions.length];
 
+	// What went wrong with the last action (a translated line under the Back button, 2026-10-22: not the chat)
+	private String problem = null;
+
 	private Translatable titlePresets = new Translatable("screen.buildguide.preset.title");
 	private Translatable textEmpty = new Translatable("screen.buildguide.preset.empty");
 
@@ -65,6 +68,7 @@ public class PresetScreen extends BaseScreen {
 			String label = (slot + 1) + ". " + (data == null ? textEmpty.toString() : label(data));
 			drawShadowLeft(fit(label, buttonsX() - margin - 6), margin, rowY(slot) + 6, data == null ? 0x888888 : 0xFFFFFF);
 		}
+		if(problem != null) drawShadowCentred(fit(problem, wrapper.getWidth() - 2 * margin), wrapper.getWidth() / 2, rowY(PresetStore.numSlots) + 34, 0xFF8080);
 	}
 
 	public boolean onEscape() {
@@ -80,6 +84,7 @@ public class PresetScreen extends BaseScreen {
 	}
 
 	private void run(int slot, Action action) {
+		problem = null;
 		try {
 			if(action == Action.SAVE) {
 				if(!BuildGuide.stateManager.getState().isShapeAvailable()) return;
@@ -90,7 +95,8 @@ public class PresetScreen extends BaseScreen {
 				load(slot);
 			}
 		}catch(IOException e) {
-			BuildGuide.logHandler.sendChatMessage("[Build Guide] Preset could not be written: " + e.getMessage());
+			problem = new Translatable("screen.buildguide.preset.notwritten", e.getMessage()).toString();
+			BuildGuide.logHandler.error("Preset could not be written: " + e.getMessage());
 		}
 	}
 
@@ -101,7 +107,7 @@ public class PresetScreen extends BaseScreen {
 		Shape before = BuildGuide.stateManager.getState().getCurrentShape();
 		String problem = BuildGuide.stateManager.getState().getCurrentShapeSet().applyPreset(BuildGuide.presets.get(slot));
 		if(problem != null) {
-			BuildGuide.logHandler.sendChatMessage("[Build Guide] " + new Translatable(problem));
+			this.problem = new Translatable(problem).toString();
 			return; // nothing changed
 		}
 		if(before != BuildGuide.stateManager.getState().getCurrentShape()) before.onDeselectedInGUI();

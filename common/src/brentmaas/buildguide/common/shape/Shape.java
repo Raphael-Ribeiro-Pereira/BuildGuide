@@ -253,6 +253,12 @@ public abstract class Shape implements IValidatable, IFocusParts {
 	// shape's colour, already set, by default; shapes that colour cubes one by one set it here
 	protected void colourCube(IShapeBuffer buffer, int x, int y, int z) {}
 
+	// Water (2026-10-22): the last generation's positions that want water instead of a block (local), for the
+	// validation and Fill; null when none (the default). It must not change with a later generation: a snapshot
+	public java.util.function.LongPredicate waterTest() {
+		return null;
+	}
+
 	// Smart fill (2026-10-22): the colour (0xRRGGBB) the world draws the cube at this local position with: the
 	// shape's colour, or the one colourCube sets for shapes that colour cubes one by one (layers, parts)
 	public int cubeRgb(int x, int y, int z) {

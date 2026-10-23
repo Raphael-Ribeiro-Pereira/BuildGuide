@@ -50,6 +50,8 @@ public class SliceScan {
 	}
 
 	private final ValidationState state;
+	// The positions that want water (2026-10-22), from the state with the palette; null when none
+	private final java.util.function.LongPredicate water;
 	// The state's palette when the scan started (4D); a new palette comes with a new generation, so a new scan
 	private final LayerPalette palette;
 	private final long epoch, generation;
@@ -110,13 +112,15 @@ public class SliceScan {
 	/**
 	 * The same with what the loader read from the state on the render thread when it asked for the scan (its scan
 	 * epoch, palette and exclusion boxes): the constructor may then run on another thread, reading nothing else of
-	 * the state. nearErrors: whether structure errors are looked for (read with the rest on the render thread).
+	 * the state but its water test (set with the palette, under the state's lock). nearErrors: whether structure
+	 * errors are looked for (read with the rest on the render thread).
 	 */
 	public SliceScan(ValidationState state, Collection<Long> shapeExpected, List<Long> tracked, int ox, int oy, int oz, long generation, long epoch, LayerPalette palette, List<int[]> exclusionBoxes, boolean nearErrors) {
 		this.state = state;
 		this.nearErrors = nearErrors;
 		this.epoch = epoch;
 		this.palette = palette;
+		this.water = state.getWater();
 		this.generation = generation;
 		this.ox = ox;
 		this.oy = oy;
@@ -326,7 +330,7 @@ public class SliceScan {
 		int wx = lx + ox, wy = ly + oy, wz = lz + oz;
 		int f = probe.flags(wx, wy, wz);
 		int id = palette != null && palette.needsId(lx, ly, lz) ? probe.blockId(wx, wy, wz) : LayerPalette.NONE;
-		byte s = LayerPalette.classify(palette, lx, ly, lz, f, id);
+		byte s = LayerPalette.classify(palette, water, lx, ly, lz, f, id);
 		statuses[i] = s;
 		names[i] = ValidationState.namesBlock(s) ? probe.name(wx, wy, wz) : null;
 		if(present[i]) statusMap.put(pos, s);

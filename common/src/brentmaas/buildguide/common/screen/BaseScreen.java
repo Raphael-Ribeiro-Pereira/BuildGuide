@@ -225,8 +225,7 @@ public abstract class BaseScreen {
 				BuildGuide.stateManager.savePersistence();
 				shouldUpdatePersistence = false;
 			}catch(Exception e) {
-				BuildGuide.logHandler.sendChatMessage("Build Guide persistence failed to save: " + e.getMessage());
-				BuildGuide.logHandler.error(e.getMessage() + "\n" + e.getStackTrace());
+				BuildGuide.logHandler.error("Build Guide persistence failed to save: " + e.getMessage() + "\n" + e.getStackTrace());
 			}
 		}
 	}

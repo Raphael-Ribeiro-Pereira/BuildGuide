@@ -44,8 +44,7 @@ public abstract class AbstractStateManager {
 				try {
 					stateStore.get(key).loadPersistence(persistenceFile);
 				}catch(IOException e) {
-					BuildGuide.logHandler.sendChatMessage("Build Guide persistence failed to load: " + e.getMessage());
-					BuildGuide.logHandler.error(e.getMessage() + "\n" + e.getStackTrace());
+					BuildGuide.logHandler.error("Build Guide persistence failed to load: " + e.getMessage() + "\n" + e.getStackTrace());
 				}
 			}
 		}

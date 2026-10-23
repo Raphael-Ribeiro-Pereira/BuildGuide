@@ -579,6 +579,27 @@ In-game checklist: Farming land > Crop Sugar cane: the Cane layout row; Cross: a
 (Show field on); cane beside water everywhere, also in a hexagon or circle; Lines as before (Rows along back); an
 old save of Farming land still opens.
 
+### Water in the farm, and no chat (on `wip/water`, on top of `wip/smartfill`, waiting for the in-game test; not merged)
+
+Raphael (2026-10-22): Fill should fill the farming land's holes with water, the player standing in the water
+they want and the backpack drawing on it; blocks such as leaves, stairs and slabs take water in, so it has to
+adapt; and every chat message goes.
+
+| What | Change |
+|---|---|
+| Holes count | A farm's water cell is built when it holds a water source: a water block, or a waterlogged slab, stairs, leaves (before, water never counted) |
+| Fill with water | The holes are a colour of their own in the Fill panel, filled with water (no block to pick). A bucket's worth per hole, as a bucket emptied there: into a dry slab / stairs / leaves, over grass; nothing where a solid block is (dig first) |
+| Where the water comes from | Standing in an endless pool (a 2 x 2 water source: two sources beside, water or a solid block below): endless, nothing taken. Else: the worn Traveler's Backpack's tanks (Tanks upgrade), water buckets and tanks carried, water buckets in shulker boxes, and the water block you stand in. The panel says which: endless, enough for N of M, or none |
+| No chat | Nothing goes to the chat any more: the validation line after each scan is gone; Fill shows its progress and how it ended (for 20 s) in the Shape tab's preview; Hand with no block writes "Hold a block" in red in the field; preset problems show in the Save menu; persistence failures go to the log |
+
+In-game checklist for `water-wip`:
+1. A Farming land (sugar cane), holes dug: Fill shows a "Water" colour; standing in a 2 x 2 pool it says endless.
+2. Start: the holes fill with water, nothing taken from the inventory. Out of the pool: buckets go empty, the
+   backpack's tank goes down.
+3. A slab or stairs (or leaves) in a hole: it gets waterlogged. Dirt in a hole: skipped.
+4. The holes with water count as built (the missing count goes down).
+5. No line in the chat after a validation or a fill; the Shape tab shows "Filling ..." and then "Fill done ...".
+
 ### Smart fill and one filter (on `wip/smartfill`, on top of `wip/relief`, waiting for the in-game test; not merged)
 
 Raphael (2026-10-22): one filter for the world and the preview, and a fill for survival by that filter: it

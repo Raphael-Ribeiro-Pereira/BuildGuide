@@ -13,7 +13,8 @@ import brentmaas.buildguide.common.screen.widget.IWidget;
  * A block id typed as text (palette per layer, 4D): "minecraft:stone", or "stone", normalised to it; empty
  * means no block. The loader checks it (IShapeHandler.normalizeBlockId: registered and not air): an invalid
  * id turns the field red and is not applied. The Hand button takes the block in the player's main hand
- * (IShapeHandler.heldBlockId), or says "Hold a block" in the chat. Row: label, field 72 px, Hand.
+ * (IShapeHandler.heldBlockId), or, with no block there, writes "Hold a block" in red in the field (2026-10-22:
+ * nothing goes to the chat), which is not applied. Row: label, field 72 px, Hand.
  *
  * Persisted URL-encoded like the instance name (PresetStore.encode): a checked id holds only
  * namespace:path characters, but nothing typed must ever reach the save's ',' ';' '=' separators.
@@ -58,11 +59,13 @@ public class PropertyBlockId extends Property<String> {
 		return true;
 	}
 
-	// The block in the main hand; nothing changes (and the chat says so) when the hand holds no block
+	// The block in the main hand; nothing changes (and the field says so, in red) when the hand holds no block
 	public boolean fromHand() {
 		String held = BuildGuide.shapeHandler.heldBlockId();
 		if(held == null) {
-			BuildGuide.logHandler.sendChatMessage(BuildGuide.screenHandler.translate("screen.buildguide.holdablock"));
+			getWidgetList(); // Initialise `field` if still null
+			field.setTextValue(BuildGuide.screenHandler.translate("screen.buildguide.holdablock"));
+			field.setTextColour(0xFF0000);
 			return false;
 		}
 		return apply(held);

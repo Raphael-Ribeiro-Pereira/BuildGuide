@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.LongPredicate;
 import java.util.function.LongToIntFunction;
 import java.util.function.Predicate;
 
@@ -20,17 +21,21 @@ import java.util.function.Predicate;
  * the first one the player still has.
  */
 public final class SmartFillPlan {
-	// More colours than this: the last group takes the rest (the screen has room for this many)
+	// More colours than this: the last block group takes the rest (the screen has room for this many; water, which
+	// never mixes with blocks, may add one)
 	public static final int maxGroups = 8;
 
 	public static final class Group {
 		public final int rgb;
+		// Its cells want water (Shape.waterTest): it is filled with water, never with blocks
+		public final boolean water;
 		public final List<Long> cells = new ArrayList<Long>();
 		// The blocks chosen for it: one fills it with that block, several mix them; none leaves it empty
 		public final List<String> blocks = new ArrayList<String>();
 
-		Group(int rgb) {
+		Group(int rgb, boolean water) {
 			this.rgb = rgb;
+			this.water = water;
 		}
 	}
 
@@ -63,25 +68,47 @@ public final class SmartFillPlan {
 	// The cells by colour, the groups in the order their colours first come; cells keep their order in each.
 	// groupOf (null: not wanted), parallel to cells, gets each cell's group
 	public static List<Group> groups(List<Long> cells, LongToIntFunction rgbOf, int[] groupOf) {
-		Map<Integer, Group> byColour = new LinkedHashMap<Integer, Group>();
+		return groups(cells, rgbOf, null, groupOf);
+	}
+
+	// The same with the cells that want water (null: none): they make groups of their own, never merged with others
+	public static List<Group> groups(List<Long> cells, LongToIntFunction rgbOf, LongPredicate water, int[] groupOf) {
+		Map<Long, Group> byColour = new LinkedHashMap<Long, Group>();
 		List<Group> out = new ArrayList<Group>();
 		for(int i = 0;i < cells.size();++i) {
 			long cell = cells.get(i);
 			int rgb = rgbOf.applyAsInt(cell);
-			Group group = byColour.get(rgb);
+			boolean wet = water != null && water.test(cell);
+			long key = ((long) rgb << 1) | (wet ? 1 : 0);
+			Group group = byColour.get(key);
 			if(group == null) {
 				if(out.size() < maxGroups) {
-					group = new Group(rgb);
+					group = new Group(rgb, wet);
 					out.add(group);
 				}else {
-					group = out.get(maxGroups - 1);
+					// More colours than there is room for: the last block group takes the rest; water keeps one of its own
+					group = wet ? waterGroup(out, rgb) : lastBlockGroup(out);
 				}
-				byColour.put(rgb, group);
+				byColour.put(key, group);
 			}
 			group.cells.add(cell);
 			if(groupOf != null) groupOf[i] = out.indexOf(group);
 		}
 		return out;
+	}
+
+	private static Group waterGroup(List<Group> groups, int rgb) {
+		for(Group g: groups) if(g.water) return g;
+		Group g = new Group(rgb, true);
+		groups.add(g);
+		return g;
+	}
+
+	private static Group lastBlockGroup(List<Group> groups) {
+		for(int i = groups.size() - 1;i >= 0;--i) if(!groups.get(i).water) return groups.get(i);
+		Group g = new Group(0, false);
+		groups.add(g);
+		return g;
 	}
 
 	// The blocks a cell tries, in order: the group's blocks from a start its position picks

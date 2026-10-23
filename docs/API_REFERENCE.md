@@ -172,6 +172,27 @@ public abstract class Shape {
   last unit; the scan preparation copies the expected set with `toLongArray()` under the lock and
   boxes it after.
 
+### Water in the farm, and no chat (`wip/water`)
+
+- `IBlockProbe.FLAG_WATER` (a water source: a water block or a waterlogged one) and `FLAG_WATERLOGGABLE` (a dry
+  block with the waterlogged property). `Shape.waterTest()`: the last generation's positions that want water
+  (default null); `ShapeFarmingLand` answers its water cells.
+- `LayerPalette.classify(palette, water, x, y, z, flags, id)`: a position that wants water is OK with
+  `FLAG_WATER`, MISSING otherwise; every validation path uses it. `ValidationState.setWater/getWater` (set by
+  the loader with the palette before a scan; `SliceScan` takes it in its constructor);
+  `updateBlock(local, air, solid, ignored, water, id, name)`.
+- `FillPlan.cells(..., water)`: a water cell is filled when shown, loaded, without water, and empty or
+  waterloggable (the player may stand in it). `SmartFillPlan.groups(cells, rgbOf, water, groupOf)`: water cells
+  make groups of their own (`Group.water`). `SmartFill.WATER` is their material; `carriedBlocks()` gives the
+  water as `WATER` (Integer.MAX_VALUE: endless). `SmartFill.status()`, `lastResult()`, `clock`, `resultMillis`.
+- Fabric `SmartFillServer.placeWater`: `BucketItem.emptyContents` of a water bucket (waterlogs, replaces grass,
+  evaporates where water does); water from an endless pool the player stands in (nothing taken), the worn
+  Traveler's Backpack's tanks (TanksUpgrade, reflection), any item fluid storage (Fabric transfer API), water
+  buckets in shulker boxes, the water block the player stands in.
+- `ILogHandler.sendChatMessage` is gone, and with it every chat line: the validation summary, Fill's lines
+  (the Shape tab's preview shows `SmartFill.status()`), "Hold a block" (red in the field), the preset problems
+  (a line in the Save menu), the persistence failures (the log only).
+
 ### Smart fill and one filter (`wip/smartfill`)
 
 - `SmartFill` (common, replaces `FillTask`): `prepare(ShapeSet)` gives a `Plan` (cells in build order, the

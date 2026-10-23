@@ -279,7 +279,6 @@ public class RenderHandler extends AbstractRenderHandler {
 		state.setActiveScan(null);
 		state.setScanPercent(-1);
 		TimingLog.recordScan(scan.getTotalMillis(), scan.getFrames(), scan.getMaxSliceMillis(), scan.getExpectedCount(), scan.getStartMillis(), publishNanos / 1000000, scan.getPrepMillis());
-		logValidation(state);
 	}
 
 	// Scans being prepared, per validation state: the copy of the expected set and SliceScan.prepare (which reads
@@ -326,6 +325,7 @@ public class RenderHandler extends AbstractRenderHandler {
 		// Exclusion boxes of the shape set (local coords): excluded positions are neither expected nor scanned
 		state.setExclusionBoxes(shapeSet.getActiveExclusionBoxes());
 		state.setPalette(paletteOf(validatable)); // before the SliceScan, which takes it
+		state.setWater(validatable.waterTest()); // the same: the positions that want water (the farm's holes)
 		long epoch = state.getScanEpoch(), generation = validatable.getGeneration();
 		LayerPalette palette = state.getPalette();
 		List<int[]> boxes = state.getExclusionBoxes();
@@ -509,13 +509,6 @@ public class RenderHandler extends AbstractRenderHandler {
 		IgnoredBlocks resolved = new IgnoredBlocks(source, found.toArray(new Block[0]));
 		ignored = resolved;
 		return resolved;
-	}
-	
-	// One-line chat summary read from the state; positions will be shown in the GUI (2.4), not logged
-	private void logValidation(ValidationState state) {
-		// Errors: structure errors plus, with a palette (4D), wrong blocks on the shape; wrong layer only with a palette
-		String wrongLayer = state.getPalette() != null ? ", wrong layer " + state.getWrongLayer() : "";
-		BuildGuide.logHandler.sendChatMessage("[Build Guide] Validate - ok " + state.getOk() + ", missing " + state.getMissing() + ", errors " + state.getErrorCount() + wrongLayer);
 	}
 
 	public static RenderPipeline getRenderPipeline() {

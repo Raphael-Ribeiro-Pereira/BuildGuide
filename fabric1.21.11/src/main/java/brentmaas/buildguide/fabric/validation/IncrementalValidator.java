@@ -11,6 +11,7 @@ import brentmaas.buildguide.fabric.RenderHandler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.Fluids;
 
 /**
  * Keeps validated shapes up to date without a rescan. Called from MixinClientLevel for every
@@ -27,6 +28,8 @@ public class IncrementalValidator {
 		boolean air = blockState.isAir();
 		boolean solid = !air && blockState.blocksMotion();
 		boolean ignored = !air && RenderHandler.isIgnored(blockState);
+		// Water (2026-10-22): a water source, as a block or waterlogged, fills a position that wants water
+		boolean water = !air && blockState.getFluidState().isSourceOfType(Fluids.WATER);
 		// Palette per layer (4D): the block's raw registry id, compared with the palette's (an int, no string)
 		int id = air ? LayerPalette.NONE : BuiltInRegistries.BLOCK.getId(blockState.getBlock());
 		String name = null;
@@ -41,7 +44,7 @@ public class IncrementalValidator {
 			if(!vs.isInRange(lx, ly, lz)) continue;
 			// Every non-air block needs its name: near blocks are listed too (resolved once, only when in range)
 			if(name == null && !air) name = blockState.getBlock().getName().getString();
-			vs.updateBlock(LocalPos.pack(lx, ly, lz), air, solid, ignored, id, name);
+			vs.updateBlock(LocalPos.pack(lx, ly, lz), air, solid, ignored, water, id, name);
 		}
 	}
 }

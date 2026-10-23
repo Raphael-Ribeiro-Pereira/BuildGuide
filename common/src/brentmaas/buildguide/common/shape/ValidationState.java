@@ -64,9 +64,11 @@ public class ValidationState {
 	private int minX, minY, minZ, maxX, maxY, maxZ;
 	public static final int nearRadius = 2;
 	private int ok = 0, missing = 0, ignored = 0, wrongLayer = 0, wrongBlock = 0;
-	// Palette per layer of the last scan (4D), null = none; kept through invalidations (set by the loader when a
-	// scan starts), so the block events and the safety net classify with the same rule as that scan
+	// Palette per layer of the last scan (4D), null = none, and the positions that want water (2026-10-22), null =
+	// none; kept through invalidations (set by the loader when a scan starts), so the block events and the safety
+	// net classify with the same rule as that scan
 	private LayerPalette palette = null;
+	private java.util.function.LongPredicate water = null;
 	// Exclusion boxes in local coordinates {minX, minY, minZ, maxX, maxY, maxZ}, inclusive. Positions
 	// inside them are never tracked: not ok, not missing, not near, and out of the total
 	private List<int[]> exclusionBoxes = new ArrayList<int[]>();
@@ -248,10 +250,20 @@ public class ValidationState {
 	public synchronized void setPalette(LayerPalette palette) {
 		this.palette = palette;
 	}
+
+	// Water (2026-10-22): the positions the shape wants water in (Shape.waterTest, set with the palette before a
+	// scan, which takes it); null when none
+	public synchronized java.util.function.LongPredicate getWater() {
+		return water;
+	}
+
+	public synchronized void setWater(java.util.function.LongPredicate water) {
+		this.water = water;
+	}
 	
 	// The status of an expected position for the probe's flags and the block's id, under this state's palette
 	public synchronized byte classifyExpected(long pos, int flags, int blockId) {
-		return LayerPalette.classify(palette, LocalPos.unpackX(pos), LocalPos.unpackY(pos), LocalPos.unpackZ(pos), flags, blockId);
+		return LayerPalette.classify(palette, water, LocalPos.unpackX(pos), LocalPos.unpackY(pos), LocalPos.unpackZ(pos), flags, blockId);
 	}
 	
 	// Statuses that keep the name of the block that caused them
@@ -455,9 +467,14 @@ public class ValidationState {
 	
 	// The same with the block's id (4D): an expected position follows LayerPalette.classify under this state's palette
 	public synchronized void updateBlock(long local, boolean air, boolean solid, boolean ignoredType, int blockId, String blockName) {
+		updateBlock(local, air, solid, ignoredType, false, blockId, blockName);
+	}
+
+	// The same with whether the block holds a water source (2026-10-22: the positions that want water)
+	public synchronized void updateBlock(long local, boolean air, boolean solid, boolean ignoredType, boolean water, int blockId, String blockName) {
 		if(!validated) return;
 		if(status.containsKey(local)) {
-			int flags = air ? IBlockProbe.FLAG_AIR : (solid ? IBlockProbe.FLAG_SOLID : 0) | (ignoredType ? IBlockProbe.FLAG_IGNORED : 0);
+			int flags = air ? IBlockProbe.FLAG_AIR : (solid ? IBlockProbe.FLAG_SOLID : 0) | (ignoredType ? IBlockProbe.FLAG_IGNORED : 0) | (water ? IBlockProbe.FLAG_WATER : 0);
 			byte s = classifyExpected(local, flags, blockId);
 			setStatus(local, s, namesBlock(s) ? blockName : null);
 			return;

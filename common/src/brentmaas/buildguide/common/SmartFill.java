@@ -5,6 +5,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.LongPredicate;
+import java.util.function.LongSupplier;
 
 import brentmaas.buildguide.common.shape.FillPlan;
 import brentmaas.buildguide.common.shape.IBlockProbe;
@@ -22,12 +24,22 @@ import brentmaas.buildguide.common.shape.SmartFillPlan.Group;
  * which takes each block out of the inventory, a shulker box or a backpack, as in survival. Only in a world this
  * game runs (singleplayer). One fill at a time; client thread only, except the loader's answer, which comes from
  * the server thread and is read on the next tick.
+ *
+ * Water (2026-10-22): the cells a shape wants water in (Shape.waterTest, the farm's holes) make groups of their
+ * own, filled with WATER, never with blocks: the loader empties a bucket's worth there, out of the pool the
+ * player stands in (none taken from an endless one), a backpack's tank, or a water bucket. Nothing goes to the
+ * chat (2026-10-22): the Shape tab shows status(), the progress and then how the fill ended.
  */
 public final class SmartFill {
 	public static final int blocksPerTick = 32;
 	// What happened at a cell (IShapeHandler.placeBlocks): placed; none of its blocks left; taken meanwhile, or
 	// the block cannot stand there; its chunk not loaded
 	public static final byte PLACED = 0, NO_BLOCKS = 1, TAKEN = 2, UNLOADED = 3;
+	// The material of a water group, and in carriedBlocks() how much water there is (Integer.MAX_VALUE: endless)
+	public static final String WATER = "minecraft:water";
+	// How long the Shape tab shows how a fill ended
+	public static final long resultMillis = 20000;
+	public static LongSupplier clock = System::currentTimeMillis;
 
 	public static final class Plan {
 		public final ShapeSet set;
@@ -90,6 +102,9 @@ public final class SmartFill {
 	private static List<Cell> batch = null;
 	private static long ticket = 0;
 	private static volatile Answer answer = null;
+	// How the last fill ended (translated) and when
+	private static String result = null;
+	private static long resultAt = 0;
 
 	private SmartFill() {}
 
@@ -107,6 +122,18 @@ public final class SmartFill {
 		return cells == 0 ? 0 : (int) (100L * (placed + taken + unloaded + noBlocks) / cells);
 	}
 
+	// What the Shape tab shows: the progress while a fill runs, then for resultMillis how it ended; else null
+	public static String status() {
+		if(running) return BuildGuide.screenHandler.translate("screen.buildguide.smartfill.running", percent() + "%", "" + placed, "" + cells);
+		if(result != null && clock.getAsLong() - resultAt < resultMillis) return result;
+		return null;
+	}
+
+	// How the last fill ended, however long ago (null: none yet)
+	public static String lastResult() {
+		return result;
+	}
+
 	// What there is to fill; a Plan with a message when nothing can be (another kind of world, generating, nothing empty)
 	public static Plan prepare(ShapeSet set) {
 		if(set == null || set.getShape() == null) return Plan.message("screen.buildguide.fill.nothing");
@@ -120,17 +147,19 @@ public final class SmartFill {
 		List<Group> groups;
 		try {
 			if(!shape.ready || shape.error) return Plan.message("screen.buildguide.fill.generating");
-			found = FillPlan.cells(shape.getExpectedBlocks(), set.getOriginX(), set.getOriginY(), set.getOriginZ(), set.getActiveExclusionBoxes(), shape.worldFocusTest(), probe, BuildGuide.shapeHandler.playerBox());
+			LongPredicate water = shape.waterTest();
+			found = FillPlan.cells(shape.getExpectedBlocks(), set.getOriginX(), set.getOriginY(), set.getOriginZ(), set.getActiveExclusionBoxes(), shape.worldFocusTest(), probe, BuildGuide.shapeHandler.playerBox(), water);
 			if(found.isEmpty()) return Plan.message("screen.buildguide.fill.nothing");
 			SmartFillPlan.sortForBuilding(found, set.getOriginX(), set.getOriginY(), set.getOriginZ());
 			groupOf = new int[found.size()];
-			groups = SmartFillPlan.groups(found, pos -> shape.cubeRgb(LocalPos.unpackX(pos), LocalPos.unpackY(pos), LocalPos.unpackZ(pos)), groupOf);
+			groups = SmartFillPlan.groups(found, pos -> shape.cubeRgb(LocalPos.unpackX(pos), LocalPos.unpackY(pos), LocalPos.unpackZ(pos)), water, groupOf);
 		}finally {
 			shape.lock.unlock();
 		}
 		for(Group group: groups) {
 			List<String> before = chosen.get(group.rgb);
-			if(before != null) group.blocks.addAll(before);
+			if(group.water) group.blocks.add(WATER);
+			else if(before != null) group.blocks.addAll(before);
 		}
 		return new Plan(set, found, groupOf, groups, null);
 	}
@@ -139,20 +168,23 @@ public final class SmartFill {
 	// takes the block in hand when they carry it
 	public static void fitToStock(Plan plan, Map<String, Integer> stock, String held) {
 		for(Group group: plan.groups) {
+			if(group.water) continue; // water stays, whether there is any or not: the panel says so
 			group.blocks.removeIf(block -> stock.getOrDefault(block, 0) <= 0);
 			if(group.blocks.isEmpty() && held != null && stock.getOrDefault(held, 0) > 0) group.blocks.add(held);
 		}
 	}
 
-	// A block in or out of a group's choice (a second block makes a mix); remembered for its colour
+	// A block in or out of a group's choice (a second block makes a mix); remembered for its colour. Not for water
 	public static void toggle(Plan plan, int group, String block) {
 		Group g = plan.groups.get(group);
+		if(g.water) return;
 		if(!g.blocks.remove(block)) g.blocks.add(block);
 		chosen.put(g.rgb, new ArrayList<String>(g.blocks));
 	}
 
 	public static void clear(Plan plan, int group) {
 		Group g = plan.groups.get(group);
+		if(g.water) return;
 		g.blocks.clear();
 		chosen.put(g.rgb, new ArrayList<String>());
 	}
@@ -168,10 +200,7 @@ public final class SmartFill {
 			long pos = plan.cells.get(i);
 			queue.add(new Cell(plan.originX + LocalPos.unpackX(pos), plan.originY + LocalPos.unpackY(pos), plan.originZ + LocalPos.unpackZ(pos), g, SmartFillPlan.candidates(pos, blocks)));
 		}
-		if(queue.isEmpty()) {
-			chat("screen.buildguide.smartfill.noblocks");
-			return false;
-		}
+		if(queue.isEmpty()) return false;
 		groupOut = new boolean[plan.groups.size()];
 		cells = queue.size();
 		placed = 0;
@@ -182,7 +211,6 @@ public final class SmartFill {
 		answer = null;
 		++ticket;
 		running = true;
-		chat("screen.buildguide.smartfill.start", "" + cells);
 		return true;
 	}
 
@@ -241,16 +269,22 @@ public final class SmartFill {
 		running = false;
 		queue.clear();
 		batch = null;
-		chat("screen.buildguide.smartfill.stopped", "" + placed, "" + cells);
+		ended("screen.buildguide.smartfill.stopped", "" + placed, "" + cells);
 	}
 
+	// Done: the count of each outcome that happened, the others left out
 	private static void finish() {
 		running = false;
-		chat("screen.buildguide.smartfill.done", "" + placed, "" + cells, "" + taken, "" + unloaded, "" + noBlocks);
+		StringBuilder more = new StringBuilder();
+		if(taken > 0) more.append(", ").append(BuildGuide.screenHandler.translate("screen.buildguide.smartfill.taken", "" + taken));
+		if(unloaded > 0) more.append(", ").append(BuildGuide.screenHandler.translate("screen.buildguide.smartfill.unloaded", "" + unloaded));
+		if(noBlocks > 0) more.append(", ").append(BuildGuide.screenHandler.translate("screen.buildguide.smartfill.short", "" + noBlocks));
+		ended("screen.buildguide.smartfill.done", "" + placed, "" + cells, more.toString());
 	}
 
-	private static void chat(String key, Object... values) {
-		BuildGuide.logHandler.sendChatMessage("[Build Guide] " + BuildGuide.screenHandler.translate(key, values));
+	private static void ended(String key, Object... values) {
+		result = BuildGuide.screenHandler.translate(key, values);
+		resultAt = clock.getAsLong();
 	}
 
 	// Offline harness only
@@ -260,5 +294,6 @@ public final class SmartFill {
 		batch = null;
 		answer = null;
 		chosen.clear();
+		result = null;
 	}
 }
