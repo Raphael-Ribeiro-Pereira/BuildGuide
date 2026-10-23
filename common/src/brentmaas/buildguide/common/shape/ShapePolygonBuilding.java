@@ -23,6 +23,7 @@ import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
  */
 public class ShapePolygonBuilding extends Shape {
 	private static final String[] focusPartNames = {"All", "Cap", "Body", "Spikes", "Hidden", "Walls", "Floor", "Roof", "Details", "Pillars"};
+	public static final int reliefRgb = 0x5B8DD9;
 	private static final FocusFilter.Part[] buildingParts = {FocusFilter.Part.WALLS, FocusFilter.Part.FLOOR, FocusFilter.Part.ROOF, FocusFilter.Part.DETAILS, FocusFilter.Part.PILLARS};
 
 	// Shape
@@ -142,11 +143,28 @@ public class ShapePolygonBuilding extends Shape {
 		setOriginOffset(g.offset, 0.0, g.offset);
 		for(int x = -g.maxR;x <= g.maxR;++x) {
 			for(int z = -g.maxR;z <= g.maxR;++z) {
+				boolean relief = g.isRelief(x, z);
 				for(int y = g.minY;y <= g.maxY;++y) {
-					if(g.partAt(x, y, z) != null) addShapeCube(buffer, x, y, z);
+					if(g.partAt(x, y, z) == null) continue;
+					setCubeColour(buffer, relief);
+					addShapeCube(buffer, x, y, z);
 				}
 			}
 		}
+	}
+
+	// The relief, outside the walls, is a plain blue; everything else is the shape's colour
+	private void setCubeColour(IShapeBuffer buffer, boolean relief) {
+		int alpha = (int) (255 * shapeSet.getShapeColourA());
+		if(relief) buffer.setColour((reliefRgb >> 16) & 0xFF, (reliefRgb >> 8) & 0xFF, reliefRgb & 0xFF, alpha);
+		else buffer.setColour((int) (255 * shapeSet.getShapeColourR()), (int) (255 * shapeSet.getShapeColourG()), (int) (255 * shapeSet.getShapeColourB()), alpha);
+	}
+
+	// A world buffer made again for the focus keeps the colours
+	@Override
+	protected void colourCube(IShapeBuffer buffer, int x, int y, int z) {
+		Geometry g = generated;
+		setCubeColour(buffer, g != null && g.isRelief(x, z));
 	}
 
 	// Build focus: Walls, Floor, Roof, Details (rim, ring, spokes, relief, the floor's pattern) and Pillars
@@ -252,6 +270,12 @@ public class ShapePolygonBuilding extends Shape {
 		private double along(double px, double pz, int i) {
 			double phi = 2 * Math.PI * i / n + angle;
 			return -px * Math.sin(phi) + pz * Math.cos(phi);
+		}
+
+		// Outside the walls: only the relief is there
+		boolean isRelief(int x, int z) {
+			double px = x - offset, pz = z - offset;
+			return polyDist(px, pz, side(px, pz)) - r >= 0.5;
 		}
 
 		boolean contains(int x, int y, int z) {

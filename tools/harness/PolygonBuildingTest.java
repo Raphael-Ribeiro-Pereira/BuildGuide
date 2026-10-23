@@ -134,6 +134,17 @@ public class PolygonBuildingTest {
 		ShapePolygonBuilding back = new ShapePolygonBuilding(); back.restorePersistence(data.replace("6,10.0", "8,12.0"));
 		check(!back.error && back.toPersistence().startsWith("8,12.0"), "saved and loaded: " + back.toPersistence());
 
+		System.out.println("-- the relief is blue");
+		ShapePolygonBuilding withRelief = make("propertyRelief", 2), noRelief = make("propertyRelief", 0);
+		Method colourCube = ShapePolygonBuilding.class.getDeclaredMethod("colourCube", IShapeBuffer.class, int.class, int.class, int.class); colourCube.setAccessible(true);
+		int[] rgb = new int[3];
+		IShapeBuffer rec = (IShapeBuffer) Proxy.newProxyInstance(PolygonBuildingTest.class.getClassLoader(), new Class<?>[]{IShapeBuffer.class}, (p, mm, x) -> { if(mm.getName().equals("setColour")){ rgb[0] = (Integer) x[0]; rgb[1] = (Integer) x[1]; rgb[2] = (Integer) x[2]; } return mm.isDefault() ? InvocationHandler.invokeDefault(p, mm, x) : null; });
+		Set<Long> blue = new HashSet<>(), other = new HashSet<>();
+		for(long p: withRelief.getExpectedBlocks()){ colourCube.invoke(withRelief, rec, LocalPos.unpackX(p), LocalPos.unpackY(p), LocalPos.unpackZ(p)); if(rgb[2] > rgb[0] && rgb[2] > rgb[1]) blue.add(p); else other.add(p); }
+		Set<Long> reliefOnly = new HashSet<>(withRelief.getExpectedBlocks()); reliefOnly.removeAll(noRelief.getExpectedBlocks());
+		check(!blue.isEmpty() && blue.equals(reliefOnly), "exactly the relief's cubes are blue (" + blue.size() + " of " + withRelief.getExpectedBlocks().size() + ")");
+		check(other.equals(noRelief.getExpectedBlocks()), "the building itself keeps the shape's colour");
+
 		System.out.println(fails == 0 ? "ALL OK" : fails + " FAILED");
 		System.exit(fails == 0 ? 0 : 1);
 	}

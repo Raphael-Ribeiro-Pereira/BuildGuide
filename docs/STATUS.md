@@ -579,6 +579,13 @@ In-game checklist: Farming land > Crop Sugar cane: the Cane layout row; Cross: a
 (Show field on); cane beside water everywhere, also in a hexagon or circle; Lines as before (Rows along back); an
 old save of Farming land still opens.
 
+### Geometric capsule: blue relief (on `wip/relief`, on top of `wip/cane`, waiting for the in-game test; not merged)
+
+Raphael (2026-10-22): the relief in a simple blue, like the parts of Farming land. The cubes outside the walls
+(columns and bands) are `0x5B8DD9`; the building keeps the shape's colour; a world buffer made again for the
+focus keeps both (`colourCube`). Only the colour: the automatic Fill button stays; a smart Fill for survival
+is for later.
+
 ## 2. Final jars
 
 Build output: `fabric1.21.11/build/libs/BuildGuide-Fabric-0.4.8.jar` (mod version is still 0.4.8).
