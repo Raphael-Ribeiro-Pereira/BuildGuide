@@ -33,6 +33,8 @@ gradle.ext.modlicense = 'Creative Commons Attribution-NonCommercial 3.0 Unported
 gradle.ext.fabricgroup = gradle.ext.modid + '.fabric'
 gradle.ext.fabricname = rootProject.name + '-Fabric'
 gradle.ext.fabricloader = '0.19.3'
+// Minecraft 26.3 (fork only, no Forge / NeoForge): the loader its Fabric API needs
+gradle.ext.fabricloader263 = '0.19.5'
 
 gradle.ext.forgegroup = gradle.ext.modid + '.forge'
 gradle.ext.forgename = rootProject.name + '-Forge'
@@ -52,3 +54,6 @@ gradle.ext.mcversions.each {
         include 'neoforge' + it
     }
 }
+
+// Minecraft 26.3: only the Fabric module, kept out of mcversions (no forge26.3 / neoforge26.3 here)
+include 'fabric26.3'

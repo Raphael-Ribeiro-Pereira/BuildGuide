@@ -1,0 +1,32 @@
+package brentmaas.buildguide.fabric;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import brentmaas.buildguide.common.BuildGuide;
+import brentmaas.buildguide.fabric.place.FillHooks;
+import brentmaas.buildguide.fabric.place.PlacementClick;
+import brentmaas.buildguide.fabric.place.PlacementHud;
+import brentmaas.buildguide.fabric.preview.PreviewRenderer;
+import brentmaas.buildguide.fabric.screen.ScreenHandler;
+import brentmaas.buildguide.fabric.screen.widget.WidgetHandler;
+import brentmaas.buildguide.fabric.shape.ShapeHandler;
+import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.rendering.v1.PictureInPictureRendererRegistry;
+import net.fabricmc.loader.api.FabricLoader;
+
+public class BuildGuideFabric implements ClientModInitializer {
+	private static final Logger logger = LogManager.getLogger();	
+	
+	public void onInitializeClient() {
+		BuildGuide.registerClient(new ScreenHandler(), new WidgetHandler(), new StateManager(), new ShapeHandler(), new RenderHandler(), new LogHandler(logger), FabricLoader.getInstance().getConfigDir().toFile());
+		BuildGuide.registerInputHandler(new InputHandler());
+		// 3D preview: a picture-in-picture GUI renderer. Must be registered before the GuiRenderer is built
+		PictureInPictureRendererRegistry.register(context -> new PreviewRenderer());
+		// Area 3: placing into the guideline (the label under the crosshair; the click hooks itself through MixinMinecraft)
+		PlacementHud.register();
+		PlacementClick.register();
+		// Fill with the block in hand: the commands per tick and their answers kept out of the chat
+		FillHooks.register();
+	}
+}

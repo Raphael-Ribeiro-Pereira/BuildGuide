@@ -51,6 +51,13 @@ export PATH="$JAVA_HOME/bin:$PATH"
 - Output: `fabric1.21.11/build/libs/BuildGuide-Fabric-0.4.8.jar`.
 - First build downloads Gradle 9 + Loom + Minecraft (~10 min); later builds are fast.
 - Only `fabric1.21.11` is maintained on this branch. Forge/NeoForge are untouched upstream code.
+- **Minecraft 26.3** (`wip/mc263`): the Fabric module `fabric26.3` carries the same fork. It needs **JDK 25**
+  (`C:\Users\Rapha\Documents\BuildGuide-tools\jdk-25.0.4.1+1`, Temurin 25.0.4.1, from adoptium.net; JDK 27 does
+  not run Gradle 9.5) and Loader 0.19.5 / Fabric API 0.161.0+26.3:
+  `JAVA_HOME=...jdk-25.0.4.1+1 ./gradlew :fabric26.3:build --configure-on-demand --no-daemon`, output
+  `fabric26.3/build/libs/BuildGuide-Fabric-0.4.8.jar`. `BuildGuide-tools\b263.ps1 [task]` builds and lists the
+  compile errors one per line. Its source is `fabric1.21.11` three-way merged with upstream's 26.2 port (base
+  `d4b846f`), then moved to the 26.3 API (see docs/STATUS.md).
 
 ## Architecture rules (these are what made the recovery possible)
 

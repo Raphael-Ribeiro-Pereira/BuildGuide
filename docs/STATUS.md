@@ -628,6 +628,31 @@ Raphael (2026-10-22): the relief in a simple blue, like the parts of Farming lan
 focus keeps both (`colourCube`). Only the colour: the automatic Fill button stays; a smart Fill for survival
 is for later.
 
+### Minecraft 26.3 (on `wip/mc263`, on top of `wip/water`; compiled, not run in the game; not merged)
+
+Raphael (2026-10-24): urgently needed for 26.3. New module `fabric26.3` (Fabric only, `include 'fabric26.3'` in
+settings.gradle; `common` is shared and untouched, so the 1.21.11 jar is unchanged). Java 25, Loader 0.19.5,
+Fabric API 0.161.0+26.3.
+
+How it was made: every file of `fabric1.21.11` three-way merged (`git merge-file`) with upstream's 26.2 port
+(base = upstream's 1.21.11 at `d4b846f`), then fixed against 26.3 until it compiled, using upstream's 26.3 release
+(0.4.9, decompiled to `BuildGuide-tools\decompiled\upstream-26.3-0.4.9`) as the reference.
+
+| What 26.3 changed | What was done |
+|---|---|
+| Rendering API moved from `com.mojang.blaze3d.*` to `com.mojang.renderpearl.api.*` (buffers, pipeline, textures, commands) | imports; `RenderSystem.getCompiledPipeline(pipeline)` for `setPipeline`; `setVertexBuffer(0, buffer.slice())`; `drawIndexed(count, 1, 0, 0, 0)`; `Optional` clear colour; `VertexFormat.Mode` is `PrimitiveTopology`; pipelines use `ColorTargetState` / `DepthStencilState` (depth is reversed: the preview pipeline is GREATER_THAN_OR_EQUAL with writes) |
+| No model-view stack (`RenderSystem.getModelViewStack` is gone) | a small stack in `RenderHandler` (`pushModelView`, `translateModelView`, `popModelView`, `getModelView`) that every draw uses |
+| No frame graph pass to add: `LevelRenderer.addWeatherPass` and `prepareCullFrustum` are gone | the world is drawn at the head of `LevelRenderer.executeOutline`, as upstream does. The terrain frustum is not captured any more: the world buffer's sections are culled by render distance only |
+| Screens extract render state (`extractRenderState`, `GuiGraphicsExtractor`) | `ScreenWrapper` draws the panel fills, then the widgets, then the texts and the 3D view |
+| 3D preview: the picture-in-picture renderer has no buffer source, draws submitted nodes into a texture it keeps private | `PreviewRenderer` takes the texture and depth views (reflection on `textureView` / `depthTextureView`) and draws its own sections there; registered with `PictureInPictureRendererRegistry` |
+| `BlockStateBase.blocksMotion()` is gone | `WorldProbe.blocksMotion`: solid, but not cobweb or bamboo sapling (1.21.11's definition) |
+| `ItemContainerContents.stream()` is `itemCopies()` / `size()`; no GLFW on the classpath; `GuiGraphics.drawString` is `text`; `Gui.hud.isHidden()`; `Minecraft.gui.screen()`; key type `KEYBOARD` | adapted |
+
+Not verifiable offline: everything that draws. The mixins were checked against the 26.3 bytecode (the targets exist).
+In-game checklist for the 26.3 jar: it loads (no crash at the title screen); the shape shows in the world
+(with and without the depth test); the 3D preview in the Shape tab and the expanded one; the shape list and
+buttons look right; Fill, the guideline placement and the validation.
+
 ## 2. Final jars
 
 Build output: `fabric1.21.11/build/libs/BuildGuide-Fabric-0.4.8.jar` (mod version is still 0.4.8).
