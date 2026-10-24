@@ -1,5 +1,7 @@
 package brentmaas.buildguide.fabric.screen;
 
+import com.mojang.blaze3d.platform.InputConstants;
+
 import brentmaas.buildguide.common.screen.BaseScreen;
 import brentmaas.buildguide.common.screen.IScreenWrapper;
 import brentmaas.buildguide.common.screen.widget.IButton;
@@ -78,7 +80,17 @@ public class ScreenWrapper extends Screen implements IScreenWrapper {
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
 		if(super.mouseClicked(event, doubleClick)) return true;
 		if(attachedScreen.isTooSmall()) return false; // only the message and X (D1)
-		return attachedScreen.onMouseClicked(event.x(), event.y(), event.button(), doubleClick);
+		return attachedScreen.onMouseClicked(event.x(), event.y(), glfwButton(event.button()), doubleClick);
+	}
+
+	// Minecraft 26.3 numbers the mouse buttons from 1 (InputConstants.MOUSE_BUTTON_LEFT 1, MIDDLE 2, RIGHT 3); common
+	// keeps GLFW's numbers (BaseScreen.MOUSE_LEFT 0, right 1, MOUSE_MIDDLE 2). Without this a left click reached the
+	// screens as a right click: the accordion headers, the name and the preview's drag ignored it
+	static int glfwButton(int button) {
+		if(button == InputConstants.MOUSE_BUTTON_LEFT) return 0;
+		if(button == InputConstants.MOUSE_BUTTON_RIGHT) return 1;
+		if(button == InputConstants.MOUSE_BUTTON_MIDDLE) return 2;
+		return button - 1; // the side buttons keep their order
 	}
 	
 	@Override

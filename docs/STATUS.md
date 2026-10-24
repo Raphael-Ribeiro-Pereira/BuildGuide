@@ -646,6 +646,7 @@ How it was made: every file of `fabric1.21.11` three-way merged (`git merge-file
 | Screens extract render state (`extractRenderState`, `GuiGraphicsExtractor`) | `ScreenWrapper` draws the panel fills, then the widgets, then the texts and the 3D view |
 | 3D preview: the picture-in-picture renderer has no buffer source, draws submitted nodes into a texture it keeps private | `PreviewRenderer` takes the texture and depth views (reflection on `textureView` / `depthTextureView`) and draws its own sections there; registered with `PictureInPictureRendererRegistry` |
 | `BlockStateBase.blocksMotion()` is gone | `WorldProbe.blocksMotion`: solid, but not cobweb or bamboo sapling (1.21.11's definition) |
+| Mouse buttons are numbered from 1 (left 1, middle 2, right 3; GLFW and common: left 0, right 1, middle 2) | `ScreenWrapper.glfwButton` translates them: a left click reached the screens as a right one, so the Origin / property headers, the name and the preview's drag did nothing (Raphael's test, 2026-10-24; everything else worked) |
 | `ItemContainerContents.stream()` is `itemCopies()` / `size()`; no GLFW on the classpath; `GuiGraphics.drawString` is `text`; `Gui.hud.isHidden()`; `Minecraft.gui.screen()`; key type `KEYBOARD` | adapted |
 
 Not verifiable offline: everything that draws. The mixins were checked against the 26.3 bytecode (the targets exist).
