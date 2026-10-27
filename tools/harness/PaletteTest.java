@@ -24,9 +24,9 @@ public class PaletteTest {
 		IdWorld copyIds(){ IdWorld w = new IdWorld(); w.flags.putAll(flags); w.names.putAll(names); return w; }
 	}
 	// The decisions written out directly, independent of LayerPalette
-	static byte reference(int[] chosen, ShapeLayers layers, int y, int flags, int blockId){
+	static byte reference(int[] chosen, ShapeLayers layers, int x, int y, int z, int flags, int blockId){
 		if((flags & AIR) != 0) return MISSING;
-		int want = chosen[layers.layerOf(y) - 1];
+		int want = chosen[layers.layerAt(x, y, z) - 1];
 		boolean inPalette = false; for(int c: chosen) if(c != NONE && c == blockId) inPalette = true;
 		if(want != NONE && blockId == want) return OK;
 		if(want != NONE && inPalette) return WL;
@@ -58,15 +58,17 @@ public class PaletteTest {
 	}
 	static LayerPalette randomPalette(SliceScanTest.Case c, Random r){
 		int minY = Integer.MAX_VALUE, maxY = Integer.MIN_VALUE; for(long p: c.shape){ minY = Math.min(minY, LocalPos.unpackY(p)); maxY = Math.max(maxY, LocalPos.unpackY(p)); }
-		int[] cut = ShapeLayers.normalize(5 + 5 * r.nextInt(17), 5 + 5 * r.nextInt(17), 5 + 5 * r.nextInt(17), 0);
+		// Random strata (2026-10-27): 2 to 5 layers, any rest, thicknesses, mix and patches
+		int count = 2 + r.nextInt(4); int[] t = new int[5], pp = new int[5], sz = new int[5]; for(int i = 0; i < 5; i++){ t[i] = r.nextInt(8); pp[i] = r.nextInt(3) == 0 ? 5 * r.nextInt(9) : 0; sz[i] = 1 + r.nextInt(5); }
+		ShapeLayers.Spec spec = new ShapeLayers.Spec(ShapeLayers.Axis.DEPTH, count, 1 + r.nextInt(count), r.nextInt(4), 1 + r.nextInt(count), t, pp, sz, r.nextLong());
 		String[] pick = {null, "Stone", "Dirt", "Cobblestone", "Oak Planks", "Torch"};
-		int[] ids = new int[4]; for(int i = 0; i < 4; i++){ String n = pick[r.nextInt(pick.length)]; ids[i] = n == null ? NONE : id(n); }
-		return new LayerPalette(new ShapeLayers(maxY, maxY - minY, cut[0], cut[1], cut[2]), ids);
+		int[] ids = new int[5]; for(int i = 0; i < 5; i++){ String n = pick[r.nextInt(pick.length)]; ids[i] = n == null ? NONE : id(n); }
+		return new LayerPalette(ShapeLayers.uniformDepth(spec, maxY, maxY - minY), ids);
 	}
 
 	public static void main(String[] a) throws Exception {
-		System.out.println("-- the truth table (Depth 20, cuts 25/50/75; Stone on layers 1 and 4, Dirt on 2, layer 3 any)");
-		ShapeLayers layers = new ShapeLayers(0, 20, 25, 50, 75);
+		System.out.println("-- the truth table (a body 20 deep in 6-block bands, the rest last; Stone on layers 1 and 4, Dirt on 2, layer 3 any)");
+		ShapeLayers layers = ShapeLayers.uniformDepth(new ShapeLayers.Spec(ShapeLayers.Axis.DEPTH, 4, 4, 0, 4, new int[]{6, 6, 6, 0, 0}, new int[5], new int[]{3, 3, 3, 3, 3}, 1), 0, 20);
 		LayerPalette pal = new LayerPalette(layers, new int[]{id("Stone"), id("Dirt"), NONE, id("Stone")});
 		int L1 = 0, L2 = -6, L3 = -12, L4 = -18;
 		Object[][] table = {
@@ -86,13 +88,13 @@ public class PaletteTest {
 			{"layer 4, Dirt", L4, SOLID, id("Dirt"), WL},
 			{"below Depth (a spike, layer 4), Stone", -35, SOLID, id("Stone"), OK},
 		};
-		for(Object[] row: table){ byte got = LayerPalette.classify(pal, (Integer) row[1], (Integer) row[2], (Integer) row[3]); check(got == (Byte) row[4], row[0] + ": " + got); }
+		for(Object[] row: table){ byte got = LayerPalette.classify(pal, 0, (Integer) row[1], 0, (Integer) row[2], (Integer) row[3]); check(got == (Byte) row[4], row[0] + ": " + got); }
 		LayerPalette soft = new LayerPalette(layers, new int[]{id("Torch"), NONE, NONE, NONE});
-		check(LayerPalette.classify(soft, L1, 0, id("Torch")) == OK, "a chosen block that is not solid (Torch on layer 1) is right there");
+		check(LayerPalette.classify(soft, 0, L1, 0, 0, id("Torch")) == OK, "a chosen block that is not solid (Torch on layer 1) is right there");
 		boolean same = true;
 		for(int f: new int[]{AIR, 0, SOLID, IGN, SOLID | IGN, AIR | IGN}) for(int y: new int[]{0, -7, -30}) for(int bid: new int[]{NONE, id("Stone"), id("Dirt")}){
 			byte old = (f & AIR) != 0 ? MISSING : (f & IGN) != 0 ? IGNORED : (f & SOLID) != 0 ? OK : MISSING;
-			same &= LayerPalette.classify(null, y, f, bid) == old && LayerPalette.classify(new LayerPalette(layers, new int[]{NONE, NONE, NONE, NONE}), y, f, bid) == old;
+			same &= LayerPalette.classify(null, 0, y, 0, f, bid) == old && LayerPalette.classify(new LayerPalette(layers, new int[]{NONE, NONE, NONE, NONE}), 0, y, 0, f, bid) == old;
 		}
 		check(same, "no palette, or a palette with no block chosen: exactly the rule of before (ignored -> IGNORED, solid -> OK, else MISSING)");
 		check(ValidationState.WRONG_LAYER == 5 && ValidationState.WRONG_BLOCK == 6 && ValidationState.IGNORED == 4, "WRONG_LAYER 5 and WRONG_BLOCK 6 after IGNORED 4 (3 stays reserved; statuses are never persisted)");
@@ -103,9 +105,9 @@ public class PaletteTest {
 			SliceScanTest.Case c = SliceScanTest.randomCase(seed); Random r = new Random(seed * 31); IdWorld w = paletteWorld(c, r); c.world = w; LayerPalette p = randomPalette(c, r);
 			String instant = scan(c, w, p, 0), sliced = scan(c, w, p, 1), budget = scan(c, w, p, 3000);
 			if(instant.equals(sliced) && instant.equals(budget)) equal++;
-			ValidationState s = scanState(c, w, p); boolean match = true; int[] chosen = new int[4]; for(int i = 0; i < 4; i++) chosen[i] = p.idOf(i + 1);
+			ValidationState s = scanState(c, w, p); boolean match = true; int[] chosen = new int[5]; for(int i = 0; i < 5; i++) chosen[i] = p.idOf(i + 1);
 			for(long pos: c.tracked){ int x = LocalPos.unpackX(pos) + c.ox, y = LocalPos.unpackY(pos) + c.oy, z = LocalPos.unpackZ(pos) + c.oz; Integer f = w.flags.get(LocalPos.pack(x, y, z)); String n = w.names.get(LocalPos.pack(x, y, z));
-				match &= s.getStatus(pos) == reference(chosen, p.layers, LocalPos.unpackY(pos), f == null ? AIR : f, n == null ? NONE : id(n)); }
+				match &= s.getStatus(pos) == reference(chosen, p.layers, LocalPos.unpackX(pos), LocalPos.unpackY(pos), LocalPos.unpackZ(pos), f == null ? AIR : f, n == null ? NONE : id(n)); }
 			if(match) ref++; total++; if(s.getWrongLayer() > 0) sawWL++; if(s.getWrongBlock() > 0) sawWB++;
 		}
 		check(equal == total, "budget 1 ns (one layer a frame), about 3 layers a frame and Instant: identical states (" + equal + " of " + total + ")");
@@ -146,7 +148,7 @@ public class PaletteTest {
 		check(s.getErrorCount() == s.getNearCount() + s.getWrongBlock(), "errors (red) = structure errors around the shape (" + s.getNearCount() + ") + wrong blocks on it (" + s.getWrongBlock() + ")");
 		IdWorld counted = w.copyIds(); ValidationState t = SliceScanTest.fresh(c); t.setPalette(p); t.consumeScanRequest();
 		SliceScan job = new SliceScan(t, c.shape, c.tracked, c.ox, c.oy, c.oz, 1); while(!job.step(counted, 0, () -> SliceScanTest.nanos)); job.publish(counted);
-		int needsId = 0; for(long pos: c.tracked) if(p.needsId(LocalPos.unpackY(pos))) needsId++;
+		int needsId = 0; for(long pos: c.tracked) if(p.needsId(LocalPos.unpackX(pos), LocalPos.unpackY(pos), LocalPos.unpackZ(pos))) needsId++;
 		int named = t.getIgnored() + t.getWrongLayer() + t.getWrongBlock();
 		check(counted.idReads == needsId, "ids read only on positions whose layer has a block (" + counted.idReads + " of " + c.tracked.size() + " expected positions): an int each, no string");
 		check(counted.nameReads == named + t.getNearCount(), "names read only for what is listed (" + counted.nameReads + " = " + named + " ignored/wrong + " + t.getNearCount() + " structure errors)");

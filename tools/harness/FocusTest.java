@@ -85,7 +85,8 @@ public class FocusTest {
 		check(new FocusFilter(Part.ALL, 3).accepts(Part.SPIKES, 3) && !new FocusFilter(Part.ALL, 3).accepts(Part.SPIKES, 4), "All x Layer 3: every part of layer 3");
 		check(new FocusFilter(Part.SPIKES, 9).layer == 0 && new FocusFilter(null, 0).part == Part.ALL, "an out-of-range layer or no part counts as All");
 		check(FocusFilter.nextPart(Part.ALL, true) == Part.CAP && FocusFilter.nextPart(Part.HIDDEN, true) == Part.ALL && FocusFilter.nextPart(Part.ALL, false) == Part.HIDDEN && FocusFilter.nextPart(Part.HIDDEN, false) == Part.ALL, "Part button: All, Cap, Body, Spikes, Hidden; without parts All, Hidden");
-		check(FocusFilter.nextLayer(0) == 1 && FocusFilter.nextLayer(4) == 0, "Layer button: All, 1, 2, 3, 4, All");
+		check(FocusFilter.nextLayer(0) == 1 && FocusFilter.nextLayer(4) == 5 && FocusFilter.nextLayer(5) == 0, "Layer button: All, 1, 2, 3, 4, 5, All");
+		check(FocusFilter.nextLayer(2, 3) == 3 && FocusFilter.nextLayer(3, 3) == 0 && FocusFilter.nextLayer(0, 2) == 1 && FocusFilter.nextLayer(2, 2) == 0, "over the layers a shape uses: 3 layers All, 1, 2, 3, All; 2 layers All, 1, 2, All");
 
 		System.out.println("-- the threshold");
 		check(!FocusFilter.isActive(Part.CAP, 0, 400, 399) && FocusFilter.isActive(Part.CAP, 0, 400, 400) && FocusFilter.isActive(Part.CAP, 0, 400, 107000), "below N no focus, at N and above it applies (N = 400, the default)");
@@ -95,12 +96,14 @@ public class FocusTest {
 		System.out.println("-- the Island's selectors");
 		ShapeIsland island = new ShapeIsland();
 		String save = island.toPersistence();
-		check(island.properties.size() == 44 && save.endsWith(",ALL,0"), "Focus part and Focus layer after Block 4, All and All by default (44 values)");
+		// The focus stays the 43rd and 44th value; the strata's 20 follow it (2026-10-27)
+		String[] sv = save.split(",", -1);
+		check(island.properties.size() == 64 && sv[42].equals("ALL") && sv[43].equals("0"), "Focus part and Focus layer after Block 4, All and All by default (values 43 and 44 of 64)");
 		Method store = Shape.class.getDeclaredMethod("storeFocus", Part.class, int.class); store.setAccessible(true);
 		store.invoke(island, Part.SPIKES, 3);
 		String focused = island.toPersistence();
 		ShapeIsland back = new ShapeIsland(); back.restorePersistence(focused);
-		check(!back.error && back.getFocusPart() == Part.SPIKES && back.getFocusLayer() == 3 && focused.endsWith(",SPIKES,3"), "saved and restored (Spikes, Layer 3)");
+		check(!back.error && back.getFocusPart() == Part.SPIKES && back.getFocusLayer() == 3 && String.join(",", Arrays.copyOfRange(focused.split(",", -1), 42, 44)).equals("SPIKES,3"), "saved and restored (Spikes, Layer 3)");
 		ShapeIsland old = new ShapeIsland(); old.restorePersistence(save.substring(0, save.length() - ",ALL,0".length()));
 		check(!old.error && old.getFocusPart() == Part.ALL && old.getFocusLayer() == 0 && old.toPersistence().equals(save), "an island saved before the focus (42 values) loads with All, All and saves the same text");
 		boolean hiddenRows = true; for(Property<?> p: island.getGuiProperties()) hiddenRows &= p != island.properties.get(42) && p != island.properties.get(43);

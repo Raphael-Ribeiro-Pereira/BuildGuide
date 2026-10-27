@@ -11,7 +11,8 @@ import brentmaas.buildguide.common.shape.*;
 // Palette per layer (4D), the Island side: four block ids after Cut 3 %, URL-encoded in the save, empty by
 // default (older islands load unchanged); typed ids are checked and normalised by the loader (a fake registry
 // here), an invalid one is not applied; the Hand button with a fake provider (a block, no block); the palette
-// travels with the generation, like the layers.
+// travels with the generation, like the layers. Since 2026-10-27 (the strata) Block 5 is saved with the layer
+// controls after the focus, and the palette has five ids.
 public class PaletteIslandTest {
 	static int fails = 0;
 	static void check(boolean c, String m){ System.out.println((c?"OK   ":"FAIL ")+m); if(!c) ++fails; }
@@ -45,15 +46,17 @@ public class PaletteIslandTest {
 		System.out.println("-- persistence");
 		TestIsland fresh = new TestIsland();
 		String save = fresh.toPersistence();
-		check(fresh.properties.size() == 44 && save.endsWith(",false,25,50,75,,,,,ALL,0"), "44 persisted properties: Block 1 to Block 4 after Cut 3 %, empty by default, then the focus (" + save.substring(save.length() - 26) + ")");
-		String old = save.substring(0, save.length() - ",,,,,ALL,0".length());
-		check(old.split(",").length == 38, "an island saved before the palette (4C): 38 values");
+		String[] sv = save.split(",", -1);
+		check(fresh.properties.size() == 64 && String.join(",", Arrays.copyOfRange(sv, 34, 44)).equals("false,25,50,75,,,,,ALL,0"), "64 persisted properties: Block 1 to Block 4 after Cut 3 %, empty by default, then the focus (" + String.join(",", Arrays.copyOfRange(sv, 34, 44)) + "), then the strata");
+		String old = String.join(",", Arrays.copyOf(sv, 38));
+		check(old.split(",", -1).length == 38, "an island saved before the palette (4C): 38 values");
 		TestIsland loaded = new TestIsland(); loaded.restorePersistence(old);
 		check(!loaded.error && loaded.toPersistence().equals(save) && block(loaded, 1).value.isEmpty() && block(loaded, 4).value.isEmpty(), "it loads with the four ids empty and saves the same text");
 		TestIsland withIds = new TestIsland(); setProp(withIds, "propertyLayers", true);
 		block(withIds, 1).apply("minecraft:stone"); block(withIds, 3).apply("create:andesite_casing");
 		String encoded = withIds.toPersistence();
-		check(encoded.endsWith(",minecraft%3Astone,,create%3Aandesite_casing,,ALL,0"), "ids are URL-encoded in the save (':' -> %3A), like the instance name: " + encoded.substring(encoded.length() - 52));
+		String ids = String.join(",", Arrays.copyOfRange(encoded.split(",", -1), 38, 44));
+		check(ids.equals("minecraft%3Astone,,create%3Aandesite_casing,,ALL,0"), "ids are URL-encoded in the save (':' -> %3A), like the instance name: " + ids);
 		TestIsland back = new TestIsland(); back.restorePersistence(encoded);
 		check(!back.error && block(back, 1).value.equals("minecraft:stone") && block(back, 2).value.isEmpty() && block(back, 3).value.equals("create:andesite_casing") && back.toPersistence().equals(encoded), "and come back exactly (a mod's namespace too)");
 		check(!encoded.replace("%3A", "").contains(":") && encoded.split(";").length == 1 && !encoded.contains("="), "nothing in the save can break its ',' ';' '=' separators");
@@ -77,7 +80,7 @@ public class PaletteIslandTest {
 		IslandLayersTest.generate(g);
 		check(g.getPalette() == null && g.getLayers() == null, "Layers off: no palette (the validation of before)");
 		setProp(g, "propertyLayers", true); IslandLayersTest.generate(g);
-		check(Arrays.equals(g.getPalette(), new String[]{"", "minecraft:dirt", "", ""}) && g.getLayers() != null, "Layers on: the generation's palette, one id per layer (\"\" = any solid)");
+		check(Arrays.equals(g.getPalette(), new String[]{"", "minecraft:dirt", "", "", ""}) && g.getLayers() != null, "Layers on: the generation's palette, one id per layer (\"\" = any solid)");
 		block(g, 2).apply("stone");
 		check(g.getPalette()[1].equals("minecraft:dirt"), "a typed id changes the palette only with the next generation (which rescans)");
 		Shape cube = new ShapeCuboid();

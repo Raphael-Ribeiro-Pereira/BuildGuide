@@ -6,8 +6,9 @@ import brentmaas.buildguide.common.screen.*;
 import brentmaas.buildguide.common.shape.*;
 import brentmaas.buildguide.common.shape.PreviewModel.ColourMode;
 // Layers in the preview (4C): "Colour: Status | Layer" colours the mesh by layer, filter and slice still
-// apply, and the rebuild key holds the colour mode and the cuts: one rebuild per change, none for the
-// same key. A shape without layers is always coloured by status. Frames as in PreviewRebuildTest.
+// apply, and the rebuild key holds the colour mode and the layers: one rebuild per change, none for the
+// same key. A shape without layers is always coloured by status. Frames as in PreviewRebuildTest. (The
+// legend's texts and widths are StrataTest's since 2026-10-27.)
 public class PreviewLayersTest {
 	static int fails = 0;
 	static void check(boolean c, String m){ System.out.println((c?"OK   ":"FAIL ")+m); if(!c) ++fails; }
@@ -29,13 +30,15 @@ public class PreviewLayersTest {
 		for(long t = 0; t < millis; t += 16){ now += 16; PreviewModel m = c.update(s); if(m == null) continue; shown = m; String r = PreviewModel.meshChange(built, m); if(r != null) rebuilds.add(r); built = m; }
 	}
 	static int drawn(PreviewModel m){ int n = 0; for(int i = 0; i < m.positions.length; i++) if(m.shows(i)) n++; return n; }
+	// Bands of `first`, 6, 6 blocks and the rest, over a 24-block column (the old Depth 24 with 25/50/75: 6 each)
+	static ShapeLayers bands(int first){ return ShapeLayers.uniformDepth(new ShapeLayers.Spec(ShapeLayers.Axis.DEPTH, 4, 4, 0, 4, new int[]{first, 6, 6, 0, 0}, new int[5], new int[]{3, 3, 3, 3, 3}, 1), 0, 23); }
 
 	public static void main(String[] a) throws Exception {
 		finish = Shape.class.getDeclaredMethod("finishGeneration"); finish.setAccessible(true);
 		fe = Shape.class.getDeclaredField("expectedBlocks"); fe.setAccessible(true);
-		// A column 0..-23 (Depth 24, cuts 25/50/75: 6 blocks per layer)
+		// A column 0..-23 in four 6-block layers
 		long[] column = new long[24]; for(int d = 0; d < 24; d++) column[d] = LocalPos.pack(0, -d, 0);
-		ShapeLayers cuts = new ShapeLayers(0, 24, 25, 50, 75);
+		ShapeLayers cuts = bands(6);
 
 		System.out.println("-- the model");
 		PreviewModel base = PreviewModel.of(Arrays.asList(column[0], column[6], column[12], column[18]), 1, cuts);
@@ -45,10 +48,10 @@ public class PreviewLayersTest {
 		PreviewModel plain = PreviewModel.of(Arrays.asList(column[0]), 1).withView(PreviewFilter.ALL, PreviewModel.SLICE_OFF, 0, ColourMode.LAYER);
 		check(plain.colourMode == ColourMode.STATUS && plain.colourAt(0) == PreviewColours.WHITE, "a model without layers stays coloured by status");
 		check(PreviewModel.meshChange(base, byLayer).equals("colour") && PreviewModel.meshChange(byLayer, base.withView(PreviewFilter.ALL, PreviewModel.SLICE_OFF, 0, ColourMode.LAYER)) == null, "rebuild key: the colour mode (another instance in the same mode: no rebuild)");
-		// Other cuts always come with a new generation; the key holds them anyway. Same positions, other cuts (set by reflection):
+		// Other layers always come with a new generation; the key holds them anyway. Same positions, other layers (set by reflection):
 		PreviewModel twin = byLayer.withView(PreviewFilter.ALL, PreviewModel.SLICE_OFF, 0, ColourMode.LAYER);
-		Field lf = PreviewModel.class.getDeclaredField("layers"); lf.setAccessible(true); lf.set(twin, new ShapeLayers(0, 24, 10, 50, 75));
-		check("layers".equals(PreviewModel.meshChange(byLayer, twin)), "and the cuts: same positions with other cuts under Colour: Layer rebuilds, reason layers");
+		Field lf = PreviewModel.class.getDeclaredField("layers"); lf.setAccessible(true); lf.set(twin, bands(3));
+		check("layers".equals(PreviewModel.meshChange(byLayer, twin)), "and the layers: same positions with other layers under Colour: Layer rebuilds, reason layers");
 
 		System.out.println("-- through the controller (frames)");
 		c = new PreviewController(() -> now);
@@ -66,8 +69,8 @@ public class PreviewLayersTest {
 		rebuilds.clear(); c.setSlice(PreviewModel.SLICE_OFF, 0); c.setFilter(PreviewFilter.MISSING); frames(s, 300);
 		check(rebuilds.equals(Arrays.asList("filter")) && drawn(shown) == 0 && shown.isViewEmpty(), "slice off and filter Missing in the same frame: one rebuild (reason filter, checked first); nothing validated, so nothing drawn: the filter still applies by layer: " + rebuilds);
 		c.setFilter(PreviewFilter.ALL); frames(s, 300);
-		rebuilds.clear(); s.next = new ShapeLayers(0, 24, 40, 50, 75); generate(s, column); frames(s, 400);
-		check(rebuilds.equals(Arrays.asList("generation")) && shown.layers.cut1 == 40, "cuts changed (a regeneration, as any shape change): one rebuild: " + rebuilds);
+		rebuilds.clear(); s.next = bands(9); generate(s, column); frames(s, 400);
+		check(rebuilds.equals(Arrays.asList("generation")) && shown.layers.spec.thickness(1) == 9, "layers changed (a regeneration, as any shape change): one rebuild: " + rebuilds);
 		rebuilds.clear(); c.setColourMode(ColourMode.STATUS); frames(s, 300);
 		check(rebuilds.equals(Arrays.asList("colour")) && shown.colourMode == ColourMode.STATUS, "back to Colour: Status: one rebuild: " + rebuilds);
 		c.setColourMode(ColourMode.LAYER); frames(s, 300);
@@ -82,11 +85,6 @@ public class PreviewLayersTest {
 		String json = new String(Files.readAllBytes(Paths.get("common/resources/assets/buildguide/lang/en_us.json")), "UTF-8");
 		for(String k: new String[]{"status", "layer"}){ Matcher m = Pattern.compile("\"screen\\.buildguide\\.colour\\." + k + "\": \"([^\"]*)\"").matcher(json); m.find();
 			check(LabelWidthTest.width(m.group(1)) <= 80 - 8, "button \"" + m.group(1) + "\": " + LabelWidthTest.width(m.group(1)) + " px in an 80 px button"); }
-		check(ShapeScreen.depthLabel(new int[]{0, 5}).equals("0-5") && ShapeScreen.depthLabel(new int[]{18, -1}).equals("18+") && ShapeScreen.depthLabel(new int[]{3, 3}).equals("3") && ShapeScreen.depthLabel(null).equals("-"), "legend texts: 0-5, 18+, 3, -");
-		int widest = 0; String widestText = "";
-		for(int depth = 0; depth <= IslandGeometry.maxDepth; depth++) for(int c1 = 5; c1 <= 85; c1 += 5) for(int c2 = c1 + 5; c2 <= 90; c2 += 5) for(int c3 = c2 + 5; c3 <= 95; c3 += 5){
-			ShapeLayers x = new ShapeLayers(0, depth, c1, c2, c3); for(int k = 1; k <= 4; k++){ String t = ShapeScreen.depthLabel(x.depthRange(k)); if(LabelWidthTest.width(t) > widest){ widest = LabelWidthTest.width(t); widestText = t; } } }
-		check(widest <= 72 - 16 - 2, "the widest legend text over every Depth and cut (\"" + widestText + "\", " + widest + " px) fits its 72-px entry after the swatch");
 		System.out.println(fails == 0 ? "ALL OK" : fails + " FAILED");
 	}
 }

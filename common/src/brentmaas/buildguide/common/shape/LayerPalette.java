@@ -24,14 +24,14 @@ public final class LayerPalette {
 	public final ShapeLayers layers;
 	private final int[] ids;
 
-	// ids: one per layer (1 to 4, index 0 to 3), NONE = any solid block
+	// ids: one per layer (1 to 5, index 0 to 4), NONE = any solid block
 	public LayerPalette(ShapeLayers layers, int[] ids) {
 		this.layers = layers;
 		this.ids = new int[ShapeLayers.COUNT];
 		for(int i = 0;i < ShapeLayers.COUNT;++i) this.ids[i] = ids != null && i < ids.length ? ids[i] : NONE;
 	}
 
-	// The chosen block of a layer (1 to 4), NONE for any
+	// The chosen block of a layer (1 to 5), NONE for any
 	public int idOf(int layer) {
 		return ids[Math.max(1, Math.min(ShapeLayers.COUNT, layer)) - 1];
 	}
@@ -46,14 +46,6 @@ public final class LayerPalette {
 		if(blockId == NONE) return false;
 		for(int id: ids) if(id == blockId) return true;
 		return false;
-	}
-
-	/**
-	 * Status of an expected position at local y, from the probe's flags (IBlockProbe) and the block's id.
-	 * palette null = no palette (the rule of before); blockId is only read when the layer has a block.
-	 */
-	public static byte classify(LayerPalette palette, int y, int flags, int blockId) {
-		return byWanted(palette, palette == null ? NONE : palette.idOf(palette.layers.layerOf(y)), flags, blockId);
 	}
 
 	// The same with the positions that want water (local, null: none). Every validation path calls this one
@@ -81,11 +73,7 @@ public final class LayerPalette {
 		return wanted != NONE ? ValidationState.WRONG_BLOCK : ValidationState.OK;
 	}
 
-	// Whether classify needs the block's id at this y (the layer has a chosen block): the loader reads it only then
-	public boolean needsId(int y) {
-		return idOf(layers.layerOf(y)) != NONE;
-	}
-
+	// Whether classify needs the block's id at this position (its layer has a chosen block): the loader reads it only then
 	public boolean needsId(int x, int y, int z) {
 		return idOf(layers.layerAt(x, y, z)) != NONE;
 	}

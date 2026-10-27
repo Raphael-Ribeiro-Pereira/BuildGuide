@@ -280,7 +280,7 @@ public class ShapeScreen extends BaseScreen{
 			buttonFocusLayer = BuildGuide.widgetHandler.createButton(x + partWidth + 2, focusRowY, layerWidth, controlsHeight, layerTitle(shape), () -> {
 				Shape s = currentShapeOrNull();
 				if(s == null) return;
-				s.setFocus(s.getFocusPart(), FocusFilter.nextLayer(s.getFocusLayer()));
+				s.setFocus(s.getFocusPart(), FocusFilter.nextLayer(s.getFocusLayer(), s.getLayers() != null ? s.getLayers().count() : ShapeLayers.COUNT));
 				buttonFocusLayer.setTitle(layerTitle(s));
 			});
 			addWidget(buttonFocusLayer);
@@ -390,13 +390,13 @@ public class ShapeScreen extends BaseScreen{
 	private void renderLegend() {
 		boolean byLayer = shownModel != null && shownModel.colourMode == ColourMode.LAYER;
 		// By status with a palette (4D): a fifth entry, the orange of the wrong-layer blocks
-		int entries = !byLayer && hasPalette() ? legendKeys.length + 1 : legendKeys.length;
+		int entries = byLayer ? shownModel.layers.count() : hasPalette() ? legendKeys.length + 1 : legendKeys.length;
 		int step = (wrapper.getWidth() - rightX) / entries;
 		for(int i = 0;i < entries;++i) {
 			int x = rightX + i * step;
 			boolean wrongLayer = i == legendKeys.length;
 			fillRect(x + 4, bands.legendY, x + 12, bands.legendY + 8, 0xFF000000 | (byLayer ? ShapeLayers.colour(i + 1) : wrongLayer ? PreviewColours.WRONG_LAYER : legendColours[i]));
-			String text = byLayer ? depthLabel(shownModel.layers.depthRange(i + 1)) : new Translatable(wrongLayer ? "screen.buildguide.legend.wronglayer" : legendKeys[i]).toString();
+			String text = byLayer ? legendLabel(i + 1, shownModel.layers.legend(i + 1)) : new Translatable(wrongLayer ? "screen.buildguide.legend.wronglayer" : legendKeys[i]).toString();
 			drawShadowLeft(text, x + 16, bands.legendY, 0xAAAAAA);
 		}
 	}
@@ -407,11 +407,19 @@ public class ShapeScreen extends BaseScreen{
 		return shape != null && shape.getValidationState().getPalette() != null;
 	}
 	
-	// "0-5", "6" (one depth), "18+" (and everything below), "-" (no block depth falls in that layer)
-	public static String depthLabel(int[] range) {
-		if(range == null) return "-";
-		if(range[1] == -1) return range[0] + "+";
-		return range[0] == range[1] ? "" + range[0] : range[0] + "-" + range[1];
+	// A layer's legend (ShapeLayers.legend), its number first: "2 3b" (3 blocks), "4 25%" (of the column or of
+	// Height; above the rest from the top, below it from the bottom), "3 rest", "5 spots" (patches only), "5 -"
+	public static String legendLabel(int layer, int[] legend) {
+		String n = "" + layer, value = "" + legend[1];
+		switch(legend[0]) {
+		case ShapeLayers.LEGEND_BLOCKS: return new Translatable("screen.buildguide.legend.blocks", n, value).toString();
+		case ShapeLayers.LEGEND_BOTTOM:
+		case ShapeLayers.LEGEND_TOP:
+		case ShapeLayers.LEGEND_BASE: return new Translatable("screen.buildguide.legend.percent", n, value).toString();
+		case ShapeLayers.LEGEND_REST: return new Translatable("screen.buildguide.legend.rest", n).toString();
+		case ShapeLayers.LEGEND_PATCHES: return new Translatable("screen.buildguide.legend.patches", n).toString();
+		default: return new Translatable("screen.buildguide.legend.empty", n).toString();
+		}
 	}
 	
 	private Shape currentShapeOrNull() {

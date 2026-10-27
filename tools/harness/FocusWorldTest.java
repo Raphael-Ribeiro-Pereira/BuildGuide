@@ -76,7 +76,7 @@ public class FocusWorldTest {
 		check(model != null && model.positions.length == total, "the preview still gets every block (" + (model == null ? "-" : "" + model.positions.length) + ")");
 		island.setFocus(Part.BODY, 2); settle(island);
 		Set<Long> body2 = select(island, new FocusFilter(Part.BODY, 2)); boolean both = true;
-		for(long p: body2) both &= island.partOf(LocalPos.unpackX(p), LocalPos.unpackY(p), LocalPos.unpackZ(p)) == Part.BODY && island.getLayers().layerOf(LocalPos.unpackY(p)) == 2;
+		for(long p: body2) both &= island.partOf(LocalPos.unpackX(p), LocalPos.unpackY(p), LocalPos.unpackZ(p)) == Part.BODY && island.getLayers().layerAt(LocalPos.unpackX(p), LocalPos.unpackY(p), LocalPos.unpackZ(p)) == 2;
 		check(!body2.isEmpty() && both && current(island).shape().equals(body2), "Body x Layer 2: the intersection (" + body2.size() + ")");
 		island.setFocus(Part.SPIKES, 0); settle(island);
 		Set<Long> spikes = select(island, new FocusFilter(Part.SPIKES, 0));

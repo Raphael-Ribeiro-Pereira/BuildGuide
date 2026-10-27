@@ -544,6 +544,11 @@ public final class IslandGeometry {
 			this.wall = wall;
 		}
 
+		// The strata over this generation's body columns (the top is y 0)
+		ShapeLayers layers(ShapeLayers.Spec spec) {
+			return ShapeLayers.depth(spec, 0, body, h);
+		}
+
 		public FocusFilter.Part partOf(int x, int y, int z) {
 			int ix = x + h, iz = z + h;
 			int b = ix < 0 || ix >= n || iz < 0 || iz >= n ? -1 : body[ix * n + iz];

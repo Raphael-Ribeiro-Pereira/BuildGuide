@@ -47,7 +47,7 @@ public class WorldCost {
 				IBlockProbe built = new IBlockProbe(){ public boolean isLoaded(int x, int y, int z){ return true; } public int flags(int x, int y, int z){ return expected.contains(LocalPos.pack(x - 100, y - 64, z + 200)) ? FLAG_SOLID : FLAG_AIR; } public int blockId(int x, int y, int z){ return 10 + (64 - y) * 4 / Math.max(1, depth + 1); } public String name(int x, int y, int z){ return "Stone"; } };
 				long[] took = new long[2];
 				for(int k = 0; k < 2; k++){
-					ValidationState ps = new ValidationState(); if(k == 1) ps.setPalette(new LayerPalette(new ShapeLayers(0, depth, 25, 50, 75), new int[]{10, 11, 12, 13}));
+					ValidationState ps = new ValidationState(); if(k == 1) ps.setPalette(new LayerPalette(ShapeLayers.uniformDepth(new ShapeLayers.Spec(ShapeLayers.Axis.DEPTH, 4, 3, 2, 4, new int[]{1, 3, 0, 25, 10}, new int[]{0, 0, 0, 15, 0}, new int[]{3, 3, 3, 3, 3}, 1), 0, depth), new int[]{10, 11, 12, 13}));
 					SliceScan job = new SliceScan(ps, expected, tracked, ox, oy, oz, 1); long s0 = System.nanoTime(); while(!job.step(built, 0, System::nanoTime)); job.publish(built); took[k] = System.nanoTime() - s0;
 					if(k == 1 && ps.getWrongLayer() + ps.getWrongBlock() > ps.getTotal() / 2) System.out.println("         (palette case misbuilt)");
 				}

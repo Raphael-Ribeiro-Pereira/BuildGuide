@@ -126,7 +126,7 @@ public class TerrainTest {
 
 		System.out.println("-- persistence, labels, accordion, registry");
 		ShapeTerrain fresh = new ShapeTerrain(); String fs = fresh.toPersistence();
-		check(fresh.properties.size() == 30 && fs.equals("CIRCLE,41,41,6,0.7,0.0,0.0,6.0,HILLS,12,20,0.0,0,2,15,15,Runnable,Runnable,Runnable,1,ALL,0,false,25,50,75,,,,"), "30 values (22 of phase 1, then Layers, the cuts and 4 block ids), neutral defaults: " + fs);
+		check(fresh.properties.size() == 49 && fs.equals("CIRCLE,41,41,6,0.7,0.0,0.0,6.0,HILLS,12,20,0.0,0,2,15,15,Runnable,Runnable,Runnable,1,ALL,0,false,25,50,75,,,,,4,2,1,,15,0,30,15,10,0,0,0,0,0,3,3,3,3,3"), "49 values (22 of phase 1, then Layers, the unused cuts and 4 block ids, then the strata's 19), neutral defaults: " + fs);
 		ShapeTerrain back = new ShapeTerrain(); prop(back, "propertyType").value = Type.MOUNTAINS; prop(back, "propertySeed").value = 4242; prop(back, "propertyOutline").value = Outline.POLYGON; String bs = back.toPersistence();
 		ShapeTerrain back2 = new ShapeTerrain(); back2.restorePersistence(bs);
 		check(!back2.error && back2.toPersistence().equals(bs), "saved and restored exactly");

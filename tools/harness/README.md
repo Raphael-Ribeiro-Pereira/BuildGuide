@@ -43,7 +43,8 @@ java  -cp "$CLASSES;$OUT" FocusWorldTest    # build focus in the world: buffer o
 java  -cp "$CLASSES;$OUT" FocusGuiTest      # build focus panel: button texts in px, the row at 270 and 360, the preview's note
 java  -cp "$CLASSES;$OUT" TerrainGeometryTest # Terrain geometry: seeds, Types, Dunes direction, the cap 3 x Scale, Edge fade, the skin without gaps (117 terrains), cost under 150k
 java  -cp "$CLASSES;$OUT" TerrainTest       # Terrain shape: the cap in the panel, Randomize/Natural/Undo, focus, persistence, labels, accordion, registry, GOLDEN of 12 terrains
-java  -cp "$CLASSES;$OUT" TerrainLayersTest # Terrain layers by height: cuts, column layer, palette truth table, sliced == instant scan, persistence, preview, focus by layer
+java  -cp "$CLASSES;$OUT" TerrainLayersTest # Terrain layers by height (the Elevation axis): column layer against a reference, palette truth table, sliced == instant scan, persistence, panel rows, preview, focus by layer
+java  -cp "$CLASSES;$OUT" StrataTest        # the strata (2026-10-27): bands in blocks from the top and % from the bottom, the rest, thin columns, the spike layer, mix, patches and their share, elevation, legend texts and widths, equality and seeds, the panel rows at 270 px, counts clamped, persistence (old saves load)
 java  -cp "$CLASSES;$OUT" SectionTest       # world buffer in 16-block sections: same vertices as one buffer, bounds, endPart budget, live apply over frames, drops, no leak, render/world-buffer lines
 java  -cp "$CLASSES;$OUT" FillTest          # Fill (smart fill, 2026-10-22): the cells (Area 3's rule, build height); build order by section and bottom up, groups by colour (8 at most), an even mix, the first block carried, coverage; Shape.cubeRgb; the plan's refusals, the choice fitted to what is carried and kept by colour, 32 per tick with one batch in flight, a colour out of blocks, Stop, a late answer; the preview follows Part and Layer; water (the farm's holes validate with a water source, Fill's holes, water groups, two buckets for 14 holes); no chat, the status lines, Stop
 java  -cp "$CLASSES;$OUT" PolygonRoomTest   # Polygon Floor / Ceiling: off = the old loop (40 random cases), floor and ceiling layers full, depth 1 and negative, persistence
@@ -55,6 +56,7 @@ java  -cp "$CLASSES;$OUT" PerfStep2Test     # performance step 2: LongIndex, Sli
 
 The whole suite is every `tools/harness/*.java` with a `main` except the probes listed below;
 the commit helpers run it and require 0 failures and Bridge 466 / 159 / 360.
+`C:\Users\Rapha\Documents\BuildGuide-tools\suite.ps1 [-NoGradle]` does all of it (build, compile, run, count).
 
 `CentreTest`, `Step4Test`, `BaseSetTest` are the Step 3/4 and 2.2c checks;
 `ScanCostTest`, `MemTest`, `OverlayCost`, `OverlayCost2`, `WorldCost` are timing/memory probes.

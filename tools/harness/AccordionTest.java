@@ -53,7 +53,8 @@ public class AccordionTest {
 				check(worst <= capacity, "height " + h + ", Island " + o + ": capacity " + capacity + " rows, base=" + s.countRows(0) + " body=" + s.countRows(1) + " spikes=" + s.countRows(2) + " spikeshape=" + s.countRows(3) + " random=" + s.countRows(s.getSectionCount() - 1));
 			}
 		}
-		// Layers section (4C, between Spike shape and Random): the box alone while off; with it on, the cuts on one row and Block 1 to 4 (4D): 6 rows
+		// Layers section (4C, between Spike shape and Random): the box alone while off; with it on (2026-10-27, the strata): count and
+		// rest, mix, the edited layer, its block, its thickness, its patches: 7 rows
 		for(int h: HEIGHTS) {
 			int accordion = ShapeLayout.accordionHeight(h);
 			for(boolean on: new boolean[]{false, true}) {
@@ -65,7 +66,7 @@ public class AccordionTest {
 				int worst = ORIGIN_ROWS;
 				for(int i = 0;i < s.getSectionCount();++i) worst = Math.max(worst, s.countRows(i));
 				int layers = s.countRows(4);
-				check(s.getSectionCount() == 6 && s.getSectionName(4).getTranslationKey().equals("property.buildguide.section.layers") && layers == (on ? 6 : 1) && worst <= capacity, "height " + h + ", Island with Layers " + (on ? "on" : "off") + ": Layers " + layers + " rows, 6 sections, capacity " + capacity);
+				check(s.getSectionCount() == 6 && s.getSectionName(4).getTranslationKey().equals("property.buildguide.section.layers") && layers == (on ? 7 : 1) && worst <= capacity, "height " + h + ", Island with Layers " + (on ? "on" : "off") + ": Layers " + layers + " rows, 6 sections, capacity " + capacity);
 			}
 		}
 		// Spikes section: 1 row (Count) with no spikes, 6 with some; every section must still fit

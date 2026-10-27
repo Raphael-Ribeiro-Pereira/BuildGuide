@@ -83,8 +83,13 @@ public final class FocusFilter {
 		return Part.ALL;
 	}
 
-	// The layer button's next value: All, 1, 2, 3, 4, All
+	// The layer button's next value: All, 1, 2, 3, 4, 5, All
 	public static int nextLayer(int layer) {
-		return layer < 0 || layer >= ShapeLayers.COUNT ? LAYER_ALL : layer + 1;
+		return nextLayer(layer, ShapeLayers.COUNT);
+	}
+
+	// The same over the layers a shape uses (2026-10-27: 2 to 5)
+	public static int nextLayer(int layer, int count) {
+		return layer < 0 || layer >= Math.min(count, ShapeLayers.COUNT) ? LAYER_ALL : layer + 1;
 	}
 }

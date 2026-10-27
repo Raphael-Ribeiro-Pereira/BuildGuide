@@ -16,47 +16,34 @@ import brentmaas.buildguide.common.shape.PreviewModel.ColourMode;
 import brentmaas.buildguide.common.shape.TerrainGeometry.Outline;
 import brentmaas.buildguide.common.shape.TerrainGeometry.Params;
 import brentmaas.buildguide.common.shape.TerrainGeometry.Type;
-// Terrain, layers and the palette by height: the layer of a column from the height of its surface (t = h /
-// Height, a surface on a cut goes to the next layer, small Heights, monotonic), the whole skin of a column in
-// its layer; Layers on changes no block (the same cubes in the same order); LayerPalette.classify on the terrain
-// (truth table) and the scan in layers equal to the instantaneous one and to an independent reference; the
-// 4 ids and the cuts saved and restored, an older terrain and an Island load; the preview by layer, its legend
-// in heights above the base, the rebuild key; the focus by layer; the Island's layers still by depth.
+// Terrain, layers and the palette by height (the Elevation axis of ShapeLayers since 2026-10-27, StrataTest): the
+// whole skin of a column in the layer its surface height falls in (layer 1 the peaks), against an independent
+// reference; Layers on changes no block (the same cubes in the same order); LayerPalette.classify on the terrain
+// (truth table) and the scan in layers equal to the instantaneous one and to the reference; the ids saved and
+// restored, an older terrain and an Island load; the panel rows; the preview by layer, the rebuild key, the
+// legend; the focus by layer.
 public class TerrainLayersTest {
 	static int fails = 0;
 	static void check(boolean c, String m){ System.out.println((c?"OK   ":"FAIL ")+m); if(!c) ++fails; }
 	static final int AIR = IBlockProbe.FLAG_AIR, SOLID = IBlockProbe.FLAG_SOLID, IGN = IBlockProbe.FLAG_IGNORED, NONE = LayerPalette.NONE;
 	@SuppressWarnings("unchecked") static <T> Property<T> prop(Shape s, String f) throws Exception { Field x = ShapeTerrain.class.getDeclaredField(f); x.setAccessible(true); return (Property<T>) x.get(s); }
 	static Params paramsOf(ShapeTerrain s) throws Exception { Method m = ShapeTerrain.class.getDeclaredMethod("params"); m.setAccessible(true); return (Params) m.invoke(s); }
-	// The layer of a height written out directly: 100 h against cut x Height
-	static int reference(int h, int height, int[] cuts){ long b = 100L * h; return b < (long) cuts[0] * height ? 1 : b < (long) cuts[1] * height ? 2 : b < (long) cuts[2] * height ? 3 : 4; }
+	// The default zones over Height 30 (31 heights), written out: the top 15 % (5), the rest (12), 30 % (9), the
+	// lowest 15 % (5); `height` and `cuts` are what the old reference took, unused now
+	static int reference(int h, int height, int[] cuts){ int d = 30 - h; return d < 5 ? 1 : d < 17 ? 2 : d < 26 ? 3 : 4; }
 
 	public static void main(String[] a) throws Exception {
 		BuildGuide.screenHandler = new AbstractScreenHandler(){ public IScreenWrapper createWrapper(Translatable t){ return null; } public void showNone(){} public String translate(String k){ return k; } public String translate(String k, Object... v){ return k; } };
 		BuildGuide.widgetHandler = new PresetTest.FakeWidgets();
 		BuildGuide.logHandler = (ILogHandler) Proxy.newProxyInstance(TerrainLayersTest.class.getClassLoader(), new Class<?>[]{ILogHandler.class}, (p, m, x) -> null);
 
-		System.out.println("-- the layer by height");
-		TerrainLayers l20 = new TerrainLayers(20, 25, 50, 75, new int[]{-1}, 0);
-		check(l20.layerOfHeight(0) == 1 && l20.layerOfHeight(4) == 1 && l20.layerOfHeight(5) == 2 && l20.layerOfHeight(9) == 2 && l20.layerOfHeight(10) == 3 && l20.layerOfHeight(15) == 4 && l20.layerOfHeight(20) == 4,
-				"Height 20, cuts 25/50/75: 0-4 layer 1, 5 (on the cut) layer 2, 10 layer 3, 15 and 20 layer 4");
-		TerrainLayers l1 = new TerrainLayers(1, 25, 50, 75, new int[]{-1}, 0), l3 = new TerrainLayers(3, 25, 50, 75, new int[]{-1}, 0);
-		check(l1.layerOfHeight(0) == 1 && l1.layerOfHeight(1) == 4 && l3.layerOfHeight(0) == 1 && l3.layerOfHeight(1) == 2 && l3.layerOfHeight(2) == 3 && l3.layerOfHeight(3) == 4, "Height 1: ground 1, the top 4; Height 3: 1, 2, 3, 4");
-		boolean mono = true, same = true; Random r = new Random(5);
-		for(int i = 0; i < 400; i++){ int[] c = ShapeLayers.normalize(5 + 5 * r.nextInt(19), 5 + 5 * r.nextInt(19), 5 + 5 * r.nextInt(19), r.nextInt(3)); int H = 1 + r.nextInt(60);
-			TerrainLayers t = new TerrainLayers(H, c[0], c[1], c[2], new int[]{-1}, 0); int prev = 1;
-			for(int h = 0; h <= H; h++){ int l = t.layerOfHeight(h); mono &= l >= prev; prev = l; same &= l == reference(h, H, c); } }
-		check(mono && same, "400 random Heights and cuts: the layer never goes down as the surface rises, and is 100 h against cut x Height");
-		check(l20.depthRange(1)[0] == 0 && l20.depthRange(1)[1] == 4 && l20.depthRange(4)[0] == 15 && l20.depthRange(4)[1] == -1 && ShapeScreen.depthLabel(l20.depthRange(2)).equals("5-9") && ShapeScreen.depthLabel(l20.depthRange(4)).equals("15+"),
-				"the legend's bands are heights above the base: 0-4, 5-9, 10-14, 15+ (the same labels as the Island's, which read depths)");
-		ShapeLayers island = new ShapeLayers(0, 20, 25, 50, 75);
-		check(island.layerAt(7, -5, 3) == island.layerOf(-5) && island.layerAt(-40, -12, 99) == island.layerOf(-12) && !island.equals(new TerrainLayers(20, 25, 50, 75, new int[]{-1}, 0)), "the Island's layers: still by depth (layerAt = layerOf(y)), and never equal to a terrain's");
-
 		System.out.println("-- the shape: the columns' layers, nothing else changes");
 		File dir = Files.createTempDirectory("bgterrainl").toFile(); BuildGuide.config = new Config(dir); BuildGuide.config.focusFrom.value = 0;
 		BuildGuide.shapeHandler = (IShapeHandler) Proxy.newProxyInstance(TerrainLayersTest.class.getClassLoader(), new Class<?>[]{IShapeHandler.class}, (p, m, x) -> m.getName().equals("newBuffer") ? new FocusWorldTest.RecBuffer() : m.getName().equals("getPlayerPosition") ? new ShapeSet.Origin(0, 64, 0) : m.isDefault() ? InvocationHandler.invokeDefault(p, m, x) : null);
 		TimingLog.sink = line -> {};
 		ShapeTerrain t = FocusWorldTest.place(new ShapeTerrain()); prop(t, "propertyType").value = Type.MOUNTAINS; prop(t, "propertyScale").value = 10; prop(t, "propertyHeight").value = 30; prop(t, "propertySeed").value = 21;
+		// No mix, so the reference is exact (the mix itself is StrataTest's)
+		StrataTest.prop(StrataTest.field(t, "layerControls"), "mix").value = 0;
 		t.update(); FocusWorldTest.settle(t);
 		List<Long> cubesOff = new ArrayList<>(((FocusWorldTest.RecBuffer) t.buffer).cubes); Set<Long> off = new HashSet<>(t.getExpectedBlocks());
 		check(t.getLayers() == null && t.getPalette() == null, "Layers off: no layers, no palette");
@@ -65,8 +52,8 @@ public class TerrainLayersTest {
 		Params tp = paramsOf(t); int[] tops = TerrainGeometry.tops(tp); int gh = TerrainGeometry.gridHalf(tp), gn = 2 * gh + 1; ShapeLayers tl = t.getLayers();
 		boolean column = true; Map<Integer, Integer> perLayer = new TreeMap<>();
 		for(long pos: off){ int x = LocalPos.unpackX(pos), y = LocalPos.unpackY(pos), z = LocalPos.unpackZ(pos); int want = reference(tops[(x + gh) * gn + (z + gh)], 30, new int[]{25, 50, 75}); column &= tl.layerAt(x, y, z) == want; perLayer.merge(want, 1, Integer::sum); }
-		check(tl instanceof TerrainLayers && column && perLayer.size() == 4, "every block of a column (its whole skin) is in its column's layer, by the surface's height; blocks per layer " + perLayer);
-		check(Arrays.equals(t.getPalette(), new String[]{"", "", "", ""}), "Layers on, no blocks chosen: a palette of four empty ids (any solid)");
+		check(tl.spec.axis == ShapeLayers.Axis.ELEVATION && column && perLayer.size() == 4, "every block of a column (its whole skin) is in its column's layer, by the surface's height; blocks per layer " + perLayer);
+		check(Arrays.equals(t.getPalette(), new String[]{"", "", "", "", ""}), "Layers on, no blocks chosen: a palette of five empty ids (any solid)");
 
 		System.out.println("-- the palette on the terrain");
 		// A column of layer 1 and one of layer 4, by their surfaces
@@ -107,15 +94,15 @@ public class TerrainLayersTest {
 		ShapeTerrain s = new ShapeTerrain(); prop(s, "propertyLayers").value = true; prop(s, "propertyCut1").value = 10; prop(s, "propertyCut2").value = 40; prop(s, "propertyCut3").value = 90;
 		prop(s, "propertyBlock1").value = "minecraft:grass_block"; prop(s, "propertyBlock4").value = "minecraft:snow_block";
 		String save = s.toPersistence(); ShapeTerrain back = new ShapeTerrain(); back.restorePersistence(save);
-		check(!back.error && back.toPersistence().equals(save) && save.endsWith(",true,10,40,90,minecraft%3Agrass_block,,,minecraft%3Asnow_block") && back.hasLayers(), "Layers, the cuts and the 4 ids saved (URL-encoded) and restored: " + save.substring(save.length() - 62));
-		ShapeTerrain fresh = new ShapeTerrain(); String full = fresh.toPersistence(); String phase1 = full.substring(0, full.length() - ",false,25,50,75,,,,".length());
+		check(!back.error && back.toPersistence().equals(save) && save.contains(",true,10,40,90,minecraft%3Agrass_block,,,minecraft%3Asnow_block,") && back.hasLayers(), "Layers, the (unused) cuts and the ids saved (URL-encoded) and restored where they were");
+		ShapeTerrain fresh = new ShapeTerrain(); String full = fresh.toPersistence(); String phase1 = String.join(",", Arrays.copyOf(full.split(",", -1), 22));
 		ShapeTerrain older = new ShapeTerrain(); older.restorePersistence(phase1);
-		check(phase1.split(",", -1).length == 22 && !older.error && !older.hasLayers() && older.toPersistence().equals(full), "a terrain saved before the layers (22 values) loads with Layers off and no blocks, and saves the 30 of now");
+		check(!older.error && !older.hasLayers() && older.toPersistence().equals(full) && full.split(",", -1).length == 49, "a terrain saved before the layers (22 values) loads with Layers off and no blocks, and saves the 49 of now");
 		ShapeIsland is = new ShapeIsland(); String isave = is.toPersistence(); ShapeIsland is2 = new ShapeIsland(); is2.restorePersistence(isave);
-		check(is.properties.size() == 44 && !is2.error && is2.toPersistence().equals(isave), "an Island loads as before (44 values)");
+		check(is.properties.size() == 64 && !is2.error && is2.toPersistence().equals(isave), "an Island loads as before (64 values)");
 		for(int h: new int[]{brentmaas.buildguide.common.screen.ShapeLayout.minHeight, 360}){ ShapeTerrain lay = new ShapeTerrain(); prop(lay, "propertyLayers").value = true; int worst = 0; for(int sec = 0; sec < lay.getSectionCount(); sec++) worst = Math.max(worst, lay.countRows(sec));
 			int capacity = (brentmaas.buildguide.common.screen.ShapeLayout.accordionHeight(h) - (1 + lay.getSectionCount()) * 11) / Property.rowHeight;
-			check(lay.countRows(2) == 6 && worst <= capacity, "height " + h + ", Layers on: the Layers section has the Island's 6 rows (box, cuts, 4 blocks), largest section " + worst + ", capacity " + capacity); }
+			check(lay.countRows(2) == 7 && worst <= capacity, "height " + h + ", Layers on: the Layers section has the Island's 7 rows (box, count and rest, mix, layer, block, thickness, patches), largest section " + worst + ", capacity " + capacity); }
 
 		System.out.println("-- the preview");
 		PreviewModel m = PreviewModel.of(t.getExpectedBlocks(), t.getGeneration(), t.getLayers()).withView(PreviewFilter.ALL, PreviewModel.SLICE_OFF, 0, ColourMode.LAYER);
@@ -123,11 +110,11 @@ public class TerrainLayersTest {
 		check(m.colourMode == ColourMode.LAYER && colours, "Colour: Layer colours every cube by its column's layer");
 		PreviewModel same2 = PreviewModel.of(t.getExpectedBlocks(), t.getGeneration(), t.getLayers()).withView(PreviewFilter.ALL, PreviewModel.SLICE_OFF, 0, ColourMode.LAYER);
 		check(PreviewModel.meshChange(m, m.withView(PreviewFilter.ALL, PreviewModel.SLICE_OFF, 0, ColourMode.LAYER)) == null, "the same layers: no rebuild");
-		TerrainLayers moved = new TerrainLayers(30, 30, 50, 75, tops, gh);
+		ShapeLayers.Spec ts = tl.spec; ShapeLayers moved = ShapeLayers.elevation(new ShapeLayers.Spec(ts.axis, ts.count, ts.rest, ts.mix, ts.spikeLayer, new int[]{20, 0, 30, 15, 10}, new int[5], new int[]{3, 3, 3, 3, 3}, ts.seed), 30, (int[]) StrataTest.field(tl, "tops"), gh);
 		PreviewModel other = PreviewModel.of(t.getExpectedBlocks(), t.getGeneration(), moved).withView(PreviewFilter.ALL, PreviewModel.SLICE_OFF, 0, ColourMode.LAYER);
-		check(PreviewModel.meshChange(m, other) != null && !moved.equals(t.getLayers()) && !new TerrainLayers(30, 25, 50, 75, tops.clone(), gh).equals(t.getLayers()) && same2.layers.equals(m.layers), "the rebuild key: other cuts, or another generation's columns, are other layers (rebuilt: " + PreviewModel.meshChange(m, other) + "); the same generation's are equal");
-		TerrainLayers d = (TerrainLayers) t.getLayers();
-		check(ShapeScreen.depthLabel(d.depthRange(1)).equals("0-7") && ShapeScreen.depthLabel(d.depthRange(4)).equals("23+"), "the legend for Height 30: " + ShapeScreen.depthLabel(d.depthRange(1)) + ", " + ShapeScreen.depthLabel(d.depthRange(2)) + ", " + ShapeScreen.depthLabel(d.depthRange(3)) + ", " + ShapeScreen.depthLabel(d.depthRange(4)) + " blocks above the base");
+		check(PreviewModel.meshChange(m, other) != null && !moved.equals(t.getLayers()) && !ShapeLayers.elevation(ts, 30, tops.clone(), gh).equals(t.getLayers()) && same2.layers.equals(m.layers), "the rebuild key: other thicknesses, or another generation's columns, are other layers (rebuilt: " + PreviewModel.meshChange(m, other) + "); the same generation's are equal");
+		ShapeLayers d = t.getLayers();
+		check(d.legend(1)[0] == ShapeLayers.LEGEND_TOP && d.legend(1)[1] == 15 && d.legend(2)[0] == ShapeLayers.LEGEND_REST && d.legend(4)[0] == ShapeLayers.LEGEND_BASE && d.legend(4)[1] == 15, "the legend: 15 % from the top, the rest, 30 % and 15 % from the base");
 
 		System.out.println("-- the focus by layer");
 		for(int layer = 1; layer <= 4; layer++){

@@ -627,18 +627,31 @@ public ShapeLayers getLayers();      // the last generation's layers, null witho
 public String[] getPalette();        // one block id per layer, "" = any solid, null without (default null)
 ```
 
-- `ShapeLayers(top, depth, cut1, cut2, cut3)` (immutable): four bands below `top`, cut at three
-  percentages of `depth`, compared in integers (a block on a cut goes to the next layer).
-  `layerOf(y)` is by depth; **`layerAt(x, y, z)` is what every consumer calls** (by `y` here).
-  `normalize(c1, c2, c3, changed)` keeps the cuts 5 apart in 5..95; `depthRange(layer)` feeds the
-  legend (`ShapeScreen.depthLabel`). Equality only between layers of the same class.
-- `TerrainLayers extends ShapeLayers`: the layer of a **column** from its surface height,
-  t = h / Height; built as `ShapeLayers(0, Height, cuts)` over the generation's `tops` array, so
-  `depthRange` reads heights above the base. Equal only with the same cuts and the same `tops`.
+- `ShapeLayers` (2026-10-27, the strata; immutable, pure): 2 to `COUNT` = 5 layers, numbered 1 (the top)
+  to `count()`, one engine for the Island and the Terrain. Made from a `Spec(axis, count, rest, mix,
+  spikeLayer, thickness[5], patches[5], size[5], seed)`:
+  - `Axis.DEPTH` (the Island), `depth(spec, topY, body, h)` over the body's columns
+    (`IslandGeometry.Parts.layers(spec)` builds it) or `uniformDepth(spec, topY, bodyDepth)` for one depth
+    everywhere: per column, the bands above the rest layer take `thickness` blocks from the column's top, those
+    below it `thickness` % of the column from its bottom (at least 1), the rest takes what is left; a thin column
+    serves the top and bottom bands first, alternately. Below the body (spikes, loose pieces): `spikeLayer`.
+  - `Axis.ELEVATION` (the Terrain), `elevation(spec, height, tops, h)`: the same bands over Height, all in %; a
+    column takes the band its surface height falls in, its whole skin with it.
+  - `mix` (0 to 6): blocks on each side of a boundary where the two layers interleave (a smooth noise and a
+    per-block one, uniformised). `patches` (0 to 100 % by 5) and `size` (1 to 16): blobs of the layer in the
+    bands next to it, about that share of them (per-size quantile tables).
+  - **`layerAt(x, y, z)` is what every consumer calls**. `legend(layer)` is `{kind, value}` (`LEGEND_BLOCKS`,
+    `LEGEND_BOTTOM`, `LEGEND_TOP`, `LEGEND_BASE`, `LEGEND_REST`, `LEGEND_PATCHES`, `LEGEND_EMPTY`) for
+    `ShapeScreen.legendLabel`. `colour(layer)`: `LAYER_1` to `LAYER_5`. Equal with the same spec and columns.
+- `LayerControls` (package-private): the Layers section's rows, shared by the Island and the Terrain. Count and
+  rest on one row, Mix, the edited layer (with its colour), its block, its thickness (or "Fills the rest"), its
+  patches and size: 7 rows at most, so the section fits at 270 px. Only the edited layer's rows show.
+  `persisted()` gives its 20 properties (19 on the Terrain: no spike layer) in save order; `spec(seed)` and
+  `palette()` (five ids, "" past the count).
 - `LayerPalette(layers, rawIds)`: `classify(palette, x, y, z, flags, blockId)` is the one rule of the
-  scan, `SliceScan`, the block events and the safety net (`classify(palette, y, ...)` stays for
-  y-only layers); `needsId(x, y, z)` says whether the block id must be read. Statuses
-  `WRONG_LAYER = 5`, `WRONG_BLOCK = 6` in `ValidationState`.
+  scan, `SliceScan`, the block events and the safety net; `needsId(x, y, z)` says whether the block id
+  must be read. Statuses `WRONG_LAYER = 5`, `WRONG_BLOCK = 6` in `ValidationState`.
+- `FocusFilter.nextLayer(layer, count)`: the Layer button's cycle over the layers the shape uses.
 
 Build focus (the world shows a part / layer; the preview, the scan and the totals never change):
 
@@ -664,11 +677,13 @@ again for the focus keeps the generation's colours. `ValidationOverlay.build(...
 `GuidelinePicker.shapeCells(..., inFocus)` take the test (null = everything).
 
 Terrain (`ShapeTerrain`, registered last): geometry in `TerrainGeometry` (pure; `enumerate(params,
-tops, out)` hands the generation's column tops to `TerrainLayers`), recipes and the height cap in
+tops, out)` hands the generation's column tops to `ShapeLayers.elevation`), recipes and the height cap in
 `TerrainControls`, noise in `TerrainNoise`. It shares no class with the Island. Height is held under
 `TerrainGeometry.maxHeightFor(scale)` = min(60, 3 x Scale) in the panel, on load and in the recipes.
-Persistence (30 values): plan (8), relief (6), random (6), focus part, focus layer, then Layers, the
-three cuts and Block 1 to 4.
+Persistence (49 values): plan (8), relief (6), random (6), focus part, focus layer, then Layers, the
+three cuts (unused since the strata, kept so saves line up) and Block 1 to 4, then the strata's 19 (count,
+rest, mix, Block 5, thickness x 5, patches x 5, size x 5). The Island likewise keeps its cuts inert and
+appends 20 (the same, then the spike layer): 64 values. Older saves load with the defaults for the rest.
 
 ## Properties (`common/property`)
 

@@ -28,10 +28,12 @@ public class PaletteGuiTest {
 		ShapeIsland s = new ShapeIsland(); Field lf = ShapeIsland.class.getDeclaredField("propertyLayers"); lf.setAccessible(true);
 		check(s.countRows(4) == 1, "Layers off: only the box (1 row)");
 		((Property<Object>) lf.get(s)).value = true;
-		check(s.countRows(4) == 6, "Layers on: the box, the three cuts on one row, Block 1 to Block 4 (6 rows; 7 fit at 270, 12 at 360)");
-		check(PropertyCompactRangeInt.columnX(2) + PropertyCompactRangeInt.columnWidth == Property.rowWidth && PropertyCompactRangeInt.buttonWidth * 2 + PropertyCompactRangeInt.textFieldWidth == PropertyCompactRangeInt.columnWidth, "three cut columns (- 10, field 26, + 10) end exactly at the row's 184 px");
-		check(w(lang(json, "property.buildguide.cuts")) <= PropertyCompactRangeInt.firstColumnX - 4, "\"" + lang(json, "property.buildguide.cuts") + "\": " + w(lang(json, "property.buildguide.cuts")) + " px before the first column (x 46)");
-		for(int i = 1; i <= 4; i++){ String t = lang(json, "property.buildguide.block" + i); check(t != null && w(t) <= 76, "\"" + t + "\": " + w(t) + " px (limit 76)"); }
+		check(s.countRows(4) == 7, "Layers on (2026-10-27): the box, count and rest, mix, the edited layer, its block, thickness, patches (7 rows; 7 fit at 270)");
+		check(PropertyCompactRangeInt.columnX(2) + PropertyCompactRangeInt.columnWidth == Property.rowWidth && PropertyCompactRangeInt.buttonWidth * 2 + PropertyCompactRangeInt.textFieldWidth == PropertyCompactRangeInt.columnWidth, "compact columns (- 10, field 26, + 10): the second and third end exactly at the row's 184 px");
+		for(String k: new String[]{"layercount", "patches"}){ String t = lang(json, "property.buildguide." + k); check(w(t) <= PropertyCompactRangeInt.columnX(1) - 4, "\"" + t + "\": " + w(t) + " px before its first column (x " + PropertyCompactRangeInt.columnX(1) + ")"); }
+		check(w(lang(json, "property.buildguide.editlayer")) <= 50 - 4, "\"" + lang(json, "property.buildguide.editlayer") + "\" before the layer's colour (x 50)");
+		for(String k: new String[]{"block1", "block2", "block3", "block4", "block5", "mix", "spikelayer", "layer.blocks", "layer.bottom", "layer.top", "layer.base"}){ String t = lang(json, "property.buildguide." + k); check(t != null && w(t) <= 76, "\"" + t + "\": " + w(t) + " px (limit 76)"); }
+		check(w(lang(json, "property.buildguide.layer.rest")) <= Property.rowWidth - 4, "\"" + lang(json, "property.buildguide.layer.rest") + "\" fits its row"); 
 		check(w(lang(json, "property.buildguide.hand")) <= PropertyBlockId.handWidth - 4 && PropertyBlockId.handX + PropertyBlockId.handWidth == Property.rowWidth, "\"" + lang(json, "property.buildguide.hand") + "\" (" + w(lang(json, "property.buildguide.hand")) + " px) in its " + PropertyBlockId.handWidth + "-px button, after the 72-px id field");
 		ShapeIsland cuts = new ShapeIsland(); Field c1 = ShapeIsland.class.getDeclaredField("propertyCut1"); c1.setAccessible(true);
 		PropertyCompactRangeInt cut1 = (PropertyCompactRangeInt) c1.get(cuts);
@@ -41,7 +43,8 @@ public class PaletteGuiTest {
 
 		System.out.println("-- colour");
 		int orange = PreviewColours.WRONG_LAYER;
-		Set<Integer> others = new HashSet<>(Arrays.asList(PreviewColours.OK, PreviewColours.MISSING, PreviewColours.IGNORED, PreviewColours.ERROR, PreviewColours.WHITE, ShapeLayers.LAYER_1, ShapeLayers.LAYER_2, ShapeLayers.LAYER_3, ShapeLayers.LAYER_4));
+		Set<Integer> others = new HashSet<>(Arrays.asList(PreviewColours.OK, PreviewColours.MISSING, PreviewColours.IGNORED, PreviewColours.ERROR, PreviewColours.WHITE, ShapeLayers.LAYER_1, ShapeLayers.LAYER_2, ShapeLayers.LAYER_3, ShapeLayers.LAYER_4, ShapeLayers.LAYER_5));
+		check(others.size() == 10, "the five layer colours differ from each other and from the five status colours");
 		check(!others.contains(orange) && PreviewColours.forStatus(ValidationState.WRONG_LAYER) == orange && PreviewColours.forStatus(ValidationState.WRONG_BLOCK) == PreviewColours.ERROR, String.format("wrong layer is orange %06X (no status or layer colour); a wrong block is red like the errors", orange));
 		double l1 = lum(orange), l2 = lum(PreviewColours.IGNORED), ratio = (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05), dh = Math.abs(hue(orange) - hue(PreviewColours.IGNORED));
 		check(dh >= 15, String.format("against IGNORED's yellow %06X: hue %.0f vs %.0f degrees (%.0f apart), luminance contrast %.2f:1 (the hue tells them apart)", PreviewColours.IGNORED, hue(orange), hue(PreviewColours.IGNORED), dh, ratio));
@@ -56,7 +59,8 @@ public class PaletteGuiTest {
 
 		System.out.println("-- list, tabs, counts, overlay (a validated shape with a palette)");
 		ShapeCuboid shape = new ShapeCuboid(); ValidationState st = shape.getValidationState();
-		ShapeLayers layers = new ShapeLayers(0, 8, 25, 50, 75);
+		// Bands of 2 blocks over a body 8 deep (the old Depth 8 with 25/50/75)
+		ShapeLayers layers = ShapeLayers.uniformDepth(new ShapeLayers.Spec(ShapeLayers.Axis.DEPTH, 4, 4, 0, 4, new int[]{2, 2, 2, 0, 0}, new int[5], new int[]{3, 3, 3, 3, 3}, 1), 0, 8);
 		check(ValidationListComponent.tabs(shape).length == 3, "no palette: the three tabs of before");
 		st.setPalette(new LayerPalette(layers, new int[]{10, 20, LayerPalette.NONE, LayerPalette.NONE}));
 		List<Long> exp = new ArrayList<>(); for(int y = 0; y >= -7; y--) exp.add(LocalPos.pack(0, y, 0));

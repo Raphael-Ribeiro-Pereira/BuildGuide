@@ -10,7 +10,6 @@ import brentmaas.buildguide.common.property.PropertyEnum;
 import brentmaas.buildguide.common.property.PropertyFloat;
 import brentmaas.buildguide.common.property.PropertyInt;
 import brentmaas.buildguide.common.property.PropertyRangeInt;
-import brentmaas.buildguide.common.property.PropertyRowLabel;
 import brentmaas.buildguide.common.property.PropertyRunnable;
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
 import brentmaas.buildguide.common.shape.TerrainControls.Control;
@@ -34,7 +33,9 @@ public class ShapeTerrain extends Shape {
 	// Persistence order: outline, width X, width Z, sides, corner round, rotation, wobble, wobble size, then
 	// type, height, scale, roughness, edge fade %, skin, then base %, relief %, randomize, natural, undo, seed,
 	// then (build focus) focus part, focus layer, then (layers by height) layers, cut 1 %, cut 2 %, cut 3 %,
-	// block 1 to block 4. New properties go at the end
+	// block 1 to block 4, then (layers, 2026-10-27) layer count, rest layer, mix, block 5, thickness 1 to 5,
+	// patches 1 to 5, patch size 1 to 5 (LayerControls.persisted; the cuts stay saved but do nothing). New
+	// properties go at the end
 	private PropertyEnum<Outline> propertyOutline = new PropertyEnum<Outline>(Outline.CIRCLE, new Translatable("property.buildguide.outline"), () -> onOutlineChanged(), outlineNames);
 	private PropertyRangeInt propertyWidthX = new PropertyRangeInt(41, new Translatable("property.buildguide.widthx"), () -> update(), TerrainGeometry.minWidth, TerrainGeometry.maxWidth);
 	private PropertyRangeInt propertyWidthZ = new PropertyRangeInt(41, new Translatable("property.buildguide.widthz"), () -> update(), TerrainGeometry.minWidth, TerrainGeometry.maxWidth);
@@ -67,27 +68,29 @@ public class ShapeTerrain extends Shape {
 	private PropertyEnum<FocusFilter.Part> propertyFocusPart = new PropertyEnum<FocusFilter.Part>(FocusFilter.Part.ALL, new Translatable("screen.buildguide.focus.part"), null, focusPartNames);
 	private PropertyInt propertyFocusLayer = new PropertyInt(FocusFilter.LAYER_ALL, new Translatable("screen.buildguide.focus.layer"), null);
 	// Layers by height (after the focus): the world and the preview coloured by the height of each column's
-	// surface, four layers cut at three percentages of Height (TerrainLayers); the same rows, ranges and block
-	// ids as the Island's. Validation by block only with a block chosen for a layer
+	// surface (ShapeLayers, Elevation: the Island's engine and rows since 2026-10-27, LayerControls), layer 1 the
+	// peaks. Validation by block only with a block chosen for a layer
 	private PropertyBoolean propertyLayers = new PropertyBoolean(false, new Translatable("property.buildguide.layers"), () -> onLayersChanged());
-	private PropertyCompactRangeInt propertyCut1 = new PropertyCompactRangeInt(ShapeLayers.defaultCut1, new Translatable("property.buildguide.cut1"), () -> onCutChanged(0), ShapeLayers.minCut, ShapeLayers.maxCut, ShapeLayers.cutStep, 0);
-	private PropertyCompactRangeInt propertyCut2 = new PropertyCompactRangeInt(ShapeLayers.defaultCut2, new Translatable("property.buildguide.cut2"), () -> onCutChanged(1), ShapeLayers.minCut, ShapeLayers.maxCut, ShapeLayers.cutStep, 1);
-	private PropertyCompactRangeInt propertyCut3 = new PropertyCompactRangeInt(ShapeLayers.defaultCut3, new Translatable("property.buildguide.cut3"), () -> onCutChanged(2), ShapeLayers.minCut, ShapeLayers.maxCut, ShapeLayers.cutStep, 2);
-	private PropertyRowLabel cutsLabel = new PropertyRowLabel(new Translatable("property.buildguide.cuts"));
+	// The three cuts of before 2026-10-27: still saved where they were, out of the panel, read by nothing
+	private PropertyCompactRangeInt propertyCut1 = new PropertyCompactRangeInt(25, new Translatable("property.buildguide.cut1"), null, 5, 95, 5, 0);
+	private PropertyCompactRangeInt propertyCut2 = new PropertyCompactRangeInt(50, new Translatable("property.buildguide.cut2"), null, 5, 95, 5, 1);
+	private PropertyCompactRangeInt propertyCut3 = new PropertyCompactRangeInt(75, new Translatable("property.buildguide.cut3"), null, 5, 95, 5, 2);
 	private PropertyBlockId propertyBlock1 = new PropertyBlockId("", new Translatable("property.buildguide.block1"), () -> update());
 	private PropertyBlockId propertyBlock2 = new PropertyBlockId("", new Translatable("property.buildguide.block2"), () -> update());
 	private PropertyBlockId propertyBlock3 = new PropertyBlockId("", new Translatable("property.buildguide.block3"), () -> update());
 	private PropertyBlockId propertyBlock4 = new PropertyBlockId("", new Translatable("property.buildguide.block4"), () -> update());
 	// The layers and the palette of the last generation (null: Layers off), for the preview and the scan
-	private volatile TerrainLayers generatedLayers = null;
+	private volatile ShapeLayers generatedLayers = null;
 	private volatile String[] generatedPalette = null;
 
 	// Panel order per section (persistence order is the `properties` list)
 	private Property<?>[] baseRows = {propertyOutline, propertyWidthX, propertyWidthZ, propertySides, propertyRoundness, propertyRotation, propertyEdgeAmplitude, propertyEdgeScale};
 	private Control[] baseControls = {null, Control.WIDTH_X, Control.WIDTH_Z, Control.SIDES, Control.CORNER_ROUND, Control.ROTATION, Control.WOBBLE, Control.WOBBLE_SIZE};
 	private Property<?>[] reliefRows = {propertyType, propertyHeight, propertyScale, propertyRoughness, propertyEdgeFade, propertySkin};
-	private PropertyCompactRangeInt[] cutRows = {propertyCut1, propertyCut2, propertyCut3};
 	private PropertyBlockId[] blockRows = {propertyBlock1, propertyBlock2, propertyBlock3, propertyBlock4};
+	// Zones by height: the peaks (top 15 % of Height), the middle (the rest), the slopes (30 %), the lowest
+	// ground (bottom 15 %); layer 5 (when used) 10 %
+	private final LayerControls layerControls = new LayerControls(this, ShapeLayers.Axis.ELEVATION, propertyLayers, blockRows, 4, 2, 1, new int[] {15, 0, 30, 15, 10}, new int[] {0, 0, 0, 0, 0}, false);
 	private Property<?>[] randomRows = {propertyBasePercent, propertyReliefPercent, propertyRandomize, propertyNatural, propertyUndo, propertySeed};
 
 	// Randomize source; one-step Undo, in memory only
@@ -127,8 +130,12 @@ public class ShapeTerrain extends Shape {
 		properties.add(propertyBlock2);
 		properties.add(propertyBlock3);
 		properties.add(propertyBlock4);
+		properties.addAll(layerControls.persisted());
 		hideFromGui(propertyFocusPart);
 		hideFromGui(propertyFocusLayer);
+		hideFromGui(propertyCut1);
+		hideFromGui(propertyCut2);
+		hideFromGui(propertyCut3);
 
 		int sectionBase = declareSection(new Translatable("property.buildguide.section.base"));
 		int sectionRelief = declareSection(new Translatable("property.buildguide.section.relief"));
@@ -136,11 +143,7 @@ public class ShapeTerrain extends Shape {
 		int sectionRandom = declareSection(new Translatable("property.buildguide.section.seed"));
 		assignSection(sectionBase, baseRows);
 		assignSection(sectionRelief, reliefRows);
-		assignSection(sectionLayers, propertyLayers);
-		assignSection(sectionLayers, cutRows);
-		assignSection(sectionLayers, blockRows);
-		addGuiOnly(cutsLabel);
-		assignSection(sectionLayers, cutsLabel);
+		layerControls.assign(sectionLayers, -1);
 		assignSection(sectionRandom, randomRows);
 		// Reset on the Random section must not throw away a terrain one likes
 		protectFromReset(propertySeed);
@@ -159,15 +162,8 @@ public class ShapeTerrain extends Shape {
 			if(isShown(p)) row = placeRow(row, p);
 			else hideRow(p);
 		}
-		if(isShown(propertyLayers)) row = placeRow(row, propertyLayers);
-		else hideRow(propertyLayers);
-		// With Layers on: the three cuts on one row, then one row per layer's block (6 rows in all)
-		if(isShown(cutsLabel) && propertyLayers.value) row = placeRow(row, cutsLabel, propertyCut1, propertyCut2, propertyCut3);
-		else hideRow(cutsLabel, propertyCut1, propertyCut2, propertyCut3);
-		for(Property<?> p: blockRows) {
-			if(isShown(p) && propertyLayers.value) row = placeRow(row, p);
-			else hideRow(p);
-		}
+		// Layers: the box, then (on) count and rest, mix, the edited layer and its block, thickness, patches
+		row = layerControls.place(row);
 		for(Property<?> p: randomRows) {
 			if(isShown(p)) row = placeRow(row, p);
 			else hideRow(p);
@@ -175,17 +171,7 @@ public class ShapeTerrain extends Shape {
 	}
 
 	private void onLayersChanged() {
-		onSelectedInGUI(); // the cuts and blocks show only with Layers on
-		update();
-	}
-
-	// A cut that changed keeps its value and pushes the others so each stays at least 5 above the one before
-	// (ShapeLayers.normalize); setValue shows the moved ones in their fields without running their actions
-	private void onCutChanged(int changed) {
-		int[] c = ShapeLayers.normalize(propertyCut1.value, propertyCut2.value, propertyCut3.value, changed);
-		for(int i = 0;i < cutRows.length;++i) {
-			if(cutRows[i].value != c[i]) cutRows[i].setValue(c[i]);
-		}
+		onSelectedInGUI(); // the layer rows show only with Layers on
 		update();
 	}
 
@@ -208,7 +194,7 @@ public class ShapeTerrain extends Shape {
 	// A world buffer made again for the focus has the generation's colours: by the column's layer with Layers on
 	@Override
 	protected void colourCube(IShapeBuffer buffer, int x, int y, int z) {
-		TerrainLayers layers = generatedLayers;
+		ShapeLayers layers = generatedLayers;
 		if(layers == null) return;
 		int rgb = ShapeLayers.colour(layers.layerAt(x, y, z));
 		buffer.setColour((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF, (int) (255 * shapeSet.getShapeColourA()));
@@ -335,7 +321,7 @@ public class ShapeTerrain extends Shape {
 		return propertyFocusPart.value;
 	}
 
-	// A saved layer out of 0..4 counts as All
+	// A saved layer out of 0..5 counts as All
 	@Override
 	public int getFocusLayer() {
 		int layer = propertyFocusLayer.value;
@@ -355,15 +341,15 @@ public class ShapeTerrain extends Shape {
 		TerrainGeometry.Params p = params();
 		boolean layered = propertyLayers.value;
 		int height = TerrainControls.cappedHeight(propertyHeight.value, propertyScale.value), half = TerrainGeometry.gridHalf(p);
-		int[] cuts = {propertyCut1.value, propertyCut2.value, propertyCut3.value};
+		ShapeLayers.Spec spec = layered ? layerControls.spec(propertySeed.value) : null;
 		generatedLayers = null;
-		generatedPalette = layered ? new String[] {propertyBlock1.value, propertyBlock2.value, propertyBlock3.value, propertyBlock4.value} : null;
+		generatedPalette = layered ? layerControls.palette() : null;
 		if(!layered) {
 			TerrainGeometry.enumerate(p, (x, y, z) -> addShapeCubeIfNew(buffer, x, y, z));
 			return;
 		}
 		int alpha = (int) (255 * shapeSet.getShapeColourA());
-		TerrainGeometry.enumerate(p, tops -> generatedLayers = new TerrainLayers(height, cuts[0], cuts[1], cuts[2], tops, half), (x, y, z) -> {
+		TerrainGeometry.enumerate(p, tops -> generatedLayers = ShapeLayers.elevation(spec, height, tops, half), (x, y, z) -> {
 			int rgb = ShapeLayers.colour(generatedLayers.layerAt(x, y, z));
 			buffer.setColour((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF, alpha);
 			addShapeCubeIfNew(buffer, x, y, z);

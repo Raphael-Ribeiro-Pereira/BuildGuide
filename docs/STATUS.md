@@ -654,6 +654,39 @@ In-game checklist for the 26.3 jar: it loads (no crash at the title screen); the
 (with and without the depth test); the 3D preview in the Shape tab and the expanded one; the shape list and
 buttons look right; Fill, the guideline placement and the validation.
 
+### Layers as strata (on `wip/strata`, on top of `wip/mc263`, waiting for the in-game test; not merged)
+
+Raphael (2026-10-27): the layers were meant to show a piece of ground lifted out of the earth and floating
+(grass, dirt, stone, deepslate), and the three cuts by height did not look like it. Agreed: fixed thicknesses
+(option C), the old cuts removed; boundaries shaded both by mixing and by patches of other blocks, so it looks
+natural; up to 5 layers with generic names; a choice of the layer the spikes take, blending with the last one;
+the Terrain on the same model (one engine, two axes). Old saves change how they look; their cuts stay saved and
+do nothing.
+
+| What | Change |
+|---|---|
+| The model | `ShapeLayers` rewritten: 2 to 5 layers, 1 the top. One layer is the **rest** and takes what the others leave. Layers above it are a thickness in **blocks from the column's top**; layers below it a **% of the column from its bottom**, so the bottom follows the island's underside. Per column: a thin column serves the top and bottom bands first and the rest shrinks first |
+| Mix | 0 to 6 blocks each side of every boundary, where the two layers interleave (smooth noise plus a per-block one): ragged boundaries, not lines |
+| Patches | Per layer: patches % (0 to 100 by 5) and size (1 to 16): blobs of that layer inside the bands next to it, covering about that share |
+| Spikes | Island: "Spike layer" at the end of Spike shape (default the last layer); spikes and loose pieces take it; with patches on, the bottom layer's blobs reach into the spikes too |
+| Terrain | The same bands over Height, all in % (from the peaks, from the base); a column takes the band its surface falls in. `TerrainLayers` is gone |
+| Panel | The Layers section, 7 rows at most (fits 270 px): Layers box; Layers (count) and rest; Mix; Layer (the one being edited, with its colour); its block; its thickness ("Blocks" / "% bottom" on the Island, "% top" / "% base" on the Terrain; "Fills the rest" for the rest); Patches % and size |
+| Defaults | Island: 4 layers, rest 3, mix 2: 1 block, 3 blocks, the rest, 25 % from the bottom with 15 % patches; spikes on layer 4. Terrain: 4 layers, rest 2, mix 1: 15 % of the peaks, the rest, 30 %, 15 % of the base |
+| Elsewhere | Legend (preview, coloured by layer), the layer's number then its thickness: "1 1b", "2 3b", "3 rest", "4 25%" ("5 spots" for a layer of patches only, "5 -" for none); the Layer focus button cycles over the layers used; palette of five ids (Block 5); validation, Fill and the focus all ask `layerAt`, so they agree |
+| Saves | Island 64 values (44 as before, then 20), Terrain 49 (30, then 19); older saves load with the defaults |
+
+Harness: `StrataTest` (new), the layer tests adapted; suite OK=1471 FAIL=0, Bridge 466 / 159 / 360.
+
+In-game checklist for `strata-wip`:
+1. An Island, Layers on, Colour: Layer in the preview: a thin top layer, a few blocks under it, the rest, and a
+   bottom that follows the underside, with ragged boundaries and some blobs of the bottom layer.
+2. Change Layer (the edited one): its block, thickness and patches rows change with it; Layers 5: a fifth colour.
+3. Rest on another layer: that layer says "Fills the rest" and the others keep their thickness.
+4. Mix 0: straight boundaries; Mix 6: wide interleaving. Patches 0: no blobs.
+5. Spike layer (end of Spike shape): the spikes change colour; Validation by layer agrees with the colours.
+6. A Terrain, Layers on: peaks, middle, lower band and base, with the same rows (in %).
+7. An island saved before: it opens (it looks different: the new layers).
+
 ## 2. Final jars
 
 Build output: `fabric1.21.11/build/libs/BuildGuide-Fabric-0.4.8.jar` (mod version is still 0.4.8).
