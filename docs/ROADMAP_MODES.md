@@ -342,3 +342,16 @@ Raphael's order. Each step gets its own investigation and approval, and nothing 
    - The licence stays CC BY-NC 3.0: credit and no commercial use.
    - Supported versions table, jars in GitHub Releases. Changing the mod id keeps old saves and configs
      readable.
+
+### Additions of 2026-10-27 (after the first strata test)
+
+- **Strata test inconclusive.** In the game the layers looked strange, and Raphael could not test them properly
+  because the interface was unclear. In particular the preview stayed one colour with Layers on. Before the new
+  UI, check whether that is a bug (the preview not recolouring) or the hidden "Colour: Status | Layer" toggle.
+  The new UI must make the layer colouring obvious, and then the test of step 0 is repeated.
+- **Fill in creative:** pick only the block(s). No quantity is needed, nothing is counted or taken, and Start is
+  never blocked by "not enough".
+- **"+" beside the shape name in the header:** add another shape relative to the current one: on top, below,
+  inside, outside, or beside. This is composition (see `docs/COMPOSITION_ANALYSIS.md`).
+- **World cache:** the shapes, their origins and these choices persist per world, even after the game is closed.
+- **Presets:** up to 10 saved (from the current limit).
