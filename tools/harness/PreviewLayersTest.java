@@ -57,7 +57,9 @@ public class PreviewLayersTest {
 		c = new PreviewController(() -> now);
 		Layered s = new Layered(); s.next = cuts;
 		generate(s, column); frames(s, 300);
-		check(rebuilds.equals(Arrays.asList("view")) && shown.colourMode == ColourMode.STATUS && shown.layers.equals(cuts), "first mesh by status (the default); the model carries the generation's layers: " + rebuilds);
+		check(rebuilds.equals(Arrays.asList("view")) && shown.colourMode == ColourMode.LAYER && shown.layers.equals(cuts), "first mesh by layer (the default since 2026-10-27); the model carries the generation's layers: " + rebuilds);
+		rebuilds.clear(); c.setColourMode(ColourMode.STATUS); frames(s, 500);
+		check(rebuilds.equals(Arrays.asList("colour")) && shown.colourMode == ColourMode.STATUS, "Colour: Status: exactly one rebuild, reason colour: " + rebuilds);
 		rebuilds.clear(); c.setColourMode(ColourMode.LAYER); frames(s, 500);
 		check(rebuilds.equals(Arrays.asList("colour")) && shown.colourMode == ColourMode.LAYER, "Colour: Layer: exactly one rebuild, reason colour: " + rebuilds);
 		rebuilds.clear(); c.setColourMode(ColourMode.LAYER); frames(s, 500);

@@ -18,8 +18,10 @@ public class AccordionTest {
 
 	public static void main(String[] a) throws Exception {
 		check(Property.rowHeight == 18, "row height 18");
-		check(ShapeLayout.accordionHeight(ShapeLayout.minHeight) == 206, "accordion at the minimum height: 206 px, as in E6");
-		check(HEADER == 11 && 1 * HEADER + 6 * HEADER + 7 * Property.rowHeight <= 206, "headers 11 px: Origin and six sections leave room for 7 rows at 270 (" + (7 * HEADER + 7 * Property.rowHeight) + " of 206 px)");
+		// The Oficina (2026-10-27): the accordion is the inspector at the right, y 22..248, and Origin moved to the
+		// Projects panel; the capacities below still count an Origin header, so they are a little conservative
+		check(ShapeLayout.accordionHeight(ShapeLayout.minHeight) == 226, "accordion at the minimum height: 226 px (the Oficina's inspector)");
+		check(HEADER == 11 && 6 * HEADER + 8 * Property.rowHeight <= 226, "headers 11 px: six sections leave room for 8 rows at 270 (" + (6 * HEADER + 8 * Property.rowHeight) + " of 226 px)");
 		for(int h: HEIGHTS) {
 			int accordion = ShapeLayout.accordionHeight(h);
 			System.out.println("-- height " + h + ": accordion " + accordion + " px");

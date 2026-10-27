@@ -45,6 +45,10 @@ public class TextFieldImpl extends EditBox implements ITextField {
 		super.setY(y);
 	}
 
+	public void shiftX(int dx) {
+		super.setX(getX() + dx);
+	}
+
 	public String getTextValue() {
 		return getValue();
 	}

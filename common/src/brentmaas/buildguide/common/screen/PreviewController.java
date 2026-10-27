@@ -45,7 +45,9 @@ public class PreviewController {
 	private PreviewFilter filter = PreviewFilter.ALL;
 	private int sliceAxis = PreviewModel.SLICE_OFF, sliceValue = 0;
 	// Colour: Status | Layer (4C), for models with layers; a model without them is always coloured by status
-	private ColourMode colourMode = ColourMode.STATUS;
+	// By layer by default (2026-10-27: by status, a shape with Layers on looked one colour); a shape without layers
+	// is coloured by status anyway
+	private ColourMode colourMode = ColourMode.LAYER;
 	private PreviewModel viewed = null;
 	// Build focus (2026-10-22): the preview shows what the world shows. The mask of the focus the world's buffer
 	// was last made with (Shape.getWorldFocus, a new object per refocus or generation) over these positions

@@ -20,6 +20,10 @@ public class SliderImpl extends AbstractSliderButton implements ISlider {
 		this.setY(y); 
 	} 
 	 
+	public void shiftX(int dx) {
+		this.setX(getX() + dx);
+	}
+
 	public void setVisibility(boolean visible) { 
 		this.visible = visible; 
 	} 

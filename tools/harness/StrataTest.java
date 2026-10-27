@@ -90,8 +90,8 @@ public class StrataTest {
 		String json = new String(Files.readAllBytes(Paths.get("common/resources/assets/buildguide/lang/en_us.json")), "UTF-8");
 		int widest = 0; String widestText = "";
 		for(String key: new String[]{"blocks", "percent", "rest", "patches", "empty"}){ java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"screen\\.buildguide\\.legend\\." + key + "\": \"([^\"]*)\"").matcher(json); check(m.find(), "legend text " + key); String t = String.format(m.group(1), "5", "100"); if(LabelWidthTest.width(t) > widest){ widest = LabelWidthTest.width(t); widestText = t; } }
-		int entry = (ShapeLayout.minWidth - ShapeScreen.rightX) / ShapeLayers.COUNT;
-		check(widest <= entry - 16 - 2, "the widest legend text (\"" + widestText + "\", " + widest + " px) fits a fifth of the legend (" + entry + " px) after its swatch");
+		int entry = (ShapeScreen.previewX2(ShapeLayout.minWidth) - ShapeScreen.previewX1(false)) / ShapeLayers.COUNT;
+		check(widest <= entry - ShapeScreen.legendTextX - 2, "the widest legend text (\"" + widestText + "\", " + widest + " px) fits a fifth of the legend (" + entry + " px) after its swatch");
 
 		System.out.println("-- equality and seeds");
 		int[] b2 = {24}; ShapeLayers e1 = ShapeLayers.depth(island, 0, b2, 0), e2 = ShapeLayers.depth(depth(4, 3, 0, 4, new int[]{1, 3, 0, 25, 10}, none), 0, b2, 0);

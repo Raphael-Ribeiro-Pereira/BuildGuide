@@ -546,7 +546,7 @@ public abstract class Shape implements IValidatable, IFocusParts {
 			return row + 1;
 		}
 		for(Property<?> p: props) {
-			p.setX(ShapeScreen.basePropertiesX);
+			p.setX(ShapeScreen.propertiesX);
 			p.setY(rowsTop + row * Property.rowHeight);
 			p.setVisibility(true);
 		}

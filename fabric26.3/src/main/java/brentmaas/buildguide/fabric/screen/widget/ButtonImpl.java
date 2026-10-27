@@ -26,4 +26,8 @@ public class ButtonImpl extends Button.Plain implements IButton {
 	public void setYPosition(int y) {
 		super.setY(y);
 	}
+
+	public void shiftX(int dx) {
+		super.setX(getX() + dx);
+	}
 }

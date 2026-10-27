@@ -14,27 +14,29 @@ public class ShapeLayoutTest {
 		System.out.println("-- 270: the minimum");
 		ShapeLayout m=new ShapeLayout(270);
 		System.out.println("   "+s(m));
-		check(m.previewBottom==236 && m.progressTop==236, "preview 40..236 (it ended at 175 with the list under it), progress line from 236");
-		check(m.statusTextY==241 && m.statusTextY+9<=m.bottomRowY, "status text at 241, inside its line above the bottom row");
-		check(m.bottomRowY==250, "Validate / Reset at y 250 (E6)");
-		check(m.legendY==256, "legend at y 256 (E6)");
-		check(m.accordionBottom==248 && m.accordionHeight()==206 && ShapeScreen.accordionTop==42, "accordion 42..248 = 206 px (E6)");
+		// The Oficina (2026-10-27): the preview runs down to the status bar (the bottom 20 px), the legend in its last
+		// 11 px; the inspector's accordion from y 22
+		check(m.previewBottom==250 && m.progressTop==250, "preview 20..250, the progress line from 250");
+		check(m.statusTextY==259 && m.statusTextY+9<=270, "status text at 259, inside the bottom row");
+		check(m.bottomRowY==250, "Validate / Reset and the status bar at y 250");
+		check(m.legendY==239, "legend at y 239, the foot of the preview");
+		check(m.accordionBottom==248 && m.accordionHeight()==226 && ShapeScreen.accordionTop==22, "accordion 22..248 = 226 px");
 
 		System.out.println("-- 360: GUI scale 3 on 1080p");
 		ShapeLayout t=new ShapeLayout(360);
 		System.out.println("   "+s(t));
-		check(t.bottomRowY==340 && t.legendY==346, "bottom row and legend follow the bottom edge (h - 20)");
-		check(t.previewBottom==236+90 && t.statusTextY==t.previewBottom+5, "the preview gets all 90 extra px, the status line stays right under it");
-		check(t.accordionHeight()==296, "accordion 42..338 = 296 px");
+		check(t.bottomRowY==340 && t.legendY==329, "bottom row and legend follow the bottom edge");
+		check(t.previewBottom==250+90 && t.statusTextY==t.previewBottom+9, "the preview gets all 90 extra px, the status bar stays right under it");
+		check(t.accordionHeight()==316, "accordion 22..338 = 316 px");
 
 		System.out.println("-- 540: GUI scale 2 on 1080p");
 		ShapeLayout u=new ShapeLayout(540);
 		System.out.println("   "+s(u));
-		check(u.bottomRowY==520 && u.previewBottom==506 && u.previewBottom<u.statusTextY && u.statusTextY<u.bottomRowY, "bands keep their order and grow");
+		check(u.bottomRowY==520 && u.previewBottom==520 && u.legendY<u.previewBottom && u.previewBottom<u.statusTextY && u.statusTextY+9<=540, "bands keep their order and grow");
 
 		System.out.println("-- below the minimum (D1 shows a message instead; the preview never shrinks under the minimum's)");
 		ShapeLayout b=new ShapeLayout(240);
-		check(b.previewBottom==236, "no negative extra: the preview keeps its size at 270");
+		check(b.previewBottom==250, "no negative extra: the preview keeps its size at 270");
 		System.out.println("-- D1: minimum check (GUI pixels = window / scale, rounded up)");
 		check(BaseScreen.fitsMinimum(480,270), "1920x1080 at scale 4 (Auto): 480x270 fits, exactly the minimum");
 		check(BaseScreen.fitsMinimum(640,360) && BaseScreen.fitsMinimum(960,540), "scale 3 and 2 on 1080p fit");

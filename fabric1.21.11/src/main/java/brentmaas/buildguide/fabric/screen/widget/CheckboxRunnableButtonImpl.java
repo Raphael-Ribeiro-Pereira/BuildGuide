@@ -52,6 +52,11 @@ public class CheckboxRunnableButtonImpl implements ICheckboxRunnableButton {
 		initCheckboxIfNull();
 		checkbox.setY(y);
 	}
+
+	public void shiftX(int dx) {
+		initCheckboxIfNull();
+		checkbox.setX(checkbox.getX() + dx);
+	}
 	
 	public void setVisibility(boolean visible) {
 		initCheckboxIfNull();

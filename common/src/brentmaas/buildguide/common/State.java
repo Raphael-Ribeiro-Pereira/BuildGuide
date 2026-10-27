@@ -47,9 +47,9 @@ public class State {
 	// 3D preview model, shared camera and input, for every view of the preview in this world and
 	// dimension. Not persisted (not among the keys written by savePersistence)
 	public final PreviewController preview = new PreviewController();
-	// Origin section of the Shape tab's accordion is open (GUI redesign E5). Transient, here because
-	// ShapeScreen is rebuilt on every tab switch; the shapes keep their own open section
-	public boolean originOpen = false;
+	// The Shape tab's open side panel (ShapeScreen.SHAPES, PROJECTS, SCAN, CHECK, or NONE = -1). Transient, here
+	// because ShapeScreen is rebuilt on every tab switch; the shapes keep their own open section
+	public int sidePanel = -1;
 	// Tab of the position list the user picked (transient); null = automatic: Errors when there are structure
 	// errors, Missing otherwise. The list is Visualisation's "Find blocks" topic since 2026-10-22
 	public ValidationListComponent.Category listTab = null;

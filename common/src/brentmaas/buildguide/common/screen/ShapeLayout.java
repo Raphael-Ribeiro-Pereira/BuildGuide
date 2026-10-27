@@ -9,10 +9,13 @@ package brentmaas.buildguide.common.screen;
  * 2026-10-22: the list of positions moved to Visualisation ("Find blocks"). The preview reaches down to one
  * status line (a 2-px progress line, then the missing count) right above the bottom row, and gets all the
  * extra height of a taller window. Below the minimum height the bands stay those of the minimum.
+ *
+ * 2026-10-27 (the Oficina): the preview runs down to the status bar (the bottom 20 px: the progress line, the
+ * text and Fill), the legend in its last 12 px; the inspector's Validate and Reset share that bottom row.
  */
 public final class ShapeLayout {
 	public static final int minWidth = 480, minHeight = 270;
-	private static final int statusHeight = 14, progressHeight = 2, bottomRowHeight = 20;
+	private static final int progressHeight = 2, bottomRowHeight = 20, legendHeight = 11;
 
 	public final int height;
 	// Preview 40..previewBottom; the status line previewBottom..bottomRowY: progress from progressTop, text at statusTextY
@@ -22,11 +25,11 @@ public final class ShapeLayout {
 	public ShapeLayout(int height) {
 		this.height = height;
 		bottomRowY = height - bottomRowHeight;
-		legendY = bottomRowY + 6;
 		accordionBottom = bottomRowY - 2;
-		previewBottom = Math.max(height, minHeight) - bottomRowHeight - statusHeight;
+		previewBottom = Math.max(height, minHeight) - bottomRowHeight;
+		legendY = previewBottom - legendHeight;
 		progressTop = previewBottom;
-		statusTextY = progressTop + progressHeight + 3;
+		statusTextY = progressTop + progressHeight + 7;
 	}
 
 	// Height available to the accordion's headers and rows (206 at the minimum height)

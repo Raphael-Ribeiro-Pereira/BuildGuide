@@ -56,11 +56,13 @@ public abstract class BaseScreen {
 		
 		addWidget(buttonEnabled);
 		addWidget(buttonClose);
-		addWidget(buttonBuildGuide);
-		addWidget(buttonVisualisation);
-		addWidget(buttonShapeList);
-		addWidget(buttonConfiguration);
-		addWidget(buttonExclusions);
+		if(hasTabs()) {
+			addWidget(buttonBuildGuide);
+			addWidget(buttonVisualisation);
+			addWidget(buttonShapeList);
+			addWidget(buttonConfiguration);
+			addWidget(buttonExclusions);
+		}
 		
 		BuildGuide.stateManager.getState().initCheck();
 	}
@@ -133,6 +135,11 @@ public abstract class BaseScreen {
 		drawShadowLeft(titleNumberOfBlocksTotal + ": " + BuildGuide.stateManager.getState().getNumberOfBlocks(), centre + halfTitle + headerGap, headerTextY, 0xFFFFFF);
 	}
 	
+	// The tab bar at y 20..40. The Shape tab has its own rail instead (the Oficina, 2026-10-27)
+	protected boolean hasTabs() {
+		return true;
+	}
+
 	// Screens that use the bottom band themselves (Shape tab, dropdowns, preview) return false
 	protected boolean hasBottomBar() {
 		return true;

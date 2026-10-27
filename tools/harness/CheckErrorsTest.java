@@ -112,7 +112,7 @@ public class CheckErrorsTest {
 		System.out.println("-- layout: the topics, and the preview down to the status line");
 		check(275 + 120 < VisualisationScreen.topicX && VisualisationScreen.topicX + VisualisationScreen.topicWidth <= 480, "topic buttons in the free column right of the cube size block (x " + VisualisationScreen.topicX + ".." + (VisualisationScreen.topicX + VisualisationScreen.topicWidth) + ")");
 		check(VisualisationScreen.findX2 < VisualisationScreen.topicX && VisualisationScreen.findTabsBottom <= VisualisationScreen.findListTop && 270 - 22 - VisualisationScreen.findListTop >= 15 * ValidationListComponent.rowHeight, "Find blocks: tabs then at least 15 rows left of the topic buttons, above the bottom bar at 270");
-		check(new brentmaas.buildguide.common.screen.ShapeLayout(270).previewBottom - ShapeScreen.previewTop - ShapeScreen.previewControlsHeight - ShapeScreen.focusRowHeight - ShapeScreen.previewHintHeight >= 140, "the 3D area of the Shape tab at 270 is 140 px tall or more (it was 77)");
+		check(new brentmaas.buildguide.common.screen.ShapeLayout(270).legendY - ShapeScreen.legendHeight - ShapeScreen.previewTop - ShapeScreen.previewControlsHeight - ShapeScreen.focusRowHeight >= 140, "the 3D area of the Shape tab at 270 is 140 px tall or more (it was 77)");
 
 		System.out.println("-- texts");
 		String lang = new String(Files.readAllBytes(new File("common/resources/assets/buildguide/lang/en_us.json").toPath()), "UTF-8");

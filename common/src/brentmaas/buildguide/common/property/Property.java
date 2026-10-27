@@ -56,7 +56,11 @@ public abstract class Property<T> {
 		this.name = name;
 	}
 	
+	// Widgets already made move with the row (they were placed from the old x)
 	public void setX(int x) {
+		if(widgetList != null && x != this.x) {
+			for(IWidget widget: widgetList) widget.shiftX(x - this.x);
+		}
 		this.x = x;
 	}
 	

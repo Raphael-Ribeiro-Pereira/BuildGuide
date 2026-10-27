@@ -687,6 +687,34 @@ In-game checklist for `strata-wip`:
 6. A Terrain, Layers on: peaks, middle, lower band and base, with the same rows (in %).
 7. An island saved before: it opens (it looks different: the new layers).
 
+### New interface, stage 1: the Oficina (on `wip/ui`, on top of `wip/strata`, waiting for the in-game test; not merged)
+
+Raphael (2026-10-27) chose variant 1 of five prototypes (the Design canvas "BuildGuide UI redesign"). Stage 1 is
+the Shape tab; the other screens keep the old tab bar for now (Shape brings you back).
+
+| What | Change |
+|---|---|
+| Layout | Rail of sections on the left (Shapes, Projects, Scan, Check, Config), a side panel beside it, the 3D preview always in the middle, the properties as the accordion at the right edge (the inspector), and a status bar under the preview with the progress and Fill |
+| Header | The shape's name is a button ("Floating island v"): it opens the shape list; the instance selector < 1/3 > and its name after it |
+| Shapes | The registered shapes in two columns; picking one closes the list, so the preview gets the room back |
+| Projects | Origin and the presets in one panel: Set origin, X / Y / Z (- field +, Enter applies), this instance's name (Enter renames), All instances..., Presets... |
+| Scan | A placeholder that lists the five modes of the next stage |
+| Check | Progress, built, missing, errors, wrong layer; Errors and blocks... (Visualisation), Exclusions... |
+| Config | Opens the configuration screen |
+| Preview | Coloured **by layer by default** (by status, a shape with Layers on looked one colour: the cause of the confusing strata test). Colour, slice, Part and Layer on two rows at its top while it is at least 150 px wide (with a side panel open at the minimum width it shows only the 3D view); the legend at its foot |
+| Code | `IWidget.shiftX` (Fabric widgets move sideways), `Property.setX` moves made widgets, `ShapeScreen.propertiesX` is the inspector's x for `Shape.placeRow`; `BaseScreen.hasTabs`; `State.sidePanel` replaces `originOpen`; `ShapeLayout` bands for the status bar |
+
+At 480 x 270: rail 44, preview 244 (side panel closed), inspector 188 with 226 px of accordion (it was 206).
+Texts shortened to fit: the focus note is "Focus Spikes, Layer 4: n of N", a patches-only legend entry "5 dots".
+
+In-game checklist for `ui-wip`:
+1. Open the GUI: the rail on the left, the preview in the middle, the properties on the right.
+2. Click the shape's name: the list opens; pick a shape: the list closes, the properties change.
+3. Projects: Set origin and the X / Y / Z fields move the shape; Presets... and All instances... open and come back.
+4. An Island with Layers on: the preview is in layer colours at once; Colour switches to status and back.
+5. Check shows the counts; Fill in the status bar works as before; resize the window: the properties follow the
+   right edge.
+
 ## 2. Final jars
 
 Build output: `fabric1.21.11/build/libs/BuildGuide-Fabric-0.4.8.jar` (mod version is still 0.4.8).
