@@ -287,3 +287,58 @@ list whose fill is quadratic (50,000 rows about 3 s), built three times on openi
 100 ms while the validation changed. Now linear, at most 1,000 rows a tab, built once on opening.
 Litematica's verifier, for comparison, lists mismatches grouped by block with counts. Grouping our
 rows by block the same way is a possible next step.
+
+## Plan of 2026-10-27: validation, new interface, Scan and its uses
+
+Raphael's order. Each step gets its own investigation and approval, and nothing is merged without his in-game test.
+
+0. **STOP: validate the layers (strata) in the game.** `strata-wip` is installed on the teste profile (2026-10-27,
+   `b13ecd2`), and its checklist is in `docs/STATUS.md` ("Layers as strata"). No step below starts until it passes
+   or its fixes are in. Then the same change goes to 26.3 (it already compiles there: `common` is shared).
+
+1. **New interface, "Oficina" (variant 1 of the prototypes).** Prototype: the Design canvas "BuildGuide UI
+   redesign" (the interactive board "1 · Oficina — protótipo interativo").
+   - Three columns: section rail, side panel, the preview always on screen (never behind a button), and a
+     property inspector with tabs (Forma / Camadas / Espinhos as the shape has them). A status bar with the
+     progress and Fill.
+   - The shape list collapses once a shape is chosen (the preview gets the room). The shape's name in the top
+     bar opens it again.
+   - Origin and Presets become one module, working name **Projetos**: where the shape stands (X Y Z, my
+     position, the block in the crosshair, rotate), the instances in this world, and the saved ones.
+   - Rail: Formas, Projetos, Scan, Validar, Config.
+   - **Ver no mundo:** shows how the structure sits in the real place.
+     - Our own view first, without any dependency: the loaded chunks, drawn top-down in map colours, with the
+       shape over them.
+     - **OrthoCamera** is an optional extra when it is installed (DimasKama, MIT, Fabric, branches up to 1.21.11
+       and 26.3). It has no API: its state is the public static `OrthoCamera.CONFIG` (`enabled`, `fixed`,
+       `fixed_yaw`, `fixed_pitch`, `scale_x`, `scale_y`), and it changes the game's own camera. So the button
+       would set those fields by reflection, a soft dependency (yaw and pitch aimed at the shape, the scale
+       fitted to it), close our screen while the ortho view shows, and restore the user's settings afterwards.
+       Fields may change between its versions, so the integration checks them and falls back to our view.
+
+2. **Scan (new rail button).** Reads the world around you into the preview, with real blocks.
+   - Modes:
+     - Scan island: the connected structure you stand on.
+     - Scan under me: from you down to a Y.
+     - Scan above me: from you up to a Y.
+     - Scan region: X, Y, Z of a box.
+     - Scan hole: the empty volume under water or inside the ground.
+   - Singleplayer or loaded chunks only (client side); kept apart from the shapes, saved to its own file.
+   - Shares its capture with the structure identifier (its Part 1); the recognition (Part 2) stays after.
+
+3. **Uses of the scan** (later, one at a time):
+   1. Relief under buildings: a construction sits on the scanned ground; the gap below becomes foundation.
+   2. Farming land on the real ground: from the scanned floor, the water pattern that grows the most of the
+      chosen crop.
+   3. Terraform: brushes (raise, smooth, dig) over the scanned terrain, in the spirit of Axiom's.
+   4. Lighting: where to put torches for the fewest torches and no dead spot (light 0). With "Slime chunk"
+      checked, the minimum becomes light 2, since slimes spawn at light 1 (to confirm against the 1.21.11
+      spawn rules before coding).
+
+4. **Name and publication** (with care, not before Raphael chooses).
+   - A name mixing "build helper" with Caroline.
+   - The README says the mod derives from BuildGuide by Brentmaas, links it, and lists the mods that inspired
+     it.
+   - The licence stays CC BY-NC 3.0: credit and no commercial use.
+   - Supported versions table, jars in GitHub Releases. Changing the mod id keeps old saves and configs
+     readable.
