@@ -2,8 +2,6 @@ package brentmaas.buildguide.fabric.screen.widget;
 
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
 import brentmaas.buildguide.common.screen.widget.ICheckboxRunnableButton;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.components.Checkbox;
 import net.minecraft.network.chat.Component;
 
 public class CheckboxRunnableButtonImpl implements ICheckboxRunnableButton {
@@ -11,7 +9,7 @@ public class CheckboxRunnableButtonImpl implements ICheckboxRunnableButton {
 	private int x, y;
 	private Translatable title;
 	private boolean checked;
-	public Checkbox checkbox;
+	public FlatCheckbox checkbox;
 	
 	public CheckboxRunnableButtonImpl(int x, int y, int width, int height, Translatable title, boolean checked, boolean drawTitle, ICheckboxRunnableButton.IPressable onPress) {
 		this.x = x;
@@ -23,7 +21,7 @@ public class CheckboxRunnableButtonImpl implements ICheckboxRunnableButton {
 	
 	public void initCheckboxIfNull() {
 		if(checkbox == null) {
-			checkbox = Checkbox.builder(Component.translatable(title.getTranslationKey(), title.getValues()), Minecraft.getInstance().font).pos(x, y).onValueChange((Checkbox checkbox, boolean selected) -> onPress()).selected(checked).build();
+			checkbox = new FlatCheckbox(x, y, Component.translatable(title.getTranslationKey(), title.getValues()), checked, this::onPress);
 			//checkbox.setWidth(width);
 			//checkbox.setHeight(height);
 		}

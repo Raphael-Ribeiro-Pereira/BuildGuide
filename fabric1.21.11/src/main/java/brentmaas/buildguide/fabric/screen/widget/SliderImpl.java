@@ -1,7 +1,10 @@
 package brentmaas.buildguide.fabric.screen.widget;
 
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
+import brentmaas.buildguide.common.screen.Theme;
 import brentmaas.buildguide.common.screen.widget.ISlider;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.network.chat.Component;
 
@@ -30,6 +33,17 @@ public class SliderImpl extends AbstractSliderButton implements ISlider {
 	
 	public void updateText() {
 		setMessage(Component.literal(name + ": " + Math.round(10.0 * getSliderValue()) / 10.0));
+	}
+	
+	// Flat look (Theme): a track filled up to the value in the accent colour, a slim handle, the label centred
+	@Override
+	public void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
+		boolean hovered = active && isHoveredOrFocused();
+		FlatStyle.box(graphics, getX(), getY(), getWidth(), getHeight(), Theme.FIELD, FlatStyle.buttonBorder(active, hovered));
+		int handleX = getX() + (int) (value * (getWidth() - 4));
+		if(handleX > getX() + 1) graphics.fill(getX() + 1, getY() + 1, handleX, getY() + getHeight() - 1, active ? Theme.SELECTED : Theme.CONTROL_DISABLED);
+		graphics.fill(handleX, getY() + 1, handleX + 4, getY() + getHeight() - 1, active ? (hovered ? Theme.ACCENT : Theme.ACCENT_DIM) : Theme.BORDER);
+		graphics.drawCenteredString(Minecraft.getInstance().font, getMessage(), getX() + getWidth() / 2, getY() + (getHeight() - 8) / 2, active ? Theme.TEXT : Theme.TEXT_FAINT);
 	}
 	
 	protected void applyValue() {

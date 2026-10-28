@@ -715,6 +715,15 @@ In-game checklist for `ui-wip`:
 5. Check shows the counts; Fill in the status bar works as before; resize the window: the properties follow the
    right edge.
 
+Stage 1b, the flat look (`ui-wip`, 2026-10-27, after Raphael asked to drop the Minecraft style, in the spirit of
+Axiom): `common/.../screen/Theme.java` holds the prototype's colours; the Fabric widgets draw themselves flat
+(`FlatStyle`): buttons (`ButtonImpl.renderContents`), text fields (an unbordered EditBox inset in our own box, clicks
+on the whole box), the slider (track, accent handle) and the checkbox (`FlatCheckbox`, vanilla's cannot be
+subclassed). ShapeScreen's panels, top bar, section headers and progress bar use the Theme. Same code in 26.3 with
+its renamed API (`GuiGraphicsExtractor`, `extractContents`, `extractWidgetRenderState`, `text`, `centeredText`).
+Check in game: buttons, fields and checkboxes look flat, hover and focus show, typing and clicking in a field
+still work (also on its edge), the Layers checkbox toggles.
+
 ## 2. Final jars
 
 Build output: `fabric1.21.11/build/libs/BuildGuide-Fabric-0.4.8.jar` (mod version is still 0.4.8).

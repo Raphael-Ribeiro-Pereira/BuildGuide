@@ -2,7 +2,9 @@ package brentmaas.buildguide.fabric.screen.widget;
 
 import brentmaas.buildguide.common.screen.widget.FieldDebounce;
 import brentmaas.buildguide.common.screen.widget.ITextField;
+import brentmaas.buildguide.common.screen.Theme;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
@@ -15,9 +17,15 @@ public class TextFieldImpl extends EditBox implements ITextField {
 	private final FieldDebounce debounce = new FieldDebounce(System::currentTimeMillis);
 	// EditBox.setValue calls the responder too: a change made by code must not count as typing
 	private boolean settingByCode = false;
+	// Flat look (Theme): the vanilla box is unbordered and sits inside our own box, inset by the padding the
+	// bordered EditBox would have, so the text stays where it was; clicks count on the whole outer box
+	private static final int padX = 4;
+	private final int padY;
 
 	public TextFieldImpl(int x, int y, int width, int height, String value) {
-		super(Minecraft.getInstance().font, x, y, width, height, Component.literal(value));
+		super(Minecraft.getInstance().font, x + padX, y + (height - 8) / 2, width - 2 * padX, height - 2 * ((height - 8) / 2), Component.literal(value));
+		padY = (height - 8) / 2;
+		setBordered(false);
 		setResponder(text -> {
 			if(!settingByCode) debounce.onUserEdit(text);
 		});
@@ -42,11 +50,24 @@ public class TextFieldImpl extends EditBox implements ITextField {
 	}
 
 	public void setYPosition(int y) {
-		super.setY(y);
+		super.setY(y + padY);
 	}
 
 	public void shiftX(int dx) {
 		super.setX(getX() + dx);
+	}
+
+	@Override
+	public boolean isMouseOver(double mouseX, double mouseY) {
+		return isVisible() && active && mouseX >= getX() - padX && mouseX < getX() + getWidth() + padX && mouseY >= getY() - padY && mouseY < getY() + getHeight() + padY;
+	}
+
+	@Override
+	public void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
+		if(!isVisible()) return;
+		int border = isFocused() ? Theme.ACCENT_DIM : isMouseOver(mouseX, mouseY) ? Theme.BORDER_HOVER : Theme.BORDER;
+		FlatStyle.box(graphics, getX() - padX, getY() - padY, getWidth() + 2 * padX, getHeight() + 2 * padY, Theme.FIELD, border);
+		super.renderWidget(graphics, mouseX, mouseY, partialTicks);
 	}
 
 	public String getTextValue() {

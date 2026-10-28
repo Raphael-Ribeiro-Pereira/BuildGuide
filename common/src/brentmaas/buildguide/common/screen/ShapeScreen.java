@@ -288,15 +288,17 @@ public class ShapeScreen extends BaseScreen{
 	@Override
 	public void renderBackground() {
 		int h = wrapper.getHeight();
-		fillRect(0, top, railWidth, h, 0xC0101010);
+		// The flat look of the new interface (Theme): the top bar and the rail on the darkest ground, the panels a step lighter
+		fillRect(0, 0, wrapper.getWidth(), top, Theme.BACKGROUND);
+		fillRect(0, top, railWidth, h, Theme.BACKGROUND);
 		if(sidePanel() != NONE) {
 			// The open panel: a blue mark beside its rail button, and the panel's ground
-			fillRect(0, railButtonY(sidePanel()), 2, railButtonY(sidePanel()) + railButtonHeight, 0xFF7CC4FF);
-			fillRect(railWidth, top, railWidth + sideWidth, h, 0xC0181818);
+			fillRect(0, railButtonY(sidePanel()), 2, railButtonY(sidePanel()) + railButtonHeight, Theme.ACCENT);
+			fillRect(railWidth, top, railWidth + sideWidth, h, Theme.PANEL);
 		}
-		fillRect(px1() - 1, previewTop, px2() + 1, bands.previewBottom, 0xFF808080);
-		fillRect(px1(), previewTop + 1, px2(), bands.previewBottom - 1, 0xFF000000);
-		fillRect(inspectorX(), top, wrapper.getWidth(), h, 0xC0181818);
+		fillRect(px1() - 1, previewTop, px2() + 1, bands.previewBottom, Theme.BORDER);
+		fillRect(px1(), previewTop + 1, px2(), bands.previewBottom - 1, Theme.FIELD);
+		fillRect(inspectorX(), top, wrapper.getWidth(), h, Theme.PANEL);
 	}
 
 	public void render() {
@@ -352,7 +354,7 @@ public class ShapeScreen extends BaseScreen{
 	private void renderStatusLine() {
 		int x1 = px1(), x2 = px2(), progressBottom = bands.progressTop + 2, textWidth = x2 - x1 - fillWidth - 8;
 		Shape shape = currentShapeOrNull();
-		fillRect(x1, bands.progressTop, x2, progressBottom, 0xFF303030);
+		fillRect(x1, bands.progressTop, x2, progressBottom, Theme.CONTROL);
 		if(shape == null) {
 			drawShadowLeft("-", x1 + 3, bands.statusTextY, 0x888888);
 			return;
@@ -364,7 +366,7 @@ public class ShapeScreen extends BaseScreen{
 			return;
 		}
 		int fill = x1 + (int) Math.round((x2 - x1) * state.getProgress());
-		if(fill > x1) fillRect(x1, bands.progressTop, fill, progressBottom, state.getOk() == state.getTotal() ? 0xFF40C040 : 0xFF40A0FF);
+		if(fill > x1) fillRect(x1, bands.progressTop, fill, progressBottom, state.getOk() == state.getTotal() ? Theme.OK : Theme.ACCENT);
 		String percent = String.format(java.util.Locale.ROOT, "%.1f%%", 100.0 * state.getProgress());
 		String text = new Translatable("screen.buildguide.status.missing", "" + counts[1]) + "   " + new Translatable("screen.buildguide.status.built", "" + state.getOk(), "" + state.getTotal(), percent);
 		if(counts[0] > 0) text += "   " + new Translatable("screen.buildguide.status.errors", "" + counts[0]);
@@ -548,9 +550,10 @@ public class ShapeScreen extends BaseScreen{
 	// Header strip: "> Name" or "v Name" on a dark strip, the row count on the right
 	private void renderSectionHeader(int y, String name, int rows, boolean open) {
 		int ix = inspectorX();
-		fillRect(ix, y, wrapper.getWidth(), y + headerHeight - 1, open ? 0xC0505050 : 0xC0202020);
-		drawShadowLeft(fit((open ? "v " : "> ") + name, panelWidth - 24), ix + 4, y + 1, 0xFFFFFF);
-		drawShadowRight("" + rows, wrapper.getWidth() - 4, y + 1, 0xAAAAAA);
+		fillRect(ix, y, wrapper.getWidth(), y + headerHeight - 1, open ? Theme.SELECTED : Theme.SURFACE);
+		if(open) fillRect(ix, y, ix + 2, y + headerHeight - 1, Theme.ACCENT);
+		drawShadowLeft(fit((open ? "v " : "> ") + name, panelWidth - 24), ix + 4, y + 1, Theme.rgb(open ? Theme.TEXT : Theme.TEXT_SOFT));
+		drawShadowRight("" + rows, wrapper.getWidth() - 4, y + 1, Theme.rgb(Theme.TEXT_FAINT));
 	}
 
 	// Y of every section header; the open section's rows follow its header
