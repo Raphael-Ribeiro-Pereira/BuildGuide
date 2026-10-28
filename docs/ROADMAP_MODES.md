@@ -355,3 +355,24 @@ Raphael's order. Each step gets its own investigation and approval, and nothing 
   inside, outside, or beside. This is composition (see `docs/COMPOSITION_ANALYSIS.md`).
 - **World cache:** the shapes, their origins and these choices persist per world, even after the game is closed.
 - **Presets:** up to 10 saved (from the current limit).
+
+### Feedback of 2026-10-27 (the `ui-wip` test)
+
+- **Strata: validated.** The layers come out right in the preview (coloured by layer). Step 0 passes on the
+  system itself; what is left is how it is presented.
+- **Labels with a comma are confusing.** "Layers, rest" and "Patches %, size" put two numbers on one row and
+  say neither what they do. Each number gets its own row with a plain name, and every row a tooltip that says
+  what it changes. Proposed:
+  - "Layers, rest" -> "Layer count" and "Filler layer" (the layer that takes what the others leave).
+  - "Mix" -> "Edge blend" (how far two layers mix at their border).
+  - "% bottom" -> "Thickness %" (with "from the bottom" / "from the top" in the tooltip).
+  - "Patches %, size" -> "Spots: amount %" and "Spots: size".
+- **A "Naturalise" button is missing** in the Layers section: one click gives natural-looking values (blend,
+  spots, an uneven border). What exactly it sets is for Raphael to confirm.
+- **Look: drop the vanilla Minecraft style.** The layout is right; the widgets should look like the prototype,
+  in the spirit of Axiom, which draws its own interface instead of Minecraft's stone buttons.
+  - Flat buttons and fields drawn by us (`ButtonImpl`, `TextFieldImpl`, `SliderImpl`, checkbox), dark panels,
+    one accent colour, a hover and a pressed state, the open section highlighted.
+  - The tokens (colours, spacing) in one class in `common`, so 1.21.11 and 26.3 look the same.
+  - A smoother font (a TTF font provider in the resource pack) is a possible second step, after the widgets.
+  - This comes before the other stage 2 items, since every later screen is built on it.
