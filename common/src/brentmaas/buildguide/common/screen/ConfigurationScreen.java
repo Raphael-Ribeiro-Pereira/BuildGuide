@@ -11,6 +11,12 @@ import brentmaas.buildguide.common.screen.widget.ICheckboxRunnableButton;
 import brentmaas.buildguide.common.screen.widget.ITextField;
 
 public class ConfigurationScreen extends BaseScreen {
+	// A page of the Oficina's config section (its page bar)
+	@Override
+	protected int section() {
+		return SECTION_CONFIG;
+	}
+
 	private ICheckboxRunnableButton buttonAsyncEnabled, buttonAdvancedRandomColorsDefaultEnabled, buttonPersistenceEnabled, buttonDebugGenerationTiminigsEnabled;
 	private IButton buttonAsyncEnabledDefault, buttonAdvancedRandomColorsDefaultEnabledDefault, buttonPersistenceEnabledDefault, buttonDebugGenerationTimingsEnabledDefault;
 	private ITextField textFieldIgnoredBlocks;

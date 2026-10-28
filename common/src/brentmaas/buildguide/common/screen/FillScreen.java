@@ -101,8 +101,8 @@ public class FillScreen extends BaseScreen {
 	@Override
 	public void renderBackground() {
 		int w = wrapper.getWidth(), h = wrapper.getHeight();
-		fillRect(panelX1 - 1, panelTop - 1, w - panelX1 + 1, h - panelMarginBottom + 1, 0xFF808080);
-		fillRect(panelX1, panelTop, w - panelX1, h - panelMarginBottom, 0xE0000000);
+		fillRect(panelX1 - 1, panelTop - 1, w - panelX1 + 1, h - panelMarginBottom + 1, Theme.BORDER);
+		fillRect(panelX1, panelTop, w - panelX1, h - panelMarginBottom, Theme.SURFACE);
 	}
 
 	@Override

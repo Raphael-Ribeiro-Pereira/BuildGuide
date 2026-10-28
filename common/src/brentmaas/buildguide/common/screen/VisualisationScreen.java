@@ -20,6 +20,12 @@ import brentmaas.buildguide.common.shape.ShapeSet;
  * then. Clicking a row marks that position in the world (the overlay's white cube).
  */
 public class VisualisationScreen extends BaseScreen {
+	// A page of the Oficina's check section (its page bar)
+	@Override
+	protected int section() {
+		return ShapeScreen.CHECK;
+	}
+
 	// Topic buttons in the free column right of the cube size block (x 400..478)
 	public static final int topicX = 400, topicWidth = 78;
 	// Find blocks: tabs and list left of the topic buttons, above the bottom bar
@@ -244,7 +250,7 @@ public class VisualisationScreen extends BaseScreen {
 		for(int i = 0;i < tabs.length;++i) {
 			int tx1 = tabX(i, tabs.length), tx2 = tabX(i + 1, tabs.length);
 			boolean selected = tabs[i] == findList.getCategory();
-			fillRect(tx1, findTabsTop, tx2 - 1, findTabsBottom, selected ? 0xC0505050 : 0xC0202020);
+			fillRect(tx1, findTabsTop, tx2 - 1, findTabsBottom, selected ? Theme.SELECTED : Theme.SURFACE);
 			// Four tabs share the width with shorter labels (4D): "Err 3", "Miss 120", "Ign 0", "Layer 5"
 			String label = new Translatable(tabs.length > 3 ? tabs[i].shortKey : tabs[i].translationKey, counts == null ? "-" : "" + counts[tabs[i].ordinal()]).toString();
 			drawShadowCentred(label, (tx1 + tx2) / 2, findTabsTop + 4, selected ? 0xFFFFFF : 0xAAAAAA);

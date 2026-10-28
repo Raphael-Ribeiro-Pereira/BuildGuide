@@ -724,6 +724,16 @@ its renamed API (`GuiGraphicsExtractor`, `extractContents`, `extractWidgetRender
 Check in game: buttons, fields and checkboxes look flat, hover and focus show, typing and clicking in a field
 still work (also on its edge), the Layers checkbox toggles.
 
+Stage 2a, the other screens as pages of the Oficina (`ui-pages`, 2026-10-28): the old five tabs are gone. Every
+screen but the Oficina has a page bar at y 20..40: "< Workshop" (back to the Oficina with the section's panel
+open; on an overlay it acts as Escape), the pages of its section as tabs with the current one underlined in the
+accent, the section's name on the right. Projects: Shape list, Presets. Check: Visualization, Exclusions.
+Config: Configuration. `BaseScreen.section()` says where a screen belongs. The chrome (bars, content ground),
+the header text, the bottom progress bar, the Fill and Preview panels, Visualisation's find tabs and both lists
+(field ground, no separators, the selected row with an accent bar) use the Theme.
+Check in game: from Check open Visualization, switch to Exclusions with its tab, "< Workshop" comes back with
+Check open; the same from Projects (Shape list, Presets) and Config; the lists scroll and select.
+
 ## 2. Final jars
 
 Build output: `fabric1.21.11/build/libs/BuildGuide-Fabric-0.4.8.jar` (mod version is still 0.4.8).

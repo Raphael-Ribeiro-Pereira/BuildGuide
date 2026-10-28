@@ -1,5 +1,6 @@
 package brentmaas.buildguide.fabric.screen.widget;
 
+import brentmaas.buildguide.common.screen.Theme;
 import java.util.List;
 
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
@@ -57,9 +58,24 @@ public class SelectorListImpl extends ObjectSelectionList<SelectorListImpl.Entry
 		//Selector lists don't do visibility
 	}
 	
+	// Flat look (Theme): the list on the field colour, no vanilla separators, the selected row lit with an accent bar
+	@Override
+	protected void renderListBackground(GuiGraphics guiGraphics) {
+		guiGraphics.fill(getX(), getY(), getRight(), getBottom(), Theme.FIELD);
+	}
+
+	@Override
+	protected void renderListSeparators(GuiGraphics guiGraphics) {
+	}
+
+	@Override
+	protected void renderSelection(GuiGraphics guiGraphics, SelectorListImpl.Entry entry, int colour) {
+		guiGraphics.fill(entry.getX(), entry.getY(), entry.getX() + entry.getWidth(), entry.getY() + entry.getHeight(), Theme.SELECTED);
+		guiGraphics.fill(entry.getX(), entry.getY(), entry.getX() + 2, entry.getY() + entry.getHeight(), Theme.ACCENT);
+	}
+
 	@Override
 	public void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
-		guiGraphics.fill(getX(), getY(), getRight(), getBottom(), (int) 0x33000000);
 		super.renderWidget(guiGraphics, mouseX, mouseY, partialTicks);
 	}
 	

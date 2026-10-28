@@ -50,8 +50,8 @@ public class PreviewScreen extends BaseScreen {
 	public void render() {
 		super.render();
 		int x1 = panelX1(), y1 = panelTop, x2 = panelX2(), y2 = panelY2();
-		fillRect(x1 - 1, y1 - 1, x2 + 1, y2 + 1, 0xFF808080);
-		fillRect(x1, y1, x2, y2, 0xFF000000);
+		fillRect(x1 - 1, y1 - 1, x2 + 1, y2 + 1, Theme.BORDER);
+		fillRect(x1, y1, x2, y2, Theme.FIELD);
 		String title = titlePreview + (shape != null ? " - " + new Translatable(shape.getTranslationKey()) : "");
 		drawShadowCentred(title, (x1 + x2) / 2, y1 + 5, 0xFFFFFF);
 		drawShadowCentred(textHint.toString(), (x1 + x2) / 2, y2 - 12, 0x888888);

@@ -18,6 +18,12 @@ import brentmaas.buildguide.common.shape.ShapeSet.Origin;
  * captures the player position.
  */
 public class ExclusionScreen extends BaseScreen {
+	// A page of the Oficina's check section (its page bar)
+	@Override
+	protected int section() {
+		return ShapeScreen.CHECK;
+	}
+
 	private static final int baseY = 55;
 	private static final int rowHeight = AbstractWidgetHandler.defaultSize;
 	private static final int fieldWidth = 40;

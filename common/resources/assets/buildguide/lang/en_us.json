@@ -207,6 +207,8 @@
 	"screen.buildguide.previewhintinline": "Drag: rotate · Scroll: zoom · Double click: reset",
 	"screen.buildguide.previewhint": "Drag to rotate, scroll to zoom, double click to reset. Esc or click outside to go back",
 	"screen.buildguide.rendering": "Rendering",
+	"screen.buildguide.page.back": "< Workshop",
+	"screen.buildguide.page.presets": "Presets",
 	"screen.buildguide.rail.shapes": "Shapes",
 	"screen.buildguide.rail.projects": "Projects",
 	"screen.buildguide.rail.scan": "Scan",

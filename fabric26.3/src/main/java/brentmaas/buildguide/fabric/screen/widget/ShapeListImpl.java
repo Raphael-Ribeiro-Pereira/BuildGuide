@@ -1,5 +1,6 @@
 package brentmaas.buildguide.fabric.screen.widget;
 
+import brentmaas.buildguide.common.screen.Theme;
 import org.jetbrains.annotations.Nullable;
 
 import brentmaas.buildguide.common.BuildGuide;
@@ -65,9 +66,24 @@ public class ShapeListImpl extends ObjectSelectionList<ShapeListImpl.Entry> impl
 		update.run();
 	}
 	
+	// Flat look (Theme): the list on the field colour, no vanilla separators, the selected row lit with an accent bar
+	@Override
+	protected void extractListBackground(GuiGraphicsExtractor guiGraphics) {
+		guiGraphics.fill(getX(), getY(), getRight(), getBottom(), Theme.FIELD);
+	}
+
+	@Override
+	protected void extractListSeparators(GuiGraphicsExtractor guiGraphics) {
+	}
+
+	@Override
+	protected void extractSelection(GuiGraphicsExtractor guiGraphics, ShapeListImpl.Entry entry, int colour) {
+		guiGraphics.fill(entry.getX(), entry.getY(), entry.getX() + entry.getWidth(), entry.getY() + entry.getHeight(), Theme.SELECTED);
+		guiGraphics.fill(entry.getX(), entry.getY(), entry.getX() + 2, entry.getY() + entry.getHeight(), Theme.ACCENT);
+	}
+
 	@Override
 	public void extractWidgetRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
-		guiGraphics.fill(getX(), getY(), getRight(), getBottom(), (int) 0x33000000);
 		super.extractWidgetRenderState(guiGraphics, mouseX, mouseY, partialTicks);
 	}
 	

@@ -35,12 +35,13 @@ public abstract class BaseScreen {
 	
 	private IButton buttonClose;
 	private ICheckboxRunnableButton buttonEnabled;
-	private IButton buttonBuildGuide = BuildGuide.widgetHandler.createButton(0, 20, 96, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.shape"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Shape)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Shape);
-	private IButton buttonVisualisation = BuildGuide.widgetHandler.createButton(96, 20, 96, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.visualisation"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Visualisation)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Visualisation);
-	private IButton buttonShapeList = BuildGuide.widgetHandler.createButton(192, 20, 96, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.shapelist"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Shapelist)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Shapelist);
-	private IButton buttonConfiguration = BuildGuide.widgetHandler.createButton(288, 20, 96, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.configuration"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Settings)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Settings);
-	// Five 96-px tabs (0..480, y 20..40) fill a 480-px GUI (six of 80 until the Validation tab went in E6)
-	private IButton buttonExclusions = BuildGuide.widgetHandler.createButton(384, 20, 96, AbstractWidgetHandler.defaultSize, new Translatable("screen.buildguide.exclusions"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Exclusions)), BuildGuide.stateManager.getState().currentScreen != ActiveScreen.Exclusions);
+	// The page bar (the Oficina, 2026-10-28) replaces the old five tabs on every screen but the Oficina itself:
+	// "< Workshop" back to it at x 0..72, then the pages of the screen's section as tabs, the section's name on
+	// the right. Sections are the Oficina's rail: Projects, Check and Config have pages; overlays have none
+	public static final int pageBarTop = 20, pageBarHeight = 20, backWidth = 72, pageTabWidth = 96;
+	public static final int SECTION_CONFIG = 4;
+	private static final String[] sectionKeys = {"screen.buildguide.rail.shapes", "screen.buildguide.rail.projects", "screen.buildguide.rail.scan", "screen.buildguide.rail.check", "screen.buildguide.rail.config"};
+	private int currentPageTab = -1;
 	
 	public void init() {
 		// A screen object can be shown again (back from a dropdown or the preview): its properties are
@@ -56,13 +57,7 @@ public abstract class BaseScreen {
 		
 		addWidget(buttonEnabled);
 		addWidget(buttonClose);
-		if(hasTabs()) {
-			addWidget(buttonBuildGuide);
-			addWidget(buttonVisualisation);
-			addWidget(buttonShapeList);
-			addWidget(buttonConfiguration);
-			addWidget(buttonExclusions);
-		}
+		if(hasTabs()) addPageBar();
 		
 		BuildGuide.stateManager.getState().initCheck();
 	}
@@ -101,7 +96,9 @@ public abstract class BaseScreen {
 	}
 
 	public void renderBackgroundChecked() {
-		if(!tooSmall) renderBackground();
+		if(tooSmall) return;
+		if(hasTabs()) renderChrome();
+		renderBackground();
 	}
 
 	public void renderChecked() {
@@ -128,16 +125,86 @@ public abstract class BaseScreen {
 		// One-line header (D4): "Enabled", the title in the centre, the shape's block count ending just
 		// left of the title and the total starting just right of it (the x 64 + n breakdown is gone)
 		int centre = wrapper.getWidth() / 2, halfTitle = wrapper.getTextWidth(title.toString()) / 2;
-		drawShadowCentred(title.toString(), centre, headerTextY, 0xFFFFFF);
-		drawShadowLeft(textEnabled.toString(), 25, headerTextY, 0xFFFFFF);
+		drawShadowCentred(title.toString(), centre, headerTextY, Theme.rgb(Theme.TEXT));
+		drawShadowLeft(textEnabled.toString(), 25, headerTextY, Theme.rgb(Theme.TEXT_SOFT));
 		int n = BuildGuide.stateManager.getState().isShapeAvailable() ? BuildGuide.stateManager.getState().getCurrentShape().getNumberOfBlocks() : 0;
-		drawShadowRight(titleNumberOfBlocksShape + ": " + n, centre - halfTitle - headerGap, headerTextY, 0xFFFFFF);
-		drawShadowLeft(titleNumberOfBlocksTotal + ": " + BuildGuide.stateManager.getState().getNumberOfBlocks(), centre + halfTitle + headerGap, headerTextY, 0xFFFFFF);
+		drawShadowRight(titleNumberOfBlocksShape + ": " + n, centre - halfTitle - headerGap, headerTextY, Theme.rgb(Theme.TEXT_MUTED));
+		drawShadowLeft(titleNumberOfBlocksTotal + ": " + BuildGuide.stateManager.getState().getNumberOfBlocks(), centre + halfTitle + headerGap, headerTextY, Theme.rgb(Theme.TEXT_MUTED));
 	}
 	
-	// The tab bar at y 20..40. The Shape tab has its own rail instead (the Oficina, 2026-10-27)
+	// The page bar at y 20..40. The Shape tab has its own rail instead (the Oficina, 2026-10-27)
 	protected boolean hasTabs() {
 		return true;
+	}
+
+	// The Oficina section this screen belongs to (ShapeScreen.PROJECTS, CHECK or SECTION_CONFIG); NONE for the
+	// overlays (fill, preview, presets, dropdowns), whose back button acts as Escape
+	protected int section() {
+		return ShapeScreen.NONE;
+	}
+
+	private void addPageBar() {
+		addWidget(BuildGuide.widgetHandler.createButton(0, pageBarTop, backWidth, pageBarHeight, new Translatable("screen.buildguide.page.back"), this::backToOficina));
+		String[] keys;
+		Runnable[] actions;
+		switch(section()) {
+		case ShapeScreen.PROJECTS:
+			keys = new String[] {"screen.buildguide.shapelist", "screen.buildguide.page.presets"};
+			actions = new Runnable[] {() -> openPage(ActiveScreen.Shapelist), () -> BuildGuide.screenHandler.showScreen(new PresetScreen(this))};
+			break;
+		case ShapeScreen.CHECK:
+			keys = new String[] {"screen.buildguide.visualisation", "screen.buildguide.exclusions"};
+			actions = new Runnable[] {() -> openPage(ActiveScreen.Visualisation), () -> openPage(ActiveScreen.Exclusions)};
+			break;
+		case SECTION_CONFIG:
+			keys = new String[] {"screen.buildguide.configuration"};
+			actions = new Runnable[] {() -> openPage(ActiveScreen.Settings)};
+			break;
+		default:
+			keys = new String[0];
+			actions = new Runnable[0];
+		}
+		currentPageTab = -1;
+		for(int i = 0;i < keys.length;++i) {
+			Runnable action = actions[i];
+			addWidget(BuildGuide.widgetHandler.createButton(backWidth + 4 + i * pageTabWidth, pageBarTop, pageTabWidth - 2, pageBarHeight, new Translatable(keys[i]), action::run));
+			if(isPage(keys[i])) currentPageTab = i;
+		}
+	}
+
+	// The tab of this screen, underlined in the page bar
+	private boolean isPage(String key) {
+		ActiveScreen current = BuildGuide.stateManager.getState().currentScreen;
+		return key.equals("screen.buildguide.shapelist") && current == ActiveScreen.Shapelist
+			|| key.equals("screen.buildguide.visualisation") && current == ActiveScreen.Visualisation
+			|| key.equals("screen.buildguide.exclusions") && current == ActiveScreen.Exclusions
+			|| key.equals("screen.buildguide.configuration") && current == ActiveScreen.Settings;
+	}
+
+	private void openPage(ActiveScreen page) {
+		BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(page));
+	}
+
+	// Back to the Oficina with this section's panel open; an overlay goes back the way Escape does
+	private void backToOficina() {
+		int s = section();
+		if(s == ShapeScreen.NONE && onEscape()) return;
+		BuildGuide.stateManager.getState().sidePanel = s == ShapeScreen.PROJECTS || s == ShapeScreen.CHECK ? s : ShapeScreen.NONE;
+		openPage(ActiveScreen.Shape);
+	}
+
+	// The chrome of the screens with the page bar (Theme): the top and page bars on the darkest ground, the
+	// content on the panel colour, the current page underlined, the section's name at the right
+	private void renderChrome() {
+		int w = wrapper.getWidth(), h = wrapper.getHeight(), barBottom = pageBarTop + pageBarHeight;
+		fillRect(0, 0, w, barBottom, Theme.BACKGROUND);
+		fillRect(0, barBottom, w, h, Theme.PANEL);
+		fillRect(0, barBottom - 1, w, barBottom, Theme.BORDER);
+		if(currentPageTab >= 0) {
+			int x = backWidth + 4 + currentPageTab * pageTabWidth;
+			fillRect(x, barBottom - 2, x + pageTabWidth - 2, barBottom, Theme.ACCENT);
+		}
+		if(section() != ShapeScreen.NONE) drawShadowRight(new Translatable(sectionKeys[section()]).toString(), w - 6, pageBarTop + 6, Theme.rgb(Theme.TEXT_FAINT));
 	}
 
 	// Screens that use the bottom band themselves (Shape tab, dropdowns, preview) return false
@@ -155,7 +222,7 @@ public abstract class BaseScreen {
 		}
 		Shape shape = BuildGuide.stateManager.getState().getCurrentShape(); // every Shape is IValidatable
 		ValidationState state = shape.getValidationState();
-		fillRect(barX1, barY1, barX2, barY2, 0xFF303030);
+		fillRect(barX1, barY1, barX2, barY2, Theme.CONTROL);
 		if(!state.isValidated()) {
 			drawShadowLeft("- / " + shape.getExpectedBlocks().size(), barX1, barTextY, 0xAAAAAA);
 			return;
@@ -163,7 +230,7 @@ public abstract class BaseScreen {
 		int ok = state.getOk(), total = state.getTotal(), errors = state.getErrorCount();
 		double progress = state.getProgress();
 		int fillX2 = barX1 + (int) Math.round((barX2 - barX1) * progress);
-		if(fillX2 > barX1) fillRect(barX1, barY1, fillX2, barY2, ok == total ? 0xFF40C040 : 0xFF40A0FF);
+		if(fillX2 > barX1) fillRect(barX1, barY1, fillX2, barY2, ok == total ? Theme.OK : Theme.ACCENT);
 		String text = ok + " / " + total + " (" + String.format(java.util.Locale.ROOT, "%.1f", 100.0 * progress) + "%)";
 		// Structure errors: solid blocks deforming the shape (Etapa 2.5)
 		if(errors > 0) text += "  errors " + errors;
