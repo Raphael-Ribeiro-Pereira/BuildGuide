@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Locale;
 
 import brentmaas.buildguide.common.BuildGuide;
+import brentmaas.buildguide.common.PresetStore;
 import brentmaas.buildguide.common.SmartFill;
 import brentmaas.buildguide.common.State.ActiveScreen;
 import brentmaas.buildguide.common.property.Property;
@@ -15,6 +16,7 @@ import brentmaas.buildguide.common.screen.widget.IButton;
 import brentmaas.buildguide.common.screen.widget.ISlider;
 import brentmaas.buildguide.common.screen.widget.ITextField;
 import brentmaas.buildguide.common.shape.FocusFilter;
+import brentmaas.buildguide.common.shape.LocalPos;
 import brentmaas.buildguide.common.shape.PreviewColours;
 import brentmaas.buildguide.common.shape.PreviewModel;
 import brentmaas.buildguide.common.shape.PreviewModel.ColourMode;
@@ -22,6 +24,7 @@ import brentmaas.buildguide.common.shape.Shape;
 import brentmaas.buildguide.common.shape.ShapeLayers;
 import brentmaas.buildguide.common.shape.ShapeRegistry;
 import brentmaas.buildguide.common.shape.ShapeSet;
+import brentmaas.buildguide.common.shape.ShapeSet.Origin;
 import brentmaas.buildguide.common.shape.ValidationState;
 
 /**
@@ -45,12 +48,17 @@ public class ShapeScreen extends BaseScreen{
 	// The inspector's x for this screen width: the properties are laid out there (Shape.placeRow)
 	public static int propertiesX = basePropertiesX;
 	// Side panels; NONE = closed
-	public static final int NONE = -1, SHAPES = 0, PLACEMENT = 1, SCAN = 2, CHECK = 3;
+	public static final int NONE = -1, SHAPES = 0, PLACEMENT = 1, SCAN = 2, CHECK = 3, CONFIG = 4;
 	private static final String[] railKeys = {"screen.buildguide.rail.shapes", "screen.buildguide.rail.placement", "screen.buildguide.rail.scan", "screen.buildguide.rail.check", "screen.buildguide.rail.config"};
-	public static final String[] panelTitleKeys = {"screen.buildguide.panel.title.shapes", "screen.buildguide.panel.title.placement", "screen.buildguide.panel.title.scan", "screen.buildguide.panel.title.check"};
+	public static final String[] panelTitleKeys = {"screen.buildguide.panel.title.shapes", "screen.buildguide.panel.title.placement", "screen.buildguide.panel.title.scan", "screen.buildguide.panel.title.check", "screen.buildguide.panel.title.config"};
 	private static final int railButtonHeight = 24, railGap = 4;
-	// Header: shape button (opens the shape list), then the instance selector < N/Total >
-	private static final int shapeButtonX = 22, shapeButtonWidth = 110, setPrevX = shapeButtonX + shapeButtonWidth + 4, arrowWidth = 14, setTextWidth = 30;
+	// Header (the prototype's): the shape button (opens the shape list), "< 2 of 3 >", and at the right the two
+	// switches, Preview | World and, with Layers, Status | Layers
+	private static final int shapeButtonX = railWidth + 4, shapeButtonWidth = 96, setPrevX = shapeButtonX + shapeButtonWidth + 4, arrowWidth = 12, setTextWidth = 40, segmentWidth = 44;
+	// The view in the preview's place: the 3D preview, or the loaded world from the top (WorldView)
+	private static boolean worldView = false;
+	private final WorldView world = new WorldView();
+	private int[] switchX = {-1, -1};
 	// Preview controls (two 16-px rows at the top of the preview) only when the preview is at least this wide
 	public static final int controlsMinWidth = 150, controlsHeight = 16, sliceWidth = 50, colourWidth = 80, partWidth = 80, layerWidth = 64, fillWidth = 72, expandSize = 12;
 	public static final int previewTop = top, previewControlsHeight = 20, focusRowHeight = 18, legendHeight = 12;
@@ -69,7 +77,7 @@ public class ShapeScreen extends BaseScreen{
 	private ShapeLayout bands = new ShapeLayout(ShapeLayout.minHeight);
 	private static final String[] axisNames = {"X", "Y", "Z"};
 
-	private Translatable textPreviewHint = new Translatable("screen.buildguide.previewhintinline");
+	private Translatable textPreviewHint = new Translatable("screen.buildguide.preview.hint");
 	private Translatable textGenerating = new Translatable("screen.buildguide.previewgenerating");
 	private Translatable textEmpty = new Translatable("screen.buildguide.previewempty");
 	private Translatable textNoMatch = new Translatable("screen.buildguide.previewnomatch");
@@ -123,6 +131,11 @@ public class ShapeScreen extends BaseScreen{
 		return false;
 	}
 
+	@Override
+	protected boolean hasEnabledCheckbox() {
+		return false;
+	}
+
 	public void init() {
 		super.init();
 		bands = new ShapeLayout(wrapper.getHeight());
@@ -136,15 +149,16 @@ public class ShapeScreen extends BaseScreen{
 		}
 
 		// Header
-		buttonShape = BuildGuide.widgetHandler.createButton(shapeButtonX, 0, shapeButtonWidth, AbstractWidgetHandler.defaultSize, new Translatable(fit(shapeName() + " v", shapeButtonWidth - 8)), () -> openPanel(sidePanel() == SHAPES ? NONE : SHAPES));
-		buttonSetPrevious = BuildGuide.widgetHandler.createButton(setPrevX, 0, arrowWidth, AbstractWidgetHandler.defaultSize, new Translatable("<"), () -> switchShapeSet(-1));
-		buttonSetNext = BuildGuide.widgetHandler.createButton(setPrevX + arrowWidth + setTextWidth, 0, arrowWidth, AbstractWidgetHandler.defaultSize, new Translatable(">"), () -> switchShapeSet(1));
+		buttonShape = BuildGuide.widgetHandler.createButton(shapeButtonX, 2, shapeButtonWidth, 16, new Translatable(fit(shapeName() + " v", shapeButtonWidth - 8)), () -> openPanel(SHAPES)).setStyle(IButton.STYLE_OUTLINE);
+		buttonSetPrevious = BuildGuide.widgetHandler.createButton(setPrevX, 4, arrowWidth, 12, new Translatable("<"), () -> switchShapeSet(-1)).setStyle(IButton.STYLE_RAIL);
+		buttonSetNext = BuildGuide.widgetHandler.createButton(setPrevX + arrowWidth + setTextWidth, 4, arrowWidth, 12, new Translatable(">"), () -> switchShapeSet(1)).setStyle(IButton.STYLE_RAIL);
 		boolean severalSets = BuildGuide.stateManager.getState().shapeSets.size() > 1;
 		buttonSetPrevious.setActive(severalSets);
 		buttonSetNext.setActive(severalSets);
 		addWidget(buttonShape);
 		addWidget(buttonSetPrevious);
 		addWidget(buttonSetNext);
+		initHeaderSwitches();
 
 		initSidePanel(available);
 
@@ -158,6 +172,8 @@ public class ShapeScreen extends BaseScreen{
 		});
 		buttonValidate.setActive(available);
 		buttonReset.setActive(available);
+		buttonValidate.setStyle(IButton.STYLE_OUTLINE);
+		buttonReset.setStyle(IButton.STYLE_OUTLINE);
 		addWidget(buttonValidate);
 		addWidget(buttonReset);
 
@@ -175,6 +191,35 @@ public class ShapeScreen extends BaseScreen{
 		layout();
 	}
 
+	// The header's switches: Preview | World, and Status | Layers while the shape has Layers (in the 3D preview)
+	private void initHeaderSwitches() {
+		switchX = new int[] {-1, -1};
+		int x = wrapper.getWidth() - AbstractWidgetHandler.defaultSize - 4;
+		Shape shape = currentShapeOrNull();
+		if(shape != null && shape.hasLayers() && !worldView) {
+			x -= 2 * segmentWidth + 4;
+			boolean byLayer = preview.getColourMode() == ColourMode.LAYER;
+			addWidget(BuildGuide.widgetHandler.createButton(x + 2, 3, segmentWidth, 14, new Translatable("screen.buildguide.view.status"), () -> setColour(ColourMode.STATUS)).setStyle(byLayer ? IButton.STYLE_SEGMENT : IButton.STYLE_SEGMENT_ON));
+			addWidget(BuildGuide.widgetHandler.createButton(x + 2 + segmentWidth, 3, segmentWidth, 14, new Translatable("screen.buildguide.view.layers"), () -> setColour(ColourMode.LAYER)).setStyle(byLayer ? IButton.STYLE_SEGMENT_ON : IButton.STYLE_SEGMENT));
+			switchX[1] = x;
+			x -= 4;
+		}
+		x -= 2 * segmentWidth + 4;
+		addWidget(BuildGuide.widgetHandler.createButton(x + 2, 3, segmentWidth, 14, new Translatable("screen.buildguide.view.preview"), () -> setWorldView(false)).setStyle(worldView ? IButton.STYLE_SEGMENT : IButton.STYLE_SEGMENT_ON));
+		addWidget(BuildGuide.widgetHandler.createButton(x + 2 + segmentWidth, 3, segmentWidth, 14, new Translatable("screen.buildguide.view.world"), () -> setWorldView(true)).setStyle(worldView ? IButton.STYLE_SEGMENT_ON : IButton.STYLE_SEGMENT));
+		switchX[0] = x;
+	}
+
+	private void setColour(ColourMode mode) {
+		preview.setColourMode(mode);
+		BuildGuide.screenHandler.showScreen(this);
+	}
+
+	private void setWorldView(boolean on) {
+		worldView = on;
+		BuildGuide.screenHandler.showScreen(this);
+	}
+
 	// ---- Side panels (the prototype's left column, 2026-10-28) ----
 
 	private static final int sideRowHeight = 18, rowHeight = 14, groupHeight = 12, sidePad = 6;
@@ -188,9 +233,12 @@ public class ShapeScreen extends BaseScreen{
 		{"screen.buildguide.shapes.group.builds", "shape.buildguide.bridge", "shape.buildguide.polygonbuilding"}};
 	public static final String[] scanShapes = {"shape.buildguide.terrain", "shape.buildguide.farmingland"};
 	private static final String[] scanModeKeys = {"island", "under", "above", "region", "hole"};
-	// Kept between inits (a pick re-inits the screen): the list's scroll and the search text
+	private static final int SCAN_UNDER = 1, SCAN_ABOVE = 2, SCAN_REGION = 3;
+	// Kept between inits (a pick re-inits the screen): the list's scroll, the search text, the scan's choices
 	private static int shapeScroll = 0;
 	private static String shapeFilter = "";
+	private static int scanMode = 0;
+	private static String scanY = "", scanX1 = "", scanY1 = "", scanZ1 = "";
 	// The shape list in order: a group header (button null) or a shape row; its y after layoutShapeList (-1 hidden)
 	private final List<String> listKeys = new ArrayList<String>();
 	private final List<IButton> listButtons = new ArrayList<IButton>();
@@ -198,11 +246,17 @@ public class ShapeScreen extends BaseScreen{
 	private int listTotalHeight = 0;
 	private ITextField textFieldSearch;
 	private IButton buttonValidateNow;
-	// Placement: the cards' row, the world list's header and the saved projects' header
-	private static final int cardsY = top + 16, cardHeight = 28, placeHereY = top + 50, nameLabelY = top + 71, nameY = top + 81, worldY = top + 101, instanceRows = 4;
-	private int savedY = 0;
-	// Scan: the five mode cards, then the shapes that use the ground
-	private static final int scanCardHeight = 23, scanCardsY = top + 16;
+	// Validation: the three "Nearest to you" rows, refreshed twice a second
+	private IButton[] nearestRows = new IButton[0];
+	private long[][] nearest = new long[0][];
+	private long nearestAt = 0;
+	// Placement: the cards, the three actions, the name, the world list's header; the saved header and rows
+	private static final int cardsY = top + 16, cardHeight = 28, placeHereY = top + 48, crosshairY = top + 66, rotateY = top + 84, nameLabelY = top + 105, nameY = top + 115, worldY = top + 134, instanceRows = 3;
+	private int savedY = 0, savedRowsEnd = 0;
+	// Scan: the five modes, then the mode's input, the Scan button and the shapes that use the ground
+	private static final int scanRowHeight = 22, scanRowsY = top + 16, scanInputY = top + 138, scanButtonY = top + 166, scanGroundY = top + 186;
+	// Validation rows
+	private static final int checkRowsY = top + 42, nearestY = top + 92, checkButtonsY = top + 148;
 
 	private int sideX() {
 		return railWidth + sidePad;
@@ -230,6 +284,8 @@ public class ShapeScreen extends BaseScreen{
 	private void initSidePanel(boolean available) {
 		int x = sideX(), w = sideW();
 		buttonValidateNow = null;
+		nearestRows = new IButton[0];
+		nearestAt = 0;
 		listKeys.clear();
 		listButtons.clear();
 		int current = BuildGuide.stateManager.getState().getCurrentShapeIndex();
@@ -269,17 +325,24 @@ public class ShapeScreen extends BaseScreen{
 			break;
 		}
 		case PLACEMENT: {
-			// Where it stands: X / Y / Z cards (the field, - and + in the card's corner), then "At my position"
+			// Where it stands: X / Y / Z cards (the field, - and + in the card's corner), then the three actions
 			int cw = (w - 8) / 3;
 			textFieldX = originCard(x, cw, 0);
 			textFieldY = originCard(x + cw + 4, cw, 1);
 			textFieldZ = originCard(x + 2 * (cw + 4), cw, 2);
 			addWidget(BuildGuide.widgetHandler.createButton(x, placeHereY, w, 16, new Translatable("screen.buildguide.placement.here"), () -> setOrigin()).setStyle(IButton.STYLE_SOFT));
+			IButton crosshair = BuildGuide.widgetHandler.createButton(x, crosshairY, w, 16, new Translatable("screen.buildguide.placement.crosshair"), () -> setOriginAtCrosshair()).setStyle(IButton.STYLE_SOFT);
+			crosshair.setActive(available && BuildGuide.shapeHandler.crosshairBlock() != null);
+			addWidget(crosshair);
+			// Rotating a shape is not in the generator yet: shown as in the prototype, not clickable
+			IButton rotate = BuildGuide.widgetHandler.createButton(x, rotateY, w, 16, new Translatable("screen.buildguide.placement.rotate"), () -> {}).setStyle(IButton.STYLE_OUTLINE);
+			rotate.setActive(false);
+			addWidget(rotate);
 			// This instance's name (Enter stores it)
 			textFieldName = BuildGuide.widgetHandler.createTextField(x, nameY, w, 14, available ? instanceName() : "");
 			textFieldName.setOnEnter(() -> applyName());
 			addWidget(textFieldName);
-			// In this world: up to four instances around the current one, then the full list
+			// In this world: up to three instances around the current one, then the full list
 			int count = BuildGuide.stateManager.getState().shapeSets.size(), set = BuildGuide.stateManager.getState().getShapeSetIndex();
 			int first = Math.max(0, Math.min(set - 1, count - instanceRows)), ry = worldY + 11;
 			for(int i = first;i < Math.min(count, first + instanceRows);++i) {
@@ -288,16 +351,54 @@ public class ShapeScreen extends BaseScreen{
 				ry += rowHeight;
 			}
 			addWidget(BuildGuide.widgetHandler.createButton(x, ry, w, rowHeight - 1, new Translatable("screen.buildguide.placement.all", "" + count), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Shapelist))).setStyle(IButton.STYLE_GHOST));
-			// Saved projects: presets, carried to any world
+			// Saved projects (presets, carried to any world): Save, then each saved one with Open
 			savedY = ry + rowHeight + 4;
-			addWidget(BuildGuide.widgetHandler.createButton(x, savedY + 11, w, 16, new Translatable("screen.buildguide.placement.save"), () -> BuildGuide.screenHandler.showScreen(new PresetScreen(this))).setStyle(IButton.STYLE_PRIMARY));
-			addWidget(BuildGuide.widgetHandler.createButton(x, savedY + 29, w, rowHeight - 1, new Translatable("screen.buildguide.placement.open"), () -> BuildGuide.screenHandler.showScreen(new PresetScreen(this))).setStyle(IButton.STYLE_GHOST));
+			IButton save = BuildGuide.widgetHandler.createButton(x, savedY + 11, w, 16, new Translatable("screen.buildguide.placement.save"), () -> BuildGuide.screenHandler.showScreen(new PresetScreen(this))).setStyle(IButton.STYLE_PRIMARY);
+			save.setActive(available);
+			addWidget(save);
+			int sy = savedY + 30;
+			for(int slot = 0;slot < PresetStore.numSlots;++slot) {
+				if(BuildGuide.presets.isEmpty(slot) || sy + rowHeight - 1 > wrapper.getHeight() - 2) continue;
+				final int s = slot;
+				IButton open = BuildGuide.widgetHandler.createButton(x, sy, w, rowHeight - 1, new Translatable(presetLabel(slot) + "\t" + new Translatable("screen.buildguide.placement.openone")), () -> loadPreset(s)).setStyle(IButton.STYLE_ROW_ACTION);
+				open.setActive(available);
+				addWidget(open);
+				sy += rowHeight;
+			}
+			savedRowsEnd = sy;
 			refreshOriginFields();
 			break;
 		}
 		case SCAN: {
-			// The modes are the next stage (drawn as cards); the shapes that use the real ground work now
-			int uy = scanCardsY + scanModeKeys.length * (scanCardHeight + 2) + 4 + 11;
+			// The five modes (one chosen), the chosen mode's input, then Scan: the reading itself is the next
+			// stage, so its button is not clickable yet. The shapes that use the real ground work now
+			for(int i = 0;i < scanModeKeys.length;++i) {
+				final int mode = i;
+				addWidget(BuildGuide.widgetHandler.createButton(x, scanRowsY + i * (scanRowHeight + 2), w, scanRowHeight, new Translatable("screen.buildguide.scan." + scanModeKeys[i]), () -> {
+					scanMode = mode;
+					BuildGuide.screenHandler.showScreen(this);
+				}).setStyle(i == scanMode ? IButton.STYLE_GHOST_SELECTED : IButton.STYLE_GHOST));
+			}
+			if(scanMode == SCAN_UNDER || scanMode == SCAN_ABOVE) {
+				ITextField field = BuildGuide.widgetHandler.createTextField(x, scanInputY + 10, w, 14, scanY);
+				field.setOnEnter(() -> scanY = field.getTextValue().trim());
+				addWidget(field);
+			}else if(scanMode == SCAN_REGION) {
+				int cw = (w - 8) / 3;
+				ITextField fx = BuildGuide.widgetHandler.createTextField(x, scanInputY + 10, cw, 14, scanX1);
+				ITextField fy = BuildGuide.widgetHandler.createTextField(x + cw + 4, scanInputY + 10, cw, 14, scanY1);
+				ITextField fz = BuildGuide.widgetHandler.createTextField(x + 2 * (cw + 4), scanInputY + 10, cw, 14, scanZ1);
+				fx.setOnEnter(() -> scanX1 = fx.getTextValue().trim());
+				fy.setOnEnter(() -> scanY1 = fy.getTextValue().trim());
+				fz.setOnEnter(() -> scanZ1 = fz.getTextValue().trim());
+				addWidget(fx);
+				addWidget(fy);
+				addWidget(fz);
+			}
+			IButton scan = BuildGuide.widgetHandler.createButton(x, scanButtonY, w, 16, new Translatable("screen.buildguide.scan.run"), () -> {}).setStyle(IButton.STYLE_PRIMARY);
+			scan.setActive(false);
+			addWidget(scan);
+			int uy = scanGroundY + 11;
 			for(String key: scanShapes) {
 				int index = registryIndex(key);
 				if(index < 0) continue;
@@ -314,12 +415,44 @@ public class ShapeScreen extends BaseScreen{
 			}).setStyle(IButton.STYLE_PRIMARY);
 			buttonValidateNow.setActive(available);
 			addWidget(buttonValidateNow);
-			addWidget(BuildGuide.widgetHandler.createButton(x, top + 100, w, 16, new Translatable("screen.buildguide.panel.findblocks"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Visualisation))).setStyle(IButton.STYLE_OUTLINE));
-			addWidget(BuildGuide.widgetHandler.createButton(x, top + 118, w, 16, new Translatable("screen.buildguide.check.exclusions"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Exclusions))).setStyle(IButton.STYLE_OUTLINE));
+			// Nearest to you: a click lights that block in the world (again: off)
+			nearestRows = new IButton[3];
+			for(int i = 0;i < nearestRows.length;++i) {
+				final int row = i;
+				nearestRows[i] = BuildGuide.widgetHandler.createButton(x, nearestY + 11 + i * rowHeight, w, rowHeight - 1, new Translatable(""), () -> highlightNearest(row)).setStyle(IButton.STYLE_GHOST);
+				nearestRows[i].setVisibility(false);
+				addWidget(nearestRows[i]);
+			}
+			addWidget(BuildGuide.widgetHandler.createButton(x, checkButtonsY, w, 16, new Translatable("screen.buildguide.panel.findblocks"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Visualisation))).setStyle(IButton.STYLE_OUTLINE));
+			addWidget(BuildGuide.widgetHandler.createButton(x, checkButtonsY + 18, w, 16, new Translatable("screen.buildguide.check.exclusions"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Exclusions))).setStyle(IButton.STYLE_OUTLINE));
+			break;
+		}
+		case CONFIG: {
+			// The prototype's settings: a row per option with an on / off pill, then the full configuration screen
+			int y = top + 16;
+			y = toggleRow(x, y, w, "screen.buildguide.config.showinworld", BuildGuide.stateManager.getState().isEnabled(), () -> {
+				BuildGuide.stateManager.getState().setEnabled(!BuildGuide.stateManager.getState().isEnabled());
+				BaseScreen.shouldUpdatePersistence = true;
+			});
+			y = toggleRow(x, y, w, "screen.buildguide.config.async", BuildGuide.config.asyncEnabled.value, () -> BuildGuide.config.asyncEnabled.setValue(!BuildGuide.config.asyncEnabled.value));
+			y = toggleRow(x, y, w, "screen.buildguide.config.persistence", BuildGuide.config.persistenceEnabled.value, () -> BuildGuide.config.persistenceEnabled.setValue(!BuildGuide.config.persistenceEnabled.value));
+			y = toggleRow(x, y, w, "screen.buildguide.config.randomcolours", BuildGuide.config.shapeListRandomColorsDefaultEnabled.value, () -> BuildGuide.config.shapeListRandomColorsDefaultEnabled.setValue(!BuildGuide.config.shapeListRandomColorsDefaultEnabled.value));
+			addWidget(BuildGuide.widgetHandler.createButton(x, y + 6, w, 16, new Translatable("screen.buildguide.config.all"), () -> BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Settings))).setStyle(IButton.STYLE_OUTLINE));
 			break;
 		}
 		default:
 		}
+	}
+
+	// A settings row: the label and an on / off pill; a click flips it, stores the configuration and redraws
+	private int toggleRow(int x, int y, int w, String key, boolean on, Runnable flip) {
+		String state = new Translatable(on ? "screen.buildguide.config.on" : "screen.buildguide.config.off").toString();
+		addWidget(BuildGuide.widgetHandler.createButton(x, y, w, 18, new Translatable(new Translatable(key).toString() + "\t" + state), () -> {
+			flip.run();
+			BuildGuide.config.write();
+			BuildGuide.screenHandler.showScreen(this);
+		}).setStyle(on ? IButton.STYLE_TOGGLE_ON : IButton.STYLE_TOGGLE_OFF));
+		return y + 20;
 	}
 
 	private void addShapeRow(String key, int x, int w, int current, boolean available) {
@@ -387,16 +520,32 @@ public class ShapeScreen extends BaseScreen{
 		return (index + 1) + " \u00B7 " + name;
 	}
 
+	// A saved project's row: its name (or "-") and its shape
+	private static String presetLabel(int slot) {
+		String[] parts = PresetStore.describe(BuildGuide.presets.get(slot));
+		String shape = "?";
+		for(int i = 0;i < ShapeRegistry.getNumberOfShapes();++i) {
+			if(ShapeRegistry.getClassIdentifier(i).equals(parts[0])) shape = new Translatable(ShapeRegistry.getTranslationKey(i)).toString();
+		}
+		return (parts[1] != null ? parts[1] + " \u00B7 " : "") + shape;
+	}
+
+	// Open a saved project into this instance, as the preset menu's Load does
+	private void loadPreset(int slot) {
+		if(!BuildGuide.stateManager.getState().isShapeAvailable()) return;
+		Shape before = BuildGuide.stateManager.getState().getCurrentShape();
+		String problem = BuildGuide.stateManager.getState().getCurrentShapeSet().applyPreset(BuildGuide.presets.get(slot));
+		if(problem != null) return;
+		if(before != BuildGuide.stateManager.getState().getCurrentShape()) before.onDeselectedInGUI();
+		BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Shape));
+	}
+
 	private void selectShapeSet(int index) {
 		BuildGuide.stateManager.getState().setShapeSetIndex(index);
 		BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Shape));
 	}
 
 	private void openPanel(int panel) {
-		if(panel == railKeys.length - 1) {
-			BuildGuide.screenHandler.showScreen(BuildGuide.stateManager.getState().createNewScreen(ActiveScreen.Settings));
-			return;
-		}
 		BuildGuide.stateManager.getState().sidePanel = panel == sidePanel() ? NONE : panel;
 		BuildGuide.screenHandler.showScreen(this);
 	}
@@ -454,17 +603,17 @@ public class ShapeScreen extends BaseScreen{
 			sectionLabel("screen.buildguide.placement.name", nameLabelY);
 			sectionLabel("screen.buildguide.placement.world", worldY + 2);
 			sectionLabel("screen.buildguide.placement.saved", savedY + 2);
+			if(savedRowsEnd == savedY + 30 && savedY + 32 < wrapper.getHeight() - 8) drawTextLeft(new Translatable("screen.buildguide.placement.none").toString(), x + 6, savedY + 33, Theme.TEXT_FAINT);
 			break;
 		}
 		case SCAN: {
-			drawTextRight(new Translatable("screen.buildguide.scan.soon").toString(), x + w, top + 5, Theme.WARN);
 			for(int i = 0;i < scanModeKeys.length;++i) {
-				int y = scanCardsY + i * (scanCardHeight + 2);
-				fillRound(x, y, x + w, y + scanCardHeight, Theme.SURFACE);
-				drawTextLeft(fit(new Translatable("screen.buildguide.scan." + scanModeKeys[i]).toString(), w - 10), x + 6, y + 3, Theme.TEXT_SOFT);
-				drawTextLeft(fit(new Translatable("screen.buildguide.scan." + scanModeKeys[i] + ".hint").toString(), w - 10), x + 6, y + 13, Theme.TEXT_FAINT);
+				int y = scanRowsY + i * (scanRowHeight + 2);
+				drawTextLeft(fit(new Translatable("screen.buildguide.scan." + scanModeKeys[i] + ".hint").toString(), w - 12), x + 6, y + 12, Theme.TEXT_MUTED);
 			}
-			sectionLabel("screen.buildguide.scan.usenow", scanCardsY + scanModeKeys.length * (scanCardHeight + 2) + 6);
+			if(scanMode == SCAN_UNDER || scanMode == SCAN_ABOVE) drawTextLeft(new Translatable("screen.buildguide.scan.toy").toString(), x, scanInputY + 1, Theme.TEXT_MUTED);
+			else if(scanMode == SCAN_REGION) drawTextLeft(new Translatable("screen.buildguide.scan.box").toString(), x, scanInputY + 1, Theme.TEXT_MUTED);
+			sectionLabel("screen.buildguide.scan.usenow", scanGroundY + 2);
 			break;
 		}
 		case CHECK: {
@@ -472,6 +621,7 @@ public class ShapeScreen extends BaseScreen{
 			int[] counts = ValidationListComponent.counts(shape);
 			if(buttonValidateNow != null) buttonValidateNow.setVisibility(counts == null);
 			if(counts == null) {
+				for(IButton row: nearestRows) row.setVisibility(false);
 				drawTextLeft(fit(new Translatable("screen.buildguide.check.notvalidated").toString(), w), x, top + 18, Theme.TEXT_SOFT);
 				drawTextLeft(fit(new Translatable("screen.buildguide.check.toverify", "" + shape.getExpectedBlocks().size()).toString(), w), x, top + 30, Theme.TEXT_FAINT);
 				break;
@@ -485,14 +635,59 @@ public class ShapeScreen extends BaseScreen{
 			int[] colours = {Theme.OK, Theme.TEXT_MUTED, Theme.WARN, Theme.ERROR};
 			int[] values = {state.getOk(), counts[1], counts[3], counts[0]};
 			for(int i = 0;i < labels.length;++i) {
-				int y = top + 42 + i * 12;
+				int y = checkRowsY + i * 12;
 				drawTextLeft(new Translatable(labels[i]).toString(), x, y, colours[i]);
 				drawTextRight("\u00A7l" + values[i], x + w, y, Theme.TEXT);
 			}
+			sectionLabel("screen.buildguide.check.nearest", nearestY + 2);
+			refreshNearest(shape);
 			break;
 		}
 		default:
 		}
+	}
+
+	// The three problems closest to the player, read again twice a second: "x y z \u00B7 what"
+	private void refreshNearest(Shape shape) {
+		long now = System.currentTimeMillis();
+		if(now - nearestAt < 500) return;
+		nearestAt = now;
+		Origin player = BuildGuide.shapeHandler.getPlayerPosition();
+		nearest = ValidationListComponent.nearest(shape, player.x, player.y, player.z, nearestRows.length);
+		ValidationState state = shape.getValidationState();
+		int ox = state.getScanOriginX(), oy = state.getScanOriginY(), oz = state.getScanOriginZ();
+		for(int i = 0;i < nearestRows.length;++i) {
+			if(i >= nearest.length) {
+				nearestRows[i].setVisibility(false);
+				continue;
+			}
+			long pos = nearest[i][0];
+			int kind = (int) nearest[i][1];
+			String what = kind == 0 ? state.getBlockName(pos) : kind == 1 ? new Translatable("screen.buildguide.check.kind.error").toString() : kind == 2 ? new Translatable("screen.buildguide.check.kind.layer").toString() : new Translatable("screen.buildguide.check.kind.missing").toString();
+			nearestRows[i].setTitle(new Translatable((ox + LocalPos.unpackX(pos)) + " " + (oy + LocalPos.unpackY(pos)) + " " + (oz + LocalPos.unpackZ(pos)) + " \u00B7 " + (what == null ? "?" : what)));
+			nearestRows[i].setStyle(pos == state.getHighlightedPos() ? IButton.STYLE_GHOST_SELECTED : IButton.STYLE_GHOST);
+			nearestRows[i].setVisibility(true);
+		}
+	}
+
+	private void highlightNearest(int row) {
+		Shape shape = currentShapeOrNull();
+		if(shape == null || row >= nearest.length) return;
+		ValidationState state = shape.getValidationState();
+		long pos = nearest[row][0];
+		state.setHighlightedPos(pos == state.getHighlightedPos() ? -1 : pos);
+		nearestAt = 0;
+	}
+
+	// "At the crosshair block": the shape stands on the block the crosshair was on when the screen opened
+	private void setOriginAtCrosshair() {
+		int[] hit = BuildGuide.shapeHandler.crosshairBlock();
+		if(hit == null || !BuildGuide.stateManager.getState().isShapeAvailable()) return;
+		BuildGuide.stateManager.getState().setOriginX(hit[0]);
+		BuildGuide.stateManager.getState().setOriginY(hit[1] + 1);
+		BuildGuide.stateManager.getState().setOriginZ(hit[2]);
+		BaseScreen.shouldUpdatePersistence = true;
+		refreshOriginFields();
 	}
 
 	// ---- Rendering ----
@@ -507,6 +702,8 @@ public class ShapeScreen extends BaseScreen{
 		fillRect(px1() - 1, previewTop, px2() + 1, bands.previewBottom, Theme.BORDER);
 		fillRect(px1(), previewTop + 1, px2(), bands.previewBottom - 1, Theme.FIELD);
 		fillRect(inspectorX(), top, wrapper.getWidth(), h, Theme.PANEL);
+		fillRect(px1() - 1, bands.previewBottom, px2() + 1, h, Theme.BACKGROUND);
+		for(int x: switchX) if(x >= 0) fillRound(x, 1, x + 2 * segmentWidth + 4, 19, Theme.FIELD);
 	}
 
 	public void render() {
@@ -517,26 +714,27 @@ public class ShapeScreen extends BaseScreen{
 		renderPreview();
 		renderStatusLine();
 		renderLegend();
+		drawTextCentred("\u00A7lBG", railWidth / 2, 6, Theme.ACCENT);
 		Shape shape = currentShapeOrNull();
 		if(shape == null) return;
-		int[] headerY = headerPositions(shape);
-		for(int s = 0;s < shape.getSectionCount();++s) renderSectionHeader(headerY[s], shape.getSectionName(s).toString(), shape.countRows(s), s == shape.getOpenSection());
+		renderTabs(shape);
 	}
 
 	private void renderHeaderText() {
 		int count = BuildGuide.stateManager.getState().shapeSets.size();
 		int index = BuildGuide.stateManager.getState().getShapeSetIndex();
-		drawShadowCentred(count == 0 ? "-" : (index + 1) + "/" + count, setPrevX + arrowWidth + setTextWidth / 2, headerTextY, 0xFFFFFF);
-		// The instance's name after the selector, up to the close button
-		int nameX = setPrevX + 2 * arrowWidth + setTextWidth + 6, nameEnd = wrapper.getWidth() - AbstractWidgetHandler.defaultSize - 4;
-		if(count > 0 && nameEnd > nameX + 20) drawShadowLeft(fit(instanceName(), nameEnd - nameX), nameX, headerTextY, 0xAAAAAA);
+		drawTextCentred(count == 0 ? "-" : new Translatable("screen.buildguide.header.instance", "" + (index + 1), "" + count).toString(), setPrevX + arrowWidth + setTextWidth / 2, headerTextY, Theme.TEXT_FAINT);
 	}
 
 	private void renderPreview() {
 		int x1 = px1(), x2 = px2(), y1 = previewAreaTop(), y2 = previewAreaBottom();
-		if(!compact()) drawShadowCentred(fit(textPreviewHint.toString(), x2 - x1 - 4), (x1 + x2) / 2, y2 + 1, 0x888888);
 		Shape shape = currentShapeOrNull();
 		if(shape == null) return;
+		if(worldView) {
+			renderWorldView(shape, x1, x2);
+			return;
+		}
+		if(!compact()) drawTextRight(fit(textPreviewHint.toString(), (x2 - x1) / 2), x2 - 4, y1 + 3, Theme.TEXT_FAINT);
 		updateSlice();
 		PreviewModel model = preview.update(shape);
 		shownModel = model;
@@ -558,46 +756,76 @@ public class ShapeScreen extends BaseScreen{
 		if(blocks > largeShapeBlocks) drawShadowRight(new Translatable("screen.buildguide.largeshape", "" + blocks).toString(), x2 - 3, y2 - 10, 0xFFCC66);
 	}
 
-	// Under the preview: the progress line, then "Missing N   built ok / total" left of Fill
+	// See in the world: the loaded ground from the top with the shape in blue, a note at the top and at the foot
+	private void renderWorldView(Shape shape, int x1, int x2) {
+		int y1 = previewTop + 1, y2 = bands.previewBottom - 1;
+		world.draw(this, x1, y1, x2, y2, shape, BuildGuide.stateManager.getState().getCurrentShapeSet());
+		chip(new Translatable("screen.buildguide.world.title").toString(), x1 + 4, y1 + 4, x2 - x1 - 8);
+		chip(new Translatable("screen.buildguide.world.note", "" + world.getStep()).toString(), x1 + 4, y2 - 16, x2 - x1 - 8);
+	}
+
+	// A note on a dark rounded ground, over the preview
+	private void chip(String text, int x, int y, int maxWidth) {
+		String shown = fit(text, maxWidth - 8);
+		fillRound(x, y, x + wrapper.getTextWidth(shown) + 8, y + 12, Theme.OVERLAY);
+		drawTextLeft(shown, x + 4, y + 2, Theme.TEXT_SOFT);
+	}
+
+	// The status bar (the prototype's): "12430 blocks", a short bar, "82% built", the problems; Fill at the right
 	private void renderStatusLine() {
-		int x1 = px1(), x2 = px2(), progressBottom = bands.progressTop + 2, textWidth = x2 - x1 - fillWidth - 8;
+		int x = px1() + 3, end = px2() - fillWidth - 6, y = bands.previewBottom + 6;
 		Shape shape = currentShapeOrNull();
-		fillRect(x1, bands.progressTop, x2, progressBottom, Theme.CONTROL);
 		if(shape == null) {
-			drawShadowLeft("-", x1 + 3, bands.statusTextY, 0x888888);
+			drawTextLeft("-", x, y, Theme.TEXT_FAINT);
 			return;
 		}
+		x = statusPiece("\u00A7l" + shape.getNumberOfBlocks() + "\u00A7r " + new Translatable("screen.buildguide.status.blocks"), x, end, y, Theme.TEXT_SOFT);
 		ValidationState state = shape.getValidationState();
 		int[] counts = ValidationListComponent.counts(shape);
 		if(counts == null) {
-			drawShadowLeft(fit(new Translatable("screen.buildguide.status.notvalidated", "" + shape.getExpectedBlocks().size()).toString(), textWidth), x1 + 3, bands.statusTextY, 0xAAAAAA);
+			statusPiece(new Translatable("screen.buildguide.check.notvalidated").toString(), x, end, y, Theme.TEXT_FAINT);
 			return;
 		}
-		int fill = x1 + (int) Math.round((x2 - x1) * state.getProgress());
-		if(fill > x1) fillRect(x1, bands.progressTop, fill, progressBottom, state.getOk() == state.getTotal() ? Theme.OK : Theme.ACCENT);
-		String percent = String.format(java.util.Locale.ROOT, "%.1f%%", 100.0 * state.getProgress());
-		String text = new Translatable("screen.buildguide.status.missing", "" + counts[1]) + "   " + new Translatable("screen.buildguide.status.built", "" + state.getOk(), "" + state.getTotal(), percent);
-		if(counts[0] > 0) text += "   " + new Translatable("screen.buildguide.status.errors", "" + counts[0]);
-		if(counts[3] > 0) text += "   " + new Translatable("screen.buildguide.status.wronglayer", "" + counts[3]);
-		drawShadowLeft(fit(text, textWidth), x1 + 3, bands.statusTextY, counts[0] > 0 ? 0xFF8080 : 0xFFFFFF);
+		if(x + 40 <= end) {
+			fillRound(x, y + 2, x + 36, y + 6, Theme.CONTROL);
+			int fill = x + (int) Math.round(36 * state.getProgress());
+			if(fill > x + 1) fillRound(x, y + 2, fill, y + 6, state.getOk() == state.getTotal() ? Theme.OK : Theme.ACCENT);
+			x += 42;
+		}
+		x = statusPiece(new Translatable("screen.buildguide.status.builtpercent", String.format(Locale.ROOT, "%.0f%%", 100.0 * state.getProgress())).toString(), x, end, y, Theme.OK);
+		if(counts[3] > 0) x = statusPiece(new Translatable("screen.buildguide.status.wronglayercount", "" + counts[3]).toString(), x, end, y, Theme.WARN);
+		if(counts[0] > 0) statusPiece(new Translatable("screen.buildguide.status.errorscount", "" + counts[0]).toString(), x, end, y, Theme.ERROR);
 	}
 
-	// The colour legend at the foot of the preview: by status (with the wrong-layer orange under a palette), or by
-	// layer with what each layer is
+	// One piece of the status bar if it fits before end; the x after it (end when it did not fit)
+	private int statusPiece(String text, int x, int end, int y, int colour) {
+		int width = wrapper.getTextWidth(text);
+		if(x + width > end) return end;
+		drawTextLeft(text, x, y, colour);
+		return x + width + 8;
+	}
+
+	// The colour legend at the foot of the preview as the prototype's chips: by status (with the wrong-layer orange
+	// under a palette), or by layer with what each layer is; the chips that do not fit are left out
 	private static final String[] legendKeys = {"screen.buildguide.legend.built", "screen.buildguide.legend.errors", "screen.buildguide.legend.ignored", "screen.buildguide.legend.missing"};
 	private static final int[] legendColours = {PreviewColours.OK, PreviewColours.ERROR, PreviewColours.IGNORED, PreviewColours.MISSING};
 	public static final int legendSwatch = 8, legendTextX = 11;
 
 	private void renderLegend() {
+		if(worldView) return;
 		boolean byLayer = shownModel != null && shownModel.colourMode == ColourMode.LAYER;
 		int entries = byLayer ? shownModel.layers.count() : hasPalette() ? legendKeys.length + 1 : legendKeys.length;
-		int x1 = px1(), step = (px2() - x1) / entries, y = bands.legendY;
+		int x = px1() + 3, end = px2() - 3, y = bands.legendY;
 		for(int i = 0;i < entries;++i) {
-			int x = x1 + i * step;
 			boolean wrongLayer = i == legendKeys.length;
-			fillRect(x + 2, y, x + 2 + legendSwatch, y + legendSwatch, 0xFF000000 | (byLayer ? ShapeLayers.colour(i + 1) : wrongLayer ? PreviewColours.WRONG_LAYER : legendColours[i]));
+			int colour = 0xFF000000 | (byLayer ? ShapeLayers.colour(i + 1) : wrongLayer ? PreviewColours.WRONG_LAYER : legendColours[i]);
 			String text = byLayer ? legendLabel(i + 1, shownModel.layers.legend(i + 1)) : new Translatable(wrongLayer ? "screen.buildguide.legend.wronglayer" : legendKeys[i]).toString();
-			drawShadowLeft(fit(text, step - legendTextX - 2), x + legendTextX, y, 0xAAAAAA);
+			int width = 14 + wrapper.getTextWidth(text) + 4;
+			if(x + width > end) break;
+			fillRound(x, y - 1, x + width, y + 10, Theme.CHIP);
+			fillRect(x + 4, y + 1, x + 10, y + 7, colour);
+			drawTextLeft(text, x + 14, y + 1, Theme.TEXT_SOFT);
+			x += width + 3;
 		}
 	}
 
@@ -633,7 +861,8 @@ public class ShapeScreen extends BaseScreen{
 		buttonFocusPart = null;
 		buttonPreviewExpand = BuildGuide.widgetHandler.createButton(x2 - expandSize - 2, y, expandSize, expandSize, new Translatable("+"), () -> BuildGuide.screenHandler.showScreen(new PreviewScreen(this)));
 		buttonPreviewExpand.setActive(available);
-		addWidget(buttonPreviewExpand);
+		buttonPreviewExpand.setStyle(IButton.STYLE_OUTLINE);
+		if(!worldView) addWidget(buttonPreviewExpand);
 		// Fill at the status bar's right end
 		fillTitle = SmartFill.title();
 		buttonFill = BuildGuide.widgetHandler.createButton(x2 - fillWidth, bands.previewBottom + 2, fillWidth, controlsHeight, new Translatable(fillTitle), () -> {
@@ -642,21 +871,15 @@ public class ShapeScreen extends BaseScreen{
 			updateFillTitle();
 		});
 		buttonFill.setActive(available);
+		buttonFill.setStyle(IButton.STYLE_PRIMARY);
 		addWidget(buttonFill);
-		if(compact()) return;
-		// Row 1: colour (with Layers on), slice axis, slice slider. Row 2: Part, Layer
+		if(compact() || worldView) return;
+		// Row 1: slice axis, slice slider (the colour is the header's Status | Layers). Row 2: Part, Layer
 		int colourSpace = 0;
-		if(layerControls) {
-			buttonColour = BuildGuide.widgetHandler.createButton(x, y, colourWidth, controlsHeight, new Translatable(preview.getColourMode() == ColourMode.LAYER ? "screen.buildguide.colour.layer" : "screen.buildguide.colour.status"), () -> {
-				preview.setColourMode(preview.getColourMode() == ColourMode.LAYER ? ColourMode.STATUS : ColourMode.LAYER);
-				BuildGuide.screenHandler.showScreen(this);
-			});
-			addWidget(buttonColour);
-			colourSpace = colourWidth + 2;
-		}
 		String axisName = axis == PreviewModel.SLICE_OFF ? new Translatable("screen.buildguide.slice.off").toString() : axisNames[axis];
 		buttonSliceAxis = BuildGuide.widgetHandler.createButton(x + colourSpace, y, sliceWidth, controlsHeight, new Translatable("screen.buildguide.slice", axisName), () -> cycleSliceAxis());
 		buttonSliceAxis.setActive(available);
+		buttonSliceAxis.setStyle(IButton.STYLE_OUTLINE);
 		addWidget(buttonSliceAxis);
 		PreviewModel model = preview.getModel();
 		int sliderX = x + colourSpace + sliceWidth + 2, sliderW = x2 - expandSize - 4 - sliderX;
@@ -671,6 +894,7 @@ public class ShapeScreen extends BaseScreen{
 			buttonFocusPart.setTitle(partTitle(s));
 		});
 		buttonFocusPart.setActive(available);
+		buttonFocusPart.setStyle(IButton.STYLE_OUTLINE);
 		addWidget(buttonFocusPart);
 		if(layerControls) {
 			buttonFocusLayer = BuildGuide.widgetHandler.createButton(x + partWidth + 2, focusRowY, layerWidth, controlsHeight, layerTitle(shape), () -> {
@@ -679,6 +903,7 @@ public class ShapeScreen extends BaseScreen{
 				s.setFocus(s.getFocusPart(), FocusFilter.nextLayer(s.getFocusLayer(), s.getLayers() != null ? s.getLayers().count() : ShapeLayers.COUNT));
 				buttonFocusLayer.setTitle(layerTitle(s));
 			});
+			buttonFocusLayer.setStyle(IButton.STYLE_OUTLINE);
 			addWidget(buttonFocusLayer);
 		}
 	}
@@ -753,34 +978,46 @@ public class ShapeScreen extends BaseScreen{
 		return x >= px1() && x < px2() && y >= previewAreaTop() && y < previewAreaBottom();
 	}
 
-	// ---- Inspector (the accordion of the shape's sections) ----
+	// ---- Inspector (the prototype's tabs: one per section of the shape, on one row or two) ----
 
-	// Header strip: "> Name" or "v Name" on a dark strip, the row count on the right
-	private void renderSectionHeader(int y, String name, int rows, boolean open) {
-		int ix = inspectorX();
-		fillRect(ix, y, wrapper.getWidth(), y + headerHeight - 1, open ? Theme.SELECTED : Theme.SURFACE);
-		if(open) fillRect(ix, y, ix + 2, y + headerHeight - 1, Theme.ACCENT);
-		drawShadowLeft(fit((open ? "v " : "> ") + name, panelWidth - 24), ix + 4, y + 1, Theme.rgb(open ? Theme.TEXT : Theme.TEXT_SOFT));
-		drawShadowRight("" + rows, wrapper.getWidth() - 4, y + 1, Theme.rgb(Theme.TEXT_FAINT));
+	public static final int tabHeight = 14;
+
+	private static int tabsPerRow(Shape shape) {
+		int n = shape.getSectionCount();
+		return n <= 3 ? Math.max(1, n) : (n + 1) / 2;
 	}
 
-	// Y of every section header; the open section's rows follow its header
-	private int[] headerPositions(Shape shape) {
-		int[] headerY = new int[shape.getSectionCount()];
-		int y = accordionTop;
-		for(int s = 0;s < shape.getSectionCount();++s) {
-			headerY[s] = y;
-			y += headerHeight;
-			if(s == shape.getOpenSection()) y += shape.countRows(s) * Property.rowHeight;
+	private static int tabRows(Shape shape) {
+		return (shape.getSectionCount() + tabsPerRow(shape) - 1) / tabsPerRow(shape);
+	}
+
+	// Tab i's box {x1, y1, x2, y2}
+	private int[] tabBox(Shape shape, int i) {
+		int perRow = tabsPerRow(shape), ix = inspectorX(), w = panelWidth / perRow;
+		int row = i / perRow, column = i % perRow;
+		int x1 = ix + column * w, x2 = column == perRow - 1 ? wrapper.getWidth() : x1 + w;
+		return new int[] {x1, accordionTop + row * tabHeight, x2, accordionTop + (row + 1) * tabHeight};
+	}
+
+	// The open tab in white with the accent under it, the others muted; a line under the tabs
+	private void renderTabs(Shape shape) {
+		int open = shape.getOpenSection();
+		for(int i = 0;i < shape.getSectionCount();++i) {
+			int[] box = tabBox(shape, i);
+			boolean on = i == open;
+			if(on) fillRect(box[0] + 2, box[3] - 2, box[2] - 2, box[3], Theme.ACCENT);
+			drawTextCentred(fit(shape.getSectionName(i).toString(), box[2] - box[0] - 4), (box[0] + box[2]) / 2, box[1] + 3, on ? Theme.TEXT : Theme.TEXT_MUTED);
 		}
-		return headerY;
+		int bottom = accordionTop + tabRows(shape) * tabHeight;
+		fillRect(inspectorX(), bottom, wrapper.getWidth(), bottom + 1, Theme.BORDER);
 	}
 
 	private void layout() {
 		Shape shape = currentShapeOrNull();
 		if(shape == null) return;
-		int open = shape.getOpenSection();
-		if(open != -1) shape.setRowsTop(headerPositions(shape)[open] + headerHeight);
+		// A tab is always open (the accordion allowed none)
+		if(shape.getOpenSection() < 0 && shape.getSectionCount() > 0) shape.setOpenSection(0);
+		shape.setRowsTop(accordionTop + tabRows(shape) * tabHeight + 4);
 		shape.onSelectedInGUI();
 	}
 
@@ -793,11 +1030,10 @@ public class ShapeScreen extends BaseScreen{
 		}
 		Shape shape = currentShapeOrNull();
 		if(button != MOUSE_LEFT || x < inspectorX() || shape == null) return false;
-		int[] headerY = headerPositions(shape);
-		for(int i = 0;i < headerY.length;++i) {
-			if(y < headerY[i] || y >= headerY[i] + headerHeight) continue;
-			// Accordion: opening one section closes the other; clicking the open one closes it
-			shape.setOpenSection(shape.getOpenSection() == i ? -1 : i);
+		for(int i = 0;i < shape.getSectionCount();++i) {
+			int[] box = tabBox(shape, i);
+			if(x < box[0] || x >= box[2] || y < box[1] || y >= box[3]) continue;
+			shape.setOpenSection(i);
 			layout();
 			return true;
 		}

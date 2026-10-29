@@ -27,6 +27,16 @@ public interface IShapeHandler {
 	public default double[] playerBox() {
 		return null;
 	}
+	// Placement "At the crosshair block" (2026-10-28): {x, y, z} of the block the crosshair is on, null when it
+	// points at no block. Default: none
+	public default int[] crosshairBlock() {
+		return null;
+	}
+	// See in the world (2026-10-28): the map colour (ARGB, shaded by height like a map) of the top block of each
+	// column of a width x depth grid from x0, z0, one every step blocks, row by row along x; 0 where the chunk is not loaded. Null: no world
+	public default int[] topColours(int x0, int z0, int width, int depth, int step) {
+		return null;
+	}
 
 	// Smart fill (2026-10-22): whether this game runs the world itself (singleplayer, or the host of a LAN world),
 	// the only place blocks can be taken out of what the player carries and placed as in survival

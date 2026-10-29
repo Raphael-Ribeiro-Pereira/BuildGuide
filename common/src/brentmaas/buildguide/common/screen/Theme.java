@@ -26,6 +26,11 @@ public class Theme {
 	public static final int ON_ACCENT = 0xFF0C0D10;
 	public static final int WARN = 0xFFFF8C1A;
 	public static final int ERROR = 0xFFFF5A5A;
+	public static final int SEGMENT_ON = 0xFF2A3442;
+	public static final int PILL_ON = 0xFF1F3A2A;
+	public static final int CHIP = 0xFF1A1D22;
+	public static final int OVERLAY = 0xD90C0D10;
+	public static final int FOOTPRINT = 0x8C7CC4FF;
 	
 	// RGB only, for the draw calls that take a colour without alpha
 	public static int rgb(int argb) {

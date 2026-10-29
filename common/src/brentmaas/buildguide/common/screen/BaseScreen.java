@@ -55,7 +55,7 @@ public abstract class BaseScreen {
 			BaseScreen.shouldUpdatePersistence = true;
 		});
 		
-		addWidget(buttonEnabled);
+		if(hasEnabledCheckbox()) addWidget(buttonEnabled);
 		addWidget(buttonClose);
 		if(hasTabs()) addPageBar();
 		
@@ -132,6 +132,11 @@ public abstract class BaseScreen {
 		drawShadowLeft(titleNumberOfBlocksTotal + ": " + BuildGuide.stateManager.getState().getNumberOfBlocks(), centre + halfTitle + headerGap, headerTextY, Theme.rgb(Theme.TEXT_MUTED));
 	}
 	
+	// The Enabled checkbox in the header's corner; the Oficina has it as "Show in the world" in its Config panel
+	protected boolean hasEnabledCheckbox() {
+		return true;
+	}
+
 	// The page bar at y 20..40. The Shape tab has its own rail instead (the Oficina, 2026-10-27)
 	protected boolean hasTabs() {
 		return true;
@@ -189,7 +194,7 @@ public abstract class BaseScreen {
 	private void backToOficina() {
 		int s = section();
 		if(s == ShapeScreen.NONE && onEscape()) return;
-		BuildGuide.stateManager.getState().sidePanel = s == ShapeScreen.PLACEMENT || s == ShapeScreen.CHECK ? s : ShapeScreen.NONE;
+		BuildGuide.stateManager.getState().sidePanel = s == ShapeScreen.PLACEMENT || s == ShapeScreen.CHECK || s == SECTION_CONFIG ? s : ShapeScreen.NONE;
 		openPage(ActiveScreen.Shape);
 	}
 

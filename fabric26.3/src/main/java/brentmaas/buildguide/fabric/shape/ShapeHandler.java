@@ -13,6 +13,11 @@ import brentmaas.buildguide.common.shape.ShapeSet.Origin;
 import brentmaas.buildguide.fabric.place.SmartFillServer;
 import brentmaas.buildguide.fabric.validation.WorldProbe;
 import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.phys.AABB;
@@ -51,6 +56,41 @@ public class ShapeHandler implements IShapeHandler {
 		if(player == null || !(player.getMainHandItem().getItem() instanceof BlockItem item)) return null;
 		Block block = item.getBlock();
 		return block.defaultBlockState().isAir() ? null : BuiltInRegistries.BLOCK.getKey(block).toString();
+	}
+
+	// Placement "At the crosshair block": the block the crosshair is on, null when it points at no block
+	@Override
+	public int[] crosshairBlock() {
+		HitResult hit = Minecraft.getInstance().hitResult;
+		if(!(hit instanceof BlockHitResult blockHit) || hit.getType() != HitResult.Type.BLOCK) return null;
+		BlockPos pos = blockHit.getBlockPos();
+		return new int[] {pos.getX(), pos.getY(), pos.getZ()};
+	}
+
+	// See in the world: each column's top block in its map colour, brighter or darker than the column to its north
+	// as a map shades slopes; 0 where the chunk is not loaded
+	@Override
+	public int[] topColours(int x0, int z0, int width, int depth, int step) {
+		ClientLevel level = Minecraft.getInstance().level;
+		if(level == null) return null;
+		int[] out = new int[width * depth];
+		int[] height = new int[width * depth];
+		BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+		for(int dz = 0;dz < depth;++dz) {
+			for(int dx = 0;dx < width;++dx) {
+				int x = x0 + dx * step, z = z0 + dz * step, i = dz * width + dx;
+				if(!level.hasChunk(x >> 4, z >> 4)) continue;
+				int y = level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z) - 1;
+				pos.set(x, y, z);
+				BlockState state = level.getBlockState(pos);
+				height[i] = y;
+				int colour = state.getMapColor(level, pos).col;
+				int shade = dz == 0 || out[i - width] == 0 ? 220 : y > height[i - width] ? 255 : y < height[i - width] ? 180 : 220;
+				int r = ((colour >> 16) & 0xFF) * shade / 255, g = ((colour >> 8) & 0xFF) * shade / 255, b = (colour & 0xFF) * shade / 255;
+				out[i] = 0xFF000000 | (r << 16) | (g << 8) | b;
+			}
+		}
+		return out;
 	}
 
 	// Fill (SmartFill): the client world, as the scan reads it

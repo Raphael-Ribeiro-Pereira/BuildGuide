@@ -176,6 +176,28 @@ public class ValidationListComponent {
 	 * positions in world coordinates, sorted, no header; one "None" row when empty, one message
 	 * row without a shape or before validation. Pure: no widgets, no loader
 	 */
+	// "Nearest to you" (the Oficina's Validation panel, 2026-10-28): up to n problems closest to (px, py, pz), first
+	// the wrong blocks and the structure errors, then the missing ones: {local position, kind} with the kind 0 for
+	// a wrong block, 1 for a structure error, 2 for a wrong layer, 3 for missing. Empty when not validated
+	public static long[][] nearest(Shape shape, int px, int py, int pz, int n) {
+		if(shape == null || !shape.getValidationState().isValidated()) return new long[0][];
+		ValidationState state = shape.getValidationState();
+		int ox = state.getScanOriginX(), oy = state.getScanOriginY(), oz = state.getScanOriginZ();
+		List<long[]> found = new ArrayList<long[]>();
+		for(long pos: state.getPositions(ValidationState.WRONG_BLOCK)) found.add(new long[] {pos, 0});
+		for(NearBlock nb: state.getNearBlocks()) found.add(new long[] {nb.localPos, 1});
+		for(long pos: state.getPositions(ValidationState.WRONG_LAYER)) found.add(new long[] {pos, 2});
+		for(long pos: state.getPositions(ValidationState.MISSING)) found.add(new long[] {pos, 3});
+		// Problems before missing blocks, each by distance
+		found.sort(Comparator.comparingLong((long[] e) -> (e[1] == 3 ? 1L << 60 : 0) + distanceSquared(e[0], ox - px, oy - py, oz - pz)));
+		return found.subList(0, Math.min(n, found.size())).toArray(new long[0][]);
+	}
+
+	private static long distanceSquared(long pos, int dx, int dy, int dz) {
+		long x = LocalPos.unpackX(pos) + dx, y = LocalPos.unpackY(pos) + dy, z = LocalPos.unpackZ(pos) + dz;
+		return x * x + y * y + z * z;
+	}
+
 	public static Entries buildEntries(Shape shape, Category category) {
 		List<Translatable> titles = new ArrayList<Translatable>();
 		List<Long> positions = new ArrayList<Long>();

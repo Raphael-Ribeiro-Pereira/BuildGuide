@@ -745,6 +745,29 @@ not validated, Errors and blocks and Exclusions. Portuguese texts in `pt_br.json
 Check in game: the wheel scrolls the shape list, the search filters it, picking a shape closes it; the origin
 cards change the origin; the instance rows switch instance; the Scan panel picks Terrain and Farming land.
 
+Stage 2c, the rest of the prototype's frame (`ui-full`, 2026-10-28):
+- Header: the BG mark on the rail, the shape button "Island v", "1 of 3" between arrows, and at the right the
+  switches Preview | World and (with Layers) Status | Layers. The Enabled checkbox is Config's "Show in the world".
+- See in the world (`WorldView`): the loaded ground around the shape from the top in map colours
+  (`IShapeHandler.topColours`, read again every 2 s or when the shape or origin changes), the shape's footprint in
+  blue, a note on the scale. Our own view; OrthoCamera stays an optional extra for later.
+- Status bar: "N blocks", a short bar, "82% built", wrong layer and errors when there are some, Fill as the
+  primary button. The legend as chips at the preview's foot, the hint at its top right.
+- Inspector: tabs (one per section, two rows past three) instead of the accordion; one tab is always open.
+- Placement: At my position, At the crosshair block (`IShapeHandler.crosshairBlock`, origin on top of it),
+  Rotate 90 degrees (shown, not clickable: rotation is not in the generator), three instances, the saved projects
+  as rows with Open (loads like the preset menu).
+- Scan: the five modes are selectable, Under / Above ask for a Y, Region for a corner; Scan itself is the next stage.
+- Validation: Nearest to you, the three closest problems (wrong blocks and errors first, then missing); a click
+  lights the block in the world.
+- Config is a side panel: Show in the world, Generate in background, Remember shapes, Random list colours as on /
+  off pills, then All settings.
+Not yet from the prototype: the Layers tab's own editor (layer chips, the block card, thickness and spots bars,
+"Make this the rest", edge blend), the number rows with a bar under them and Randomize, the Spikes tab's
+Points | Filled switch, the scan result view and its uses.
+Check in game: World shows the ground and the shape in blue; the tabs switch sections; At the crosshair block
+moves the origin; Nearest to you lights a block; the Config pills switch and stay after reopening.
+
 ## 2. Final jars
 
 Build output: `fabric1.21.11/build/libs/BuildGuide-Fabric-0.4.8.jar` (mod version is still 0.4.8).
