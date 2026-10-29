@@ -55,6 +55,7 @@ public class IslandLayersTest {
 	static Set<Long> blocks(ShapeIsland s) throws Exception { return new HashSet<>(s.getExpectedBlocks()); }
 
 	public static void main(String[] a) throws Exception {
+		ShapeIsland.layersInGame = true; // the layers' generation and saving (out of the Island's panel since 2026-10-28)
 		brentmaas.buildguide.common.BuildGuide.widgetHandler = new PresetTest.FakeWidgets(); // setValue touches the widgets
 		System.out.println("-- world colours");
 		ShapeIsland s = new TestIsland(); set(s);

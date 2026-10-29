@@ -233,14 +233,57 @@ public abstract class Shape implements IValidatable, IFocusParts {
 		CubeMesh.push(buffer, x, y, z, s);
 	}
 	
+	// Rotate 90 degrees (2026-10-28): the generators work unturned; addShapeCube turns every block it emits by the
+	// set's quarter turns, so the world, the expected set, the validation and Fill all see the turned shape. A
+	// lookup by a stored position (focus, colour, water) turns it back first (the *Stored methods)
+	public static int turnX(int x, int z, int turns) {
+		switch(turns & 3) {
+		case 1: return -z;
+		case 2: return -x;
+		case 3: return z;
+		default: return x;
+		}
+	}
+
+	public static int turnZ(int x, int z, int turns) {
+		switch(turns & 3) {
+		case 1: return x;
+		case 2: return -z;
+		case 3: return -x;
+		default: return z;
+		}
+	}
+
+	private int quarterTurns() {
+		return shapeSet == null ? 0 : shapeSet.getQuarterTurns();
+	}
+
+	// isInFocus for a stored (turned) position
+	public boolean isInFocusStored(FocusFilter f, int x, int y, int z) {
+		int back = (4 - quarterTurns()) & 3;
+		return isInFocus(f, turnX(x, z, back), y, turnZ(x, z, back));
+	}
+
+	// waterTest for stored (turned) positions
+	public final java.util.function.LongPredicate storedWaterTest() {
+		java.util.function.LongPredicate test = waterTest();
+		int back = (4 - quarterTurns()) & 3;
+		if(test == null || back == 0) return test;
+		return pos -> {
+			int x = LocalPos.unpackX(pos), z = LocalPos.unpackZ(pos);
+			return test.test(LocalPos.pack(turnX(x, z, back), LocalPos.unpackY(pos), turnZ(x, z, back)));
+		};
+	}
+
 	protected void addShapeCube(IShapeBuffer buffer, int x, int y, int z) throws InterruptedException {
+		int turns = quarterTurns(), tx = turnX(x, z, turns), tz = turnZ(x, z, turns);
 		if(emitFocus == null || isInFocus(emitFocus, x, y, z)) {
-			addCube(buffer, x + 0.5 - shapeSet.getShapeCubeSize() / 2, y + 0.5 - shapeSet.getShapeCubeSize() / 2, z + 0.5 - shapeSet.getShapeCubeSize() / 2, shapeSet.getShapeCubeSize());
+			addCube(buffer, tx + 0.5 - shapeSet.getShapeCubeSize() / 2, y + 0.5 - shapeSet.getShapeCubeSize() / 2, tz + 0.5 - shapeSet.getShapeCubeSize() / 2, shapeSet.getShapeCubeSize());
 			++worldBlocks;
 		}else if(Thread.currentThread().isInterrupted()) {
 			throw new InterruptedException();
 		}
-		expectedBlocks.add(LocalPos.pack(x, y, z));
+		expectedBlocks.add(LocalPos.pack(tx, y, tz));
 
 		++nBlocks;
 	}
@@ -262,6 +305,7 @@ public abstract class Shape implements IValidatable, IFocusParts {
 	// Smart fill (2026-10-22): the colour (0xRRGGBB) the world draws the cube at this local position with: the
 	// shape's colour, or the one colourCube sets for shapes that colour cubes one by one (layers, parts)
 	public int cubeRgb(int x, int y, int z) {
+		int back = (4 - quarterTurns()) & 3, ux = turnX(x, z, back), uz = turnZ(x, z, back);
 		final int[] rgb = {((int) (255 * shapeSet.getShapeColourR()) << 16) | ((int) (255 * shapeSet.getShapeColourG()) << 8) | (int) (255 * shapeSet.getShapeColourB())};
 		colourCube(new IShapeBuffer() {
 			public void setColour(int r, int g, int b, int a) {
@@ -273,7 +317,7 @@ public abstract class Shape implements IValidatable, IFocusParts {
 			public void end() {}
 
 			public void close() {}
-		}, x, y, z);
+		}, ux, y, uz);
 		return rgb[0];
 	}
 
@@ -288,8 +332,9 @@ public abstract class Shape implements IValidatable, IFocusParts {
 		for(int k = 0, n = expectedBlocks.size();k < n;++k) {
 			long pos = expectedBlocks.get(k);
 			int x = LocalPos.unpackX(pos), y = LocalPos.unpackY(pos), z = LocalPos.unpackZ(pos);
-			if(!isInFocus(f, x, y, z)) continue;
-			colourCube(buffer, x, y, z);
+			if(!isInFocusStored(f, x, y, z)) continue;
+			int back = (4 - quarterTurns()) & 3;
+			colourCube(buffer, turnX(x, z, back), y, turnZ(x, z, back));
 			addCube(buffer, x + o, y + o, z + o, s);
 			++count;
 		}
@@ -383,12 +428,13 @@ public abstract class Shape implements IValidatable, IFocusParts {
 	public java.util.function.LongPredicate worldFocusTest() {
 		final FocusFilter f = bufferFocus;
 		if(f == null) return null;
-		return pos -> isInFocus(f, LocalPos.unpackX(pos), LocalPos.unpackY(pos), LocalPos.unpackZ(pos));
+		return pos -> isInFocusStored(f, LocalPos.unpackX(pos), LocalPos.unpackY(pos), LocalPos.unpackZ(pos));
 	}
 	
 	// Emit only if this position has not been emitted in this generation; returns whether it was new
 	protected boolean addShapeCubeIfNew(IShapeBuffer buffer, int x, int y, int z) throws InterruptedException {
-		if(!expectedBlocks.add(LocalPos.pack(x, y, z))) return false;
+		int turns = quarterTurns();
+		if(expectedBlocks.contains(LocalPos.pack(turnX(x, z, turns), y, turnZ(x, z, turns)))) return false;
 		addShapeCube(buffer, x, y, z);
 		return true;
 	}
@@ -466,6 +512,11 @@ public abstract class Shape implements IValidatable, IFocusParts {
 		guiOnlyProperties.add(p);
 	}
 	
+	// Whether a property is kept out of the panel (LayerControls: the Island's hidden Layers box hides its rows)
+	boolean isHiddenFromGui(Property<?> p) {
+		return hiddenProperties.contains(p);
+	}
+
 	// Keep a property in the persistence list but out of the panel (for properties that became inert)
 	protected void hideFromGui(Property<?> p) {
 		hiddenProperties.add(p);

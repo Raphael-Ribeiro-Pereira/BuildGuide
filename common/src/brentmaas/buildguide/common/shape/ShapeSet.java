@@ -20,6 +20,11 @@ public class ShapeSet {
 	// Instance name typed in the Shape tab (E8; E6 kept it in memory only). Written last, URL-encoded: a jar
 	// without it skips the unknown key, a save without it gives the default "Type #N"
 	private static final String PERSISTENCE_NAME = "name";
+	// Rotate 90 degrees (the Oficina's Placement, 2026-10-28): quarter turns about the vertical axis through the
+	// origin, applied to every block the shape emits (Shape.addShapeCube). Saved with the world when not 0; an
+	// older jar skips the unknown key. Presets leave it out (their keys are fixed, PresetStore.setKeys)
+	private static final String PERSISTENCE_ROTATION = "rotation";
+	private int quarterTurns = 0;
 	
 	public Shape[] shapes;
 	private int index;
@@ -236,6 +241,15 @@ public class ShapeSet {
 	}
 	
 	// Typed instance name, null for the default
+	public int getQuarterTurns() {
+		return quarterTurns;
+	}
+
+	// One more quarter turn (0, 90, 180, 270 degrees); the caller generates the shape again
+	public void rotate() {
+		quarterTurns = (quarterTurns + 1) % 4;
+	}
+
 	public String getName() {
 		return name;
 	}
@@ -281,6 +295,7 @@ public class ShapeSet {
 			}
 		}
 		if(name != null) persistenceData += PERSISTENCE_NAME + "=" + PresetStore.encode(name) + ";";
+		if(quarterTurns != 0) persistenceData += PERSISTENCE_ROTATION + "=" + quarterTurns + ";";
 		return persistenceData;
 	}
 
@@ -344,6 +359,12 @@ public class ShapeSet {
 					shapeCubeSize = Double.parseDouble(value);
 				}else if(key.equals(PERSISTENCE_ORIGINCUBESIZE)){
 					originCubeSize = Double.parseDouble(value);
+				}else if(key.equals(PERSISTENCE_ROTATION)) {
+					try {
+						quarterTurns = Math.floorMod(Integer.parseInt(value.trim()), 4);
+					}catch(NumberFormatException e) {
+						quarterTurns = 0;
+					}
 				}else if(key.equals(PERSISTENCE_NAME)) {
 					name = PresetStore.decode(value).trim();
 					if(name.isEmpty()) name = null;

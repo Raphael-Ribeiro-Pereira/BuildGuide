@@ -79,7 +79,7 @@ public class PropertyRangeInt extends PropertyInt {
 	@Override
 	public void render(BaseScreen screen) {
 		super.render(screen);
-		if(!visible || maxValue <= minValue) return;
+		if(!isDrawn() || maxValue <= minValue) return;
 		int left = x + fieldX + 2, width = fieldWidth - 4;
 		int filled = (int) Math.round(width * (value - minValue) / (double) (maxValue - minValue));
 		screen.fillRect(left, y + rowHeight - 3, left + width, y + rowHeight - 2, Theme.CONTROL);

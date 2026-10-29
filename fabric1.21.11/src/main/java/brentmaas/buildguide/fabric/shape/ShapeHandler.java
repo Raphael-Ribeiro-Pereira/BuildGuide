@@ -93,6 +93,46 @@ public class ShapeHandler implements IShapeHandler {
 		return out;
 	}
 
+	// The Scan: the blocks of the box that can be seen (not air, with air on one of their six sides), with their
+	// map colour; the box is read top down, so a full budget keeps the surface
+	@Override
+	public int[] scanBlocks(int x0, int yMin, int z0, int width, int yMax, int depth, int maxBlocks) {
+		ClientLevel level = Minecraft.getInstance().level;
+		if(level == null) return null;
+		int[] out = new int[4 * Math.max(0, maxBlocks)];
+		int n = 0;
+		BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos(), side = new BlockPos.MutableBlockPos();
+		for(int y = yMax;y >= yMin && n < maxBlocks;--y) {
+			for(int dz = 0;dz < depth && n < maxBlocks;++dz) {
+				for(int dx = 0;dx < width && n < maxBlocks;++dx) {
+					int x = x0 + dx, z = z0 + dz;
+					if(!level.hasChunk(x >> 4, z >> 4)) continue;
+					pos.set(x, y, z);
+					BlockState state = level.getBlockState(pos);
+					if(state.isAir()) continue;
+					boolean seen = false;
+					for(int[] d: SIDES) {
+						side.set(x + d[0], y + d[1], z + d[2]);
+						if(level.getBlockState(side).isAir()) {
+							seen = true;
+							break;
+						}
+					}
+					if(!seen) continue;
+					out[4 * n] = x;
+					out[4 * n + 1] = y;
+					out[4 * n + 2] = z;
+					int colour = state.getMapColor(level, pos).col;
+					out[4 * n + 3] = colour == 0 ? 0x9AA1AD : colour; // a block without a map colour (glass): grey
+					++n;
+				}
+			}
+		}
+		return java.util.Arrays.copyOf(out, 4 * n);
+	}
+
+	private static final int[][] SIDES = {{0, 1, 0}, {0, -1, 0}, {1, 0, 0}, {-1, 0, 0}, {0, 0, 1}, {0, 0, -1}};
+
 	// Fill (SmartFill): the client world, as the scan reads it
 	@Override
 	public IBlockProbe worldProbe() {

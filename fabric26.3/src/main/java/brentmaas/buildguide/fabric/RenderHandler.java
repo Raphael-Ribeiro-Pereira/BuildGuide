@@ -354,7 +354,7 @@ public class RenderHandler extends AbstractRenderHandler {
 		// Exclusion boxes of the shape set (local coords): excluded positions are neither expected nor scanned
 		state.setExclusionBoxes(shapeSet.getActiveExclusionBoxes());
 		state.setPalette(paletteOf(validatable)); // before the SliceScan, which takes it
-		state.setWater(validatable.waterTest()); // the same: the positions that want water (the farm's holes)
+		state.setWater(validatable.storedWaterTest()); // the same: the positions that want water (the farm's holes)
 		long epoch = state.getScanEpoch(), generation = validatable.getGeneration();
 		LayerPalette palette = state.getPalette();
 		List<int[]> boxes = state.getExclusionBoxes();

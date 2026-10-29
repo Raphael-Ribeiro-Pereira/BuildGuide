@@ -71,7 +71,7 @@ final class LayerControls {
 			@Override
 			public void render(BaseScreen screen) {
 				super.render(screen);
-				if(visible) {
+				if(isDrawn()) {
 					screen.fillRect(x + 50, y + 4, x + 60, y + 14, 0xFF000000);
 					screen.fillRect(x + 51, y + 5, x + 59, y + 13, 0xFF000000 | ShapeLayers.colour(value));
 				}
@@ -130,7 +130,7 @@ final class LayerControls {
 	int place(int row) {
 		if(shape.isShown(enabled)) row = shape.placeRow(row, enabled);
 		else shape.hideRow(enabled);
-		boolean on = enabled.value && shape.isShown(countLabel);
+		boolean on = enabled.value && !shape.isHiddenFromGui(enabled) && shape.isShown(countLabel);
 		int e = edited();
 		// The count, the rest and the edited layer are set by the chips and the buttons
 		shape.hideRow(countLabel, count, rest, edit);
@@ -176,7 +176,7 @@ final class LayerControls {
 	/** The Spike layer row (Island), shown with spikes and Layers on; returns the next row. */
 	int placeSpikeLayer(int row, boolean spikes) {
 		if(spikeLayer == null) return row;
-		if(spikes && enabled.value && shape.isShown(spikeLayer)) return shape.placeRow(row, spikeLayer);
+		if(spikes && enabled.value && !shape.isHiddenFromGui(enabled) && shape.isShown(spikeLayer)) return shape.placeRow(row, spikeLayer);
 		shape.hideRow(spikeLayer);
 		return row;
 	}

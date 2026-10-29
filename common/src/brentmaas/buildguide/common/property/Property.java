@@ -20,6 +20,8 @@ public abstract class Property<T> {
 	protected Translatable name;
 	private ArrayList<IWidget> widgetList = null;
 	protected boolean visible = true;
+	// Scrolled out of the inspector's area (ShapeScreen, 2026-10-28): still laid out, but neither drawn nor clickable
+	protected boolean clipped = false;
 	
 	public Property(T value, Translatable name) {
 		x = ShapeScreen.basePropertiesX;
@@ -74,9 +76,24 @@ public abstract class Property<T> {
 	
 	public void setVisibility(boolean visible) {
 		for(IWidget widget: getWidgetList()) {
-			widget.setVisibility(visible);
+			widget.setVisibility(visible && !clipped);
 		}
 		this.visible = visible;
+	}
+
+	public void setClipped(boolean clipped) {
+		if(this.clipped == clipped) return;
+		this.clipped = clipped;
+		setVisibility(visible);
+	}
+
+	// Laid out and inside the inspector's area
+	protected boolean isDrawn() {
+		return visible && !clipped;
+	}
+
+	public int getY() {
+		return y;
 	}
 	
 	public void render(BaseScreen screen) {
@@ -85,10 +102,10 @@ public abstract class Property<T> {
 	
 	// Flat text in the Oficina's colours (2026-10-28): labels soft white, values in the accent
 	public void drawString(BaseScreen screen, String text, int x, int y, int colour) {
-		if(visible) screen.drawTextLeft(text, x, y, Theme.TEXT_SOFT);
+		if(isDrawn()) screen.drawTextLeft(text, x, y, Theme.TEXT_SOFT);
 	}
 	
 	public void drawStringCentred(BaseScreen screen, String text, int x, int y, int colour) {
-		if(visible) screen.drawTextCentred(text, x, y, Theme.ACCENT);
+		if(isDrawn()) screen.drawTextCentred(text, x, y, Theme.ACCENT);
 	}
 }

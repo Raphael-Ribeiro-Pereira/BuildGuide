@@ -193,18 +193,26 @@ public class ShapeIsland extends Shape {
 		int sectionBase = declareSection(new Translatable("property.buildguide.section.base"));
 		int sectionBody = declareSection(new Translatable("property.buildguide.section.body"));
 		int sectionSpikes = declareSection(new Translatable("property.buildguide.section.spikes"));
-		// Always declared (sections are fixed per shape); with no spikes it shows no rows
-		int sectionSpikeShape = declareSection(new Translatable("property.buildguide.section.spikeshape"));
-		int sectionLayers = declareSection(new Translatable("property.buildguide.section.layers"));
-		int sectionRandom = declareSection(new Translatable("property.buildguide.section.seed"));
 		assignSection(sectionBase, baseRows);
 		assignSection(sectionBody, propertyWall, propertyDepth, propertyProfile, propertySharpness, propertyRoughness);
 		assignSection(sectionSpikes, propertySpikes);
 		assignSection(sectionSpikes, spikeRows);
-		assignSection(sectionSpikeShape, spikeShapeRows);
-		layerControls.assign(sectionLayers, sectionSpikeShape);
-		addGuiOnly(propertyNaturaliseAll);
-		assignSection(sectionRandom, propertyBasePercent, propertyBodyPercent, propertySpikesPercent, propertyRandomize, propertyNaturaliseAll, propertyNaturalize, propertyNaturalizeSpikes, propertyUndo, propertySeed);
+		// Only Base, Body and Spikes (Raphael, 2026-10-28): the spikes' shape is part of Spikes (the inspector
+		// scrolls when they do not fit); Layers and Random are out for now
+		assignSection(sectionSpikes, spikeShapeRows);
+		// Layers left out of the Island for now: the box hidden and off (restorePersistence), its rows never shown
+		layerControls.assign(sectionBody, sectionSpikes);
+		hideFromGui(propertyLayers);
+		// Randomize and Undo at the end of Base (the prototype's Randomize); the percentages and the Naturalize
+		// buttons are left out for now (still saved)
+		assignSection(sectionBase, propertyRandomize, propertyUndo);
+		assignSection(sectionBody, propertyBasePercent, propertyBodyPercent, propertySpikesPercent, propertyNaturaliseAll, propertyNaturalize, propertyNaturalizeSpikes, propertySeed);
+		hideFromGui(propertyBasePercent);
+		hideFromGui(propertyBodyPercent);
+		hideFromGui(propertySpikesPercent);
+		hideFromGui(propertyNaturalize);
+		hideFromGui(propertyNaturalizeSpikes);
+		hideFromGui(propertyNaturaliseAll);
 		// Random has 8 rows with Seed; at the minimum GUI height (270) the sections leave room for 7 (six of
 		// them since Layers, with 11-px headers), so the Seed row is not shown (still saved, still in presets,
 		// still drawn by Randomize and New seed)
@@ -241,6 +249,16 @@ public class ShapeIsland extends Shape {
 		row = layerControls.placeSpikeLayer(row, propertySpikes.value > 0);
 		// Layers: the box, then (on) count and rest, mix, the edited layer and its block, thickness, patches
 		row = layerControls.place(row);
+	}
+
+	// Layers are out of the Island for now (2026-10-28): an island saved with them loads without. The tests of the
+	// layers' generation and saving turn this on
+	public static boolean layersInGame = false;
+
+	@Override
+	public void restorePersistence(String persistenceData) {
+		super.restorePersistence(persistenceData);
+		if(!layersInGame) propertyLayers.value = false;
 	}
 
 	private void onLayersChanged() {

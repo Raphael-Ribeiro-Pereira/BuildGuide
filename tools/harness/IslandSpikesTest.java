@@ -117,10 +117,10 @@ public class IslandSpikesTest {
 		check(!l.error && now.startsWith(old + ",0,RANDOM,12,3,0,50"), "a 19-value Island loads, its 19 values intact, the 6 block B values at their defaults (Count 0; later properties follow): " + now);
 		Values lv = values(l); check(lv.spikes == 0, "an old island has no spikes");
 		ShapeIsland panel = new TestIsland();
-		check(panel.getSectionCount() >= 4 && panel.getSectionName(2).getTranslationKey().equals("property.buildguide.section.spikes") && panel.getSectionName(panel.getSectionCount() - 1).getTranslationKey().equals("property.buildguide.section.seed"), "sections: Base, Body, Spikes, ..., Random (spikes 2 adds Spike shape before Random)");
+		check(panel.getSectionCount() == 3 && panel.getSectionName(2).getTranslationKey().equals("property.buildguide.section.spikes"), "sections (2026-10-28): Base, Body, Spikes");
 		check(panel.countRows(2) == 1, "Count 0: the Spikes section shows 1 row (Count)");
 		setProp(panel, "propertySpikes", 3);
-		check(panel.countRows(2) == 6, "Count 3: the Spikes section shows 6 rows");
+		check(panel.countRows(2) == 10, "Count 3: the Spikes tab shows 10 rows (with the spike shape's 4)");
 		System.out.println(fails == 0 ? "ALL OK" : fails + " FAILED");
 	}
 	static Params copyNoSpikes(Params a){ Params p = copy(a); p.spikes = 0; return p; }

@@ -97,9 +97,9 @@ public class IslandSpikes2Test {
 		System.out.println("-- panel and persistence");
 		ShapeIsland panel = new TestIsland();
 		check(panel.countRows(2) == 1, "Count 0: Spikes shows 1 row");
-		setProp(panel, "propertySpikes", 64); check(panel.countRows(2) == 6, "Count 64, Random: 6 rows");
-		setProp(panel, "propertySpikeMode", SpikeMode.RING); check(panel.countRows(2) == 6, "Ring: 6 rows");
-		setProp(panel, "propertySpikeMode", SpikeMode.FILL); check(panel.countRows(2) == 7, "Fill: 7 rows (Jitter % shows)");
+		setProp(panel, "propertySpikes", 64); check(panel.countRows(2) == 10, "Count 64, Random: 10 rows (6 and the 4 of spike shape)");
+		setProp(panel, "propertySpikeMode", SpikeMode.RING); check(panel.countRows(2) == 10, "Ring: 10 rows");
+		setProp(panel, "propertySpikeMode", SpikeMode.FILL); check(panel.countRows(2) == 11, "Fill: 11 rows (Jitter % shows)");
 		check(((PropertyRangeInt) get(panel, "propertySpikes")).setValueFromString("64") && !((PropertyRangeInt) get(panel, "propertySpikes")).setValueFromString("65"), "the Count field takes 64 and refuses 65");
 		String old = "ORGANIC,51,37,6,0.7,15.0,0.25,6.0,3,30,TERRACED,0.4,0.3,777,Runnable,20,35,Runnable,Runnable,9,RING,22,5,15,70";
 		ShapeIsland l = new TestIsland(); l.restorePersistence(old); String now = l.toPersistence();

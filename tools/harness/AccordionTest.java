@@ -68,7 +68,8 @@ public class AccordionTest {
 				int worst = ORIGIN_ROWS;
 				for(int i = 0;i < s.getSectionCount();++i) worst = Math.max(worst, s.countRows(i));
 				int layers = s.countRows(4);
-				check(s.getSectionCount() == 6 && s.getSectionName(4).getTranslationKey().equals("property.buildguide.section.layers") && layers == (on ? 9 : 1) && worst <= capacity, "height " + h + ", Island with Layers " + (on ? "on" : "off") + ": Layers " + layers + " rows, 6 sections, capacity " + capacity);
+				// Only Base, Body and Spikes since 2026-10-28; the Layers box is out of the panel for now
+				check(s.getSectionCount() == 3 && s.getSectionName(2).getTranslationKey().equals("property.buildguide.section.spikes") && worst <= capacity, "height " + h + ", Island with Layers " + (on ? "on" : "off") + ": 3 sections (Base, Body, Spikes), largest " + worst + " rows, capacity " + capacity);
 			}
 		}
 		// Spikes section: 1 row (Count) with no spikes, 6 with some; every section must still fit
@@ -84,7 +85,8 @@ public class AccordionTest {
 				int worst = ORIGIN_ROWS;
 				for(int i = 0;i < s.getSectionCount();++i) worst = Math.max(worst, s.countRows(i));
 				int shapeRows = s.countRows(3), randomRows = s.countRows(s.getSectionCount() - 1);
-				check(worst <= capacity && s.countRows(2) == (count == 0 ? 1 : count > 0 ? 6 : 7) && shapeRows == (count == 0 ? 0 : 4) && randomRows == 8, "height " + h + ", Island with " + Math.abs(count) + (count < 0 ? " spikes in Fill" : " spikes") + ": Spikes " + s.countRows(2) + " rows, Spike shape " + shapeRows + ", Random " + randomRows + ", capacity " + capacity);
+				// Spike shape is part of Spikes (2026-10-28): count, the spike rows and the 4 spike shape rows
+				check(worst <= capacity && s.countRows(2) == (count == 0 ? 1 : count > 0 ? 10 : 11), "height " + h + ", Island with " + Math.abs(count) + (count < 0 ? " spikes in Fill" : " spikes") + ": Spikes " + s.countRows(2) + " rows, Spike shape " + shapeRows + ", Random " + randomRows + ", capacity " + capacity);
 			}
 		}
 		System.out.println(fails == 0 ? "ALL OK" : fails + " FAILED");

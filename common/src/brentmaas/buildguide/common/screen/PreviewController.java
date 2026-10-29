@@ -130,7 +130,7 @@ public class PreviewController {
 			boolean[] next = new boolean[base.positions.length];
 			for(int i = 0;i < next.length;++i) {
 				long pos = base.positions[i];
-				next[i] = current.isInFocus(focus, LocalPos.unpackX(pos), LocalPos.unpackY(pos), LocalPos.unpackZ(pos));
+				next[i] = current.isInFocusStored(focus, LocalPos.unpackX(pos), LocalPos.unpackY(pos), LocalPos.unpackZ(pos));
 			}
 			maskFocus = focus;
 			maskPositions = base.positions;

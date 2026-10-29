@@ -123,8 +123,8 @@ public class IslandSegmentedTest {
 		call(u, "randomize"); setProp(u, "propertyBreak", BreakMode.SEGMENTED); call(u, "undo");
 		check(values(u).breakMode == BreakMode.ATTACHED && values(u).equals(before), "Undo restores the values before the last Randomize, Break included");
 		ShapeIsland panel = new TestIsland(); setProp(panel, "propertySpikes", 4);
-		check(panel.countRows(3) == 4, "Spike shape, Attached: Dripstone, Taper, Edge falloff %, Break (4 rows)");
-		setProp(panel, "propertyBreak", BreakMode.SEGMENTED); check(panel.countRows(3) == 6, "Segmented: + Pieces and Gap (6 rows)");
+		check(panel.countRows(2) == 10, "Spikes, Attached: Count and 5 spike rows, then Dripstone, Taper, Edge falloff %, Break (10 rows)");
+		setProp(panel, "propertyBreak", BreakMode.SEGMENTED); check(panel.countRows(2) == 12, "Segmented: + Pieces and Gap (12 rows; the inspector scrolls)");
 		String old = "ORGANIC,51,37,6,0.7,15.0,0.25,6.0,3,30,TERRACED,0.4,0.3,777,Runnable,20,35,Runnable,Runnable,9,FILL,22,5,15,70,35,true,2.3,45,60,Runnable";
 		ShapeIsland l = new TestIsland(); l.restorePersistence(old);
 		check(!l.error && l.toPersistence().startsWith(old + ",ATTACHED,2,2,"), "a 31-value Island loads unchanged, Break Attached, Pieces 2, Gap 2 (later values follow): " + l.toPersistence());

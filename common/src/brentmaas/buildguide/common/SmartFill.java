@@ -147,7 +147,7 @@ public final class SmartFill {
 		List<Group> groups;
 		try {
 			if(!shape.ready || shape.error) return Plan.message("screen.buildguide.fill.generating");
-			LongPredicate water = shape.waterTest();
+			LongPredicate water = shape.storedWaterTest();
 			found = FillPlan.cells(shape.getExpectedBlocks(), set.getOriginX(), set.getOriginY(), set.getOriginZ(), set.getActiveExclusionBoxes(), shape.worldFocusTest(), probe, BuildGuide.shapeHandler.playerBox(), water);
 			if(found.isEmpty()) return Plan.message("screen.buildguide.fill.nothing");
 			SmartFillPlan.sortForBuilding(found, set.getOriginX(), set.getOriginY(), set.getOriginZ());

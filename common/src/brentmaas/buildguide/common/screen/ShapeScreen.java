@@ -264,7 +264,7 @@ public class ShapeScreen extends BaseScreen{
 	private static int scanUse = -1;
 	private static boolean slimeChunk = false;
 	private static boolean scanView = false;
-	private final WorldView scanMap = new WorldView();
+
 	// Validation rows
 	private static final int checkRowsY = top + 42, nearestY = top + 92, checkButtonsY = top + 148;
 
@@ -344,9 +344,10 @@ public class ShapeScreen extends BaseScreen{
 			IButton crosshair = BuildGuide.widgetHandler.createButton(x, crosshairY, w, 16, new Translatable("screen.buildguide.placement.crosshair"), () -> setOriginAtCrosshair()).setStyle(IButton.STYLE_SOFT);
 			crosshair.setActive(available && BuildGuide.shapeHandler.crosshairBlock() != null);
 			addWidget(crosshair);
-			// Rotating a shape is not in the generator yet: shown as in the prototype, not clickable
-			IButton rotate = BuildGuide.widgetHandler.createButton(x, rotateY, w, 16, new Translatable("screen.buildguide.placement.rotate"), () -> {}).setStyle(IButton.STYLE_OUTLINE);
-			rotate.setActive(false);
+			// Rotate 90 degrees: one more quarter turn about the origin (ShapeSet.rotate), the shape generated again
+			int turns = available ? BuildGuide.stateManager.getState().getCurrentShapeSet().getQuarterTurns() : 0;
+			IButton rotate = BuildGuide.widgetHandler.createButton(x, rotateY, w, 16, new Translatable("screen.buildguide.placement.rotate", "" + 90 * turns), () -> rotateShape()).setStyle(IButton.STYLE_OUTLINE);
+			rotate.setActive(available);
 			addWidget(rotate);
 			// This instance's name (Enter stores it)
 			textFieldName = BuildGuide.widgetHandler.createTextField(x, nameY, w, 14, available ? instanceName() : "");
@@ -695,26 +696,69 @@ public class ShapeScreen extends BaseScreen{
 		nearestAt = 0;
 	}
 
-	// Scan: the area of the chosen mode (96 x 56 blocks around you; Region from the typed corner to you), shown
-	// from the top in the preview's place. Reading the blocks in 3D is the next stage
+	// Scan: the blocks of the chosen mode's box that can be seen, read from the loaded world and shown in the 3D
+	// preview in their map colours (drag to turn it, wheel to zoom, as a shape). The box: 96 x 56 around you,
+	// from a little under you up to a little over (Island, Hole lower), down to the typed Y (Under me), up to it
+	// (Above me), or from the typed corner to you (Region); never more than 192 x 192 x 128
+	public static final int scanMaxBlocks = 150000, scanMaxSide = 192, scanMaxHeight = 128;
+	private static PreviewModel scanModel = null;
+	private static long scanCount = 0;
+
 	private void doScan() {
 		Origin player = BuildGuide.shapeHandler.getPlayerPosition();
 		int width = 96, depth = 56, x0 = player.x - width / 2, z0 = player.z - depth / 2;
-		if(scanMode == SCAN_REGION) {
-			try {
-				int cx = Integer.parseInt(scanX1.trim()), cz = Integer.parseInt(scanZ1.trim());
+		int yMin = player.y - 32, yMax = player.y + 16;
+		Integer typedY = parseOrNull(scanY);
+		if(scanMode == SCAN_UNDER) {
+			yMax = player.y;
+			yMin = typedY != null ? Math.min(typedY, player.y) : player.y - 48;
+		}else if(scanMode == SCAN_ABOVE) {
+			yMin = player.y;
+			yMax = typedY != null ? Math.max(typedY, player.y) : player.y + 48;
+		}else if(scanMode == SCAN_REGION) {
+			Integer cx = parseOrNull(scanX1), cy = parseOrNull(scanY1), cz = parseOrNull(scanZ1);
+			if(cx != null && cz != null) {
 				x0 = Math.min(cx, player.x);
 				z0 = Math.min(cz, player.z);
 				width = Math.abs(cx - player.x) + 1;
 				depth = Math.abs(cz - player.z) + 1;
-			}catch(NumberFormatException e) {
-				// no corner typed: the area around you
 			}
+			if(cy != null) {
+				yMin = Math.min(cy, player.y);
+				yMax = Math.max(cy, player.y);
+			}
+		}else if(scanMode == 4) {
+			// Hole: the space under water or the ground, below you
+			yMax = player.y;
+			yMin = player.y - 48;
 		}
-		scanArea = new int[] {x0, z0, width, depth};
+		width = Math.min(width, scanMaxSide);
+		depth = Math.min(depth, scanMaxSide);
+		yMin = Math.max(yMin, yMax - scanMaxHeight);
+		int[] blocks = BuildGuide.shapeHandler.scanBlocks(x0, yMin, z0, width, yMax, depth, scanMaxBlocks);
+		if(blocks == null) return;
+		int n = blocks.length / 4, cx = x0 + width / 2, cz = z0 + depth / 2;
+		long[] positions = new long[n];
+		int[] rgb = new int[n];
+		for(int i = 0;i < n;++i) {
+			positions[i] = LocalPos.pack(blocks[4 * i] - cx, blocks[4 * i + 1] - yMin, blocks[4 * i + 2] - cz);
+			rgb[i] = blocks[4 * i + 3];
+		}
+		// A generation of its own (below the shapes' ones), so the preview builds a new mesh for every scan
+		scanModel = PreviewModel.ofColoured(positions, rgb, -2 - (++scanCount));
+		scanArea = new int[] {x0, z0, width, depth, n};
 		scanView = true;
 		worldView = false;
+		preview.camera.reset();
 		BuildGuide.screenHandler.showScreen(this);
+	}
+
+	private static Integer parseOrNull(String text) {
+		try {
+			return Integer.valueOf(text.trim());
+		}catch(NumberFormatException e) {
+			return null;
+		}
 	}
 
 	// A use of the scan: Farming land and Terraform open their shape, keeping the Scan panel
@@ -729,14 +773,23 @@ public class ShapeScreen extends BaseScreen{
 		BuildGuide.screenHandler.showScreen(this);
 	}
 
-	// The scanned area from the top, what was scanned at the top, what the chosen use does at the foot
+	// The scanned blocks in the 3D preview; what was scanned at the top, what the chosen use does at the foot
 	private void renderScanView(int x1, int x2) {
 		int y1 = previewTop + 1, y2 = bands.previewBottom - 1;
-		scanMap.drawArea(this, x1, y1, x2, y2, scanArea[0], scanArea[1], scanArea[2], scanArea[3]);
+		if(scanModel != null && !scanModel.isEmpty()) wrapper.drawShapePreview(x1, y1, x2, y2, scanModel, preview.camera);
+		else drawTextCentred(new Translatable("screen.buildguide.scan.empty").toString(), (x1 + x2) / 2, (y1 + y2) / 2 - 4, Theme.TEXT_MUTED);
 		String mode = new Translatable("screen.buildguide.scan." + scanModeKeys[scanMode]).toString();
 		chip(new Translatable("screen.buildguide.scan.title", mode, "" + scanArea[2], "" + scanArea[3]).toString(), x1 + 4, y1 + 4, x2 - x1 - 8);
 		String note = scanUse < 0 ? "screen.buildguide.scan.note.choose" : "screen.buildguide.scan.note." + scanUseKeys[scanUse] + (scanUse == USE_LIGHT && slimeChunk ? ".slime" : "");
 		chip(new Translatable(note).toString(), x1 + 4, y2 - 16, x2 - x1 - 8);
+	}
+
+	private void rotateShape() {
+		if(!BuildGuide.stateManager.getState().isShapeAvailable()) return;
+		BuildGuide.stateManager.getState().getCurrentShapeSet().rotate();
+		BuildGuide.stateManager.getState().getCurrentShape().update();
+		BaseScreen.shouldUpdatePersistence = true;
+		BuildGuide.screenHandler.showScreen(this);
 	}
 
 	// "At the crosshair block": the shape stands on the block the crosshair was on when the screen opened
@@ -759,6 +812,8 @@ public class ShapeScreen extends BaseScreen{
 		fillRect(0, 0, wrapper.getWidth(), top, Theme.BACKGROUND);
 		fillRect(0, top, railWidth, h, Theme.BACKGROUND);
 		if(sidePanel() != NONE) renderSidePanelBackground();
+		// A row a property moved (a change in the shape re-lays its rows) is clipped again before the widgets draw
+		clipInspector();
 		fillRect(px1() - 1, previewTop, px2() + 1, bands.previewBottom, Theme.BORDER);
 		fillRect(px1(), previewTop + 1, px2(), bands.previewBottom - 1, Theme.FIELD);
 		fillRect(inspectorX(), top, wrapper.getWidth(), h, Theme.PANEL);
@@ -778,6 +833,7 @@ public class ShapeScreen extends BaseScreen{
 		Shape shape = currentShapeOrNull();
 		if(shape == null) return;
 		renderTabs(shape);
+		renderInspectorScrollbar(shape);
 	}
 
 	private void renderHeaderText() {
@@ -790,7 +846,7 @@ public class ShapeScreen extends BaseScreen{
 		int x1 = px1(), x2 = px2(), y1 = previewAreaTop(), y2 = previewAreaBottom();
 		Shape shape = currentShapeOrNull();
 		if(shape == null) return;
-		if(scanView && scanArea != null) {
+		if(scanView && scanArea != null && scanModel != null) {
 			renderScanView(x1, x2);
 			return;
 		}
@@ -1089,13 +1145,47 @@ public class ShapeScreen extends BaseScreen{
 		fillRect(inspectorX(), bottom, wrapper.getWidth(), bottom + 1, Theme.BORDER);
 	}
 
+	// The inspector scrolls (2026-10-28) when the open tab has more rows than fit: the wheel over it moves the rows
+	// a row a notch, the rows outside its area are clipped (Property.setClipped)
+	private static int inspectorScroll = 0;
+
+	private int rowsTop(Shape shape) {
+		return accordionTop + tabRows(shape) * tabHeight + 4;
+	}
+
+	private int maxInspectorScroll(Shape shape) {
+		int open = shape.getOpenSection();
+		if(open < 0) return 0;
+		return Math.max(0, shape.countRows(open) * Property.rowHeight - (bands.accordionBottom - rowsTop(shape)));
+	}
+
 	private void layout() {
 		Shape shape = currentShapeOrNull();
 		if(shape == null) return;
 		// A tab is always open (the accordion allowed none)
 		if(shape.getOpenSection() < 0 && shape.getSectionCount() > 0) shape.setOpenSection(0);
-		shape.setRowsTop(accordionTop + tabRows(shape) * tabHeight + 4);
+		inspectorScroll = Math.max(0, Math.min(inspectorScroll, maxInspectorScroll(shape)));
+		shape.setRowsTop(rowsTop(shape) - inspectorScroll);
 		shape.onSelectedInGUI();
+		clipInspector();
+	}
+
+	// Rows above the tabs' line or below the inspector's area are not drawn and cannot be clicked
+	private void clipInspector() {
+		Shape shape = currentShapeOrNull();
+		if(shape == null) return;
+		int top = rowsTop(shape), bottom = bands.accordionBottom;
+		for(Property<?> p: properties) p.setClipped(p.getY() < top || p.getY() + Property.rowHeight > bottom);
+	}
+
+	// A slim bar at the inspector's right edge while it scrolls
+	private void renderInspectorScrollbar(Shape shape) {
+		int max = maxInspectorScroll(shape);
+		if(max <= 0) return;
+		int top = rowsTop(shape), bottom = bands.accordionBottom, view = bottom - top, total = view + max;
+		int thumb = Math.max(12, view * view / total), ty = top + (view - thumb) * inspectorScroll / max, bx = wrapper.getWidth() - 3;
+		fillRect(bx, top, bx + 2, bottom, Theme.CONTROL);
+		fillRect(bx, ty, bx + 2, ty + thumb, Theme.ACCENT_DIM);
 	}
 
 	// ---- Input ----
@@ -1111,6 +1201,7 @@ public class ShapeScreen extends BaseScreen{
 			int[] box = tabBox(shape, i);
 			if(x < box[0] || x >= box[2] || y < box[1] || y >= box[3]) continue;
 			shape.setOpenSection(i);
+			inspectorScroll = 0;
 			layout();
 			return true;
 		}
@@ -1132,6 +1223,13 @@ public class ShapeScreen extends BaseScreen{
 
 	@Override
 	public boolean onMouseScrolled(double x, double y, double amount) {
+		// The wheel over the inspector's rows scrolls them, a row a notch
+		Shape scrolled = currentShapeOrNull();
+		if(scrolled != null && x >= inspectorX() && y >= rowsTop(scrolled) && y < bands.accordionBottom && maxInspectorScroll(scrolled) > 0) {
+			inspectorScroll -= (int) Math.signum(amount) * Property.rowHeight;
+			layout();
+			return true;
+		}
 		// The wheel over the shape list scrolls it, two rows a notch
 		if(sidePanel() == SHAPES && x >= railWidth && x < railWidth + sideWidth && y >= shapeListTop()) {
 			shapeScroll -= (int) Math.signum(amount) * 2 * rowHeight;

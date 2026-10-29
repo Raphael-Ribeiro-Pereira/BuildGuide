@@ -128,11 +128,11 @@ public class IslandSpikesShapeTest {
 		check(!l.error && l.toPersistence().startsWith(old + ",false,1.0,0,15,Runnable"), "a 26-value Island loads unchanged, the 5 new at their defaults (no Dripstone, Taper 1.0, falloff 0, Spikes 15 %): " + l.toPersistence());
 		ShapeIsland g = new TestIsland(); g.restorePersistence(old + ",true,2.3,45,60,Runnable");
 		check(!g.error && g.toPersistence().startsWith(old + ",true,2.3,45,60,Runnable"), "Dripstone, Taper 2.3, falloff 45 and Spikes 60 % saved and loaded");
-		ShapeIsland panel = new TestIsland(); int shape = 3, random = panel.getSectionCount() - 1;
-		check(panel.getSectionCount() == 6 && panel.getSectionName(shape).getTranslationKey().equals("property.buildguide.section.spikeshape") && panel.getSectionName(shape + 1).getTranslationKey().equals("property.buildguide.section.layers") && panel.getSectionName(random).getTranslationKey().equals("property.buildguide.section.seed"), "sections: Base, Body, Spikes, Spike shape, Layers (4C), Random");
-		check(panel.countRows(shape) == 0, "Count 0: Spike shape has no rows (the accordion's sections are fixed, so the header stays)");
-		setProp(panel, "propertySpikes", 4); check(panel.countRows(shape) == 4, "with spikes: Dripstone, Taper, Edge falloff %, and Break since phase 3 (4 rows; Pieces and Gap only in Segmented)");
-		check(panel.countRows(random) == 8, "Random: 8 rows with Naturalise all (Seed not shown, still saved)");
+		ShapeIsland panel = new TestIsland(); int shape = 2;
+		check(panel.getSectionCount() == 3 && panel.getSectionName(shape).getTranslationKey().equals("property.buildguide.section.spikes"), "sections (2026-10-28): Base, Body, Spikes; the spike shape is part of Spikes");
+		check(panel.countRows(shape) == 1, "Count 0: Spikes shows only Count, no spike shape rows");
+		setProp(panel, "propertySpikes", 4); check(panel.countRows(shape) == 10, "with spikes: the 6 spike rows, then Dripstone, Taper, Edge falloff % and Break (Pieces and Gap only in Segmented)");
+
 		System.out.println(fails == 0 ? "ALL OK" : fails + " FAILED");
 	}
 }

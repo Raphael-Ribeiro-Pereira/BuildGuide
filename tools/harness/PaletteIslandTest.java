@@ -33,6 +33,7 @@ public class PaletteIslandTest {
 	static String held = null; static final List<String> chat = new ArrayList<>();
 
 	public static void main(String[] a) throws Exception {
+		ShapeIsland.layersInGame = true; // the layers' generation and saving (out of the Island's panel since 2026-10-28)
 		BuildGuide.widgetHandler = new Widgets();
 		BuildGuide.screenHandler = new AbstractScreenHandler(){ public IScreenWrapper createWrapper(Translatable t){ return null; } public void showNone(){} public String translate(String k){ return k; } public String translate(String k, Object... v){ return k; } };
 		BuildGuide.logHandler = (ILogHandler) Proxy.newProxyInstance(PaletteIslandTest.class.getClassLoader(), new Class<?>[]{ILogHandler.class}, (p, m, x) -> { if(m.getName().equals("sendChatMessage")) chat.add((String) x[0]); return null; });

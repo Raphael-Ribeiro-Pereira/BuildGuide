@@ -29,6 +29,7 @@ public class StrataTest {
 	static String nameKey(Property<?> p) throws Exception { Field f = Property.class.getDeclaredField("name"); f.setAccessible(true); return ((AbstractScreenHandler.Translatable) f.get(p)).getTranslationKey(); }
 
 	public static void main(String[] a) throws Exception {
+		ShapeIsland.layersInGame = true; // the layers' generation and saving (out of the Island's panel since 2026-10-28)
 		BuildGuide.screenHandler = new AbstractScreenHandler(){ public IScreenWrapper createWrapper(Translatable t){ return null; } public void showNone(){} public String translate(String k){ return k; } public String translate(String k, Object... v){ return k; } };
 		BuildGuide.widgetHandler = new PresetTest.FakeWidgets();
 		BuildGuide.config = new brentmaas.buildguide.common.Config(Files.createTempDirectory("bgstrata").toFile());
@@ -108,12 +109,14 @@ public class StrataTest {
 		for(int count = 2; count <= 5; count++) for(int rest = 1; rest <= count; rest++) for(int edit = 1; edit <= count; edit++){
 			prop(lc, "count").value = count; prop(lc, "rest").value = rest; prop(lc, "edit").value = edit;
 			worstLayers = Math.max(worstLayers, is.countRows(4)); worstSpikes = Math.max(worstSpikes, is.countRows(3)); }
-		check(worstLayers <= capacity && worstLayers == 9 && worstSpikes <= capacity, "Island, every count, rest and edited layer: Layers " + worstLayers + " rows, Spike shape " + worstSpikes + ", capacity " + capacity + " at the minimum height");
-		is.setOpenSection(4); prop(lc, "count").value = 5; prop(lc, "rest").value = 3; prop(lc, "edit").value = 2; is.onSelectedInGUI();
-		Property<?>[] thick = (Property<?>[]) field(lc, "thickness");
-		check(nameKey(thick[1]).equals("property.buildguide.layer.blocks"), "layer 2, above the rest: its thickness in blocks");
-		prop(lc, "edit").value = 4; is.onSelectedInGUI();
-		check(nameKey(thick[3]).equals("property.buildguide.layer.bottom"), "layer 4, below the rest: in % from the bottom");
+		check(worstLayers == 0 && worstSpikes == 0, "Island, every count, rest and edited layer: Layers " + worstLayers + " rows, Spike shape " + worstSpikes + ", capacity " + capacity + " at the minimum height");
+		// The thickness label follows the rest; the Island has no layer rows since 2026-10-28, so the Terrain shows it
+		ShapeTerrain lt = new ShapeTerrain(); prop(lt, "propertyLayers").value = true; Object ltc = field(lt, "layerControls");
+		lt.setOpenSection(2); prop(ltc, "count").value = 5; prop(ltc, "rest").value = 3; prop(ltc, "edit").value = 2; lt.onSelectedInGUI();
+		Property<?>[] thick = (Property<?>[]) field(ltc, "thickness");
+		check(nameKey(thick[1]).equals("property.buildguide.layer.top"), "layer 2, above the rest: % from the top");
+		prop(ltc, "edit").value = 4; lt.onSelectedInGUI();
+		check(nameKey(thick[3]).equals("property.buildguide.layer.base"), "layer 4, below the rest: % of the base");
 		prop(lc, "edit").value = 5; prop(lc, "spikeLayer").value = 5; prop(lc, "count").value = 3; call(lc, "onCountChanged");
 		check(prop(lc, "rest").value.equals(3) && prop(lc, "edit").value.equals(3) && prop(lc, "spikeLayer").value.equals(3), "count down to 3: the edited layer and the spike layer come down to 3, the rest stays 3");
 		prop(lc, "count").value = 2; call(lc, "onCountChanged");

@@ -37,6 +37,12 @@ public interface IShapeHandler {
 	public default int[] topColours(int x0, int z0, int width, int depth, int step) {
 		return null;
 	}
+	// The Scan (2026-10-28): the blocks of the box x0..x0+width-1, yMin..yMax, z0..z0+depth-1 that can be seen (not
+	// air, with air on a side), at most maxBlocks, as {x, y, z, rgb} quadruples in world coordinates; rgb is the
+	// block's map colour. Null: no world
+	public default int[] scanBlocks(int x0, int yMin, int z0, int width, int yMax, int depth, int maxBlocks) {
+		return null;
+	}
 
 	// Smart fill (2026-10-22): whether this game runs the world itself (singleplayer, or the host of a LAN world),
 	// the only place blocks can be taken out of what the player carries and placed as in survival

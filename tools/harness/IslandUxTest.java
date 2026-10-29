@@ -54,8 +54,8 @@ public class IslandUxTest {
 
 		int bp = ((PropertyRangeInt) get(n, "propertyBasePercent")).value, bd = ((PropertyRangeInt) get(n, "propertyBodyPercent")).value;
 		check(bp == 15 && bd == 15, "Base % and Body % default to 15 (" + bp + ", " + bd + ")");
-		TestIsland rs = new TestIsland(); rs.captureDefaults(); /* as ShapeSet does right after construction */ setProp(rs, "propertyBasePercent", 60); setProp(rs, "propertyBodyPercent", 80); rs.setOpenSection(rs.getSectionCount() - 1); /* Random is the last section (Base, Body, Spikes, Spike shape, Random since spikes 2) */ rs.resetShownToDefaults();
-		check(((PropertyRangeInt) get(rs, "propertyBasePercent")).value == 15 && ((PropertyRangeInt) get(rs, "propertyBodyPercent")).value == 15, "Reset on the Random section: Base % and Body % back to 15");
+		TestIsland rs = new TestIsland(); rs.captureDefaults(); setProp(rs, "propertyBasePercent", 60); rs.setOpenSection(0); rs.resetShownToDefaults();
+		check(((PropertyRangeInt) get(rs, "propertyBasePercent")).value == 60, "Reset on Base leaves Base % alone (it is out of the panel since 2026-10-28)");
 		ShapeIsland saved = new TestIsland(); saved.restorePersistence("CIRCLE,41,41,6,0.7,0.0,0.0,6.0,2,24,BOWL,0.0,0.0,1,Runnable,30,45,Runnable,Runnable");
 		check(saved.toPersistence().contains(",Runnable,30,45,Runnable,Runnable,"), "a saved island keeps its own percentages (30, 45)");
 
@@ -80,9 +80,9 @@ public class IslandUxTest {
 			check(IslandTest.set(IslandTest.gen(base)).equals(IslandTest.set(IslandTest.gen(moved))), o + ": changing its hidden controls leaves the blocks unchanged");
 		}
 		ShapeIsland v = new TestIsland(); updates = 0;
-		int[] expectBase = {4, 5, 6, 7}; // Outline, widths, rotation (+ Corner round, + Sides, + Wobble and its size)
+		int[] expectBase = {6, 7, 8, 9}; // Outline, widths, rotation (+ Corner round, + Sides, + Wobble and its size), Randomize, Undo
 		for(Outline o: Outline.values()){ setProp(v, "propertyOutline", o); check(v.countRows(0) == expectBase[o.ordinal()], o + ": Base shows " + v.countRows(0) + " rows (Body " + v.countRows(1) + ", Random " + v.countRows(v.getSectionCount() - 1) + ")"); }
-		check(v.countRows(v.getSectionCount() - 1) == 8, "Random rows: Base %, Body %, Spikes %, Randomize, Naturalise all, Naturalize, Natural spikes, Undo (Seed is saved but not shown)");
+		check(v.getSectionCount() == 3 && !v.getGuiProperties().contains(get(v, "propertyBasePercent")) && !v.getGuiProperties().contains(get(v, "propertyNaturalize")), "only Base, Body, Spikes (2026-10-28): the percentages and Naturalize are out of the panel, still saved");
 
 		System.out.println("-- Randomize (seeded)");
 		TestIsland r1 = island(42), r2 = island(42);

@@ -49,10 +49,10 @@ public class PropertyLayerChips extends Property<Void> {
 		if(buttonAdd == null) return;
 		int n = count.getAsInt(), c = chosen.getAsInt();
 		for(int i = 0;i < chips.length;++i) {
-			chips[i].setVisibility(visible && i < n);
+			chips[i].setVisibility(isDrawn() && i < n);
 			chips[i].setStyle(i + 1 == c ? IButton.STYLE_SEGMENT_ON : IButton.STYLE_OUTLINE);
 		}
-		buttonAdd.setVisibility(visible);
+		buttonAdd.setVisibility(isDrawn());
 		buttonAdd.setActive(n < ShapeLayers.COUNT);
 	}
 
@@ -66,7 +66,7 @@ public class PropertyLayerChips extends Property<Void> {
 	@Override
 	public void render(BaseScreen screen) {
 		refresh();
-		if(!visible) return;
+		if(!isDrawn()) return;
 		int n = count.getAsInt(), c = chosen.getAsInt();
 		for(int i = 0;i < n;++i) {
 			int cx = x + labelX + i * (chipWidth + chipGap);

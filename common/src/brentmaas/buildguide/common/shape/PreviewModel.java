@@ -45,8 +45,16 @@ public final class PreviewModel {
 	// Build focus (2026-10-22): the positions the world draws, parallel to positions, so the preview shows what the
 	// world shows (the Part and Layer buttons choose for both); null when the world draws every position
 	public final boolean[] focusMask;
+	// The Scan (2026-10-28): a colour (0xRRGGBB) per position, the real blocks' map colours, parallel to positions;
+	// null for a shape (status or layer colours). Kept by every with* copy
+	public final int[] rgb;
 
 	private PreviewModel(long[] positions, int[] bounds, byte[] status, long[] errors, long stateVersion, long generation, PreviewFilter filter, int sliceAxis, int sliceValue, ShapeLayers layers, ColourMode colourMode, boolean[] focusMask) {
+		this(positions, bounds, status, errors, stateVersion, generation, filter, sliceAxis, sliceValue, layers, colourMode, focusMask, null);
+	}
+
+	private PreviewModel(long[] positions, int[] bounds, byte[] status, long[] errors, long stateVersion, long generation, PreviewFilter filter, int sliceAxis, int sliceValue, ShapeLayers layers, ColourMode colourMode, boolean[] focusMask, int[] rgb) {
+		this.rgb = rgb;
 		this.positions = positions;
 		minX = bounds[0];
 		minY = bounds[1];
@@ -64,6 +72,11 @@ public final class PreviewModel {
 		this.layers = layers;
 		this.colourMode = layers == null ? ColourMode.STATUS : colourMode;
 		this.focusMask = focusMask;
+	}
+
+	// The Scan's model: scanned blocks with their own colours; generation tells the renderer a new scan is a new mesh
+	public static PreviewModel ofColoured(long[] positions, int[] rgb, long generation) {
+		return new PreviewModel(positions, bounds(positions), null, new long[0], -1, generation, PreviewFilter.ALL, SLICE_OFF, 0, null, ColourMode.STATUS, null, rgb);
 	}
 
 	public static PreviewModel of(Collection<Long> positions) {
@@ -127,12 +140,12 @@ public final class PreviewModel {
 
 	// The same with the colour mode (4C); LAYER without layers stays STATUS
 	public PreviewModel withView(PreviewFilter filter, int sliceAxis, int sliceValue, ColourMode colourMode) {
-		return new PreviewModel(positions, boundsArray(), status, errors, stateVersion, generation, filter, sliceAxis, sliceValue, layers, colourMode, focusMask);
+		return new PreviewModel(positions, boundsArray(), status, errors, stateVersion, generation, filter, sliceAxis, sliceValue, layers, colourMode, focusMask, rgb);
 	}
 
 	// The same with the build focus: mask parallel to positions (null: every position), shared, never changed
 	public PreviewModel withFocus(boolean[] mask) {
-		return new PreviewModel(positions, boundsArray(), status, errors, stateVersion, generation, filter, sliceAxis, sliceValue, layers, colourMode, mask);
+		return new PreviewModel(positions, boundsArray(), status, errors, stateVersion, generation, filter, sliceAxis, sliceValue, layers, colourMode, mask, rgb);
 	}
 
 	/**
@@ -222,6 +235,7 @@ public final class PreviewModel {
 
 	// Colour of position i: its layer's colour when coloured by layer; else its status when validated, white otherwise
 	public int colourAt(int i) {
+		if(rgb != null) return rgb[i];
 		if(colourMode == ColourMode.LAYER) return ShapeLayers.colour(layers.layerAt(LocalPos.unpackX(positions[i]), LocalPos.unpackY(positions[i]), LocalPos.unpackZ(positions[i])));
 		return PreviewColours.forStatus(status == null ? ValidationState.UNKNOWN : status[i]);
 	}

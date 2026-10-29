@@ -773,8 +773,20 @@ Stage 2d, the inspector and the Scan as the prototype (`ui-final`, 2026-10-28):
 - Scan: Scan shows the chosen area from the top (96 x 56 around you, Region from the typed corner to you);
   "Use the scan for": Relief, Farming land (opens it), Terraform (opens Terrain), Lighting with Slime chunk;
   a note at the foot says what each does. Reading the blocks in 3D and Relief / Lighting are the next stage.
-Still different from the prototype: Rotate 90 degrees is shown but does nothing (the generator cannot rotate);
-the Ctrl+Z note is left out (there is no general undo).
+Stage 2e, after Raphael's test of `ui-final` (`ui-done`, 2026-10-28):
+- The Island has only Base, Body and Spikes. The spike shape rows are part of Spikes; Randomize and Undo end Base.
+  Layers are out of the Island for now (the box hidden, an island saved with it loads with it off,
+  `ShapeIsland.layersInGame` for the tests); the percentages and the Naturalize buttons are out of the panel (saved).
+- The inspector scrolls (wheel over its rows, a slim bar) when a tab has more rows than fit; rows outside its area
+  are clipped (`Property.setClipped`).
+- Rotate 90 degrees works: quarter turns per instance (`ShapeSet.rotate`, saved as "rotation" with the world, not in
+  presets), applied to every block in `Shape.addShapeCube`; focus, colours and the farm's water turn the stored
+  position back (`isInFocusStored`, `storedWaterTest`). Known limit: a turned Terrain with Layers colours its
+  preview by the unturned layers.
+- Scan in the 3D preview: Scan reads the blocks of the mode's box that can be seen (`IShapeHandler.scanBlocks`, up to
+  150000, 192 x 192 x 128 at most) and shows them in their map colours (`PreviewModel.ofColoured`), turned and
+  zoomed like a shape. Its uses: Farming land and Terraform open their shapes; Relief and Lighting are notes.
+- Only the Ctrl+Z note of the prototype is left out (there is no general undo).
 Check in game: World shows the ground and the shape in blue; the tabs switch sections; At the crosshair block
 moves the origin; Nearest to you lights a block; the Config pills switch and stay after reopening.
 
