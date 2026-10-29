@@ -38,6 +38,10 @@ public class WorldView {
 			builtAt = now;
 		}
 		if(colours == null) return;
+		paint(screen, x1, y1, x2, y2);
+	}
+
+	private void paint(BaseScreen screen, int x1, int y1, int x2, int y2) {
 		int tile = Math.max(1, Math.min((x2 - x1) / columns, (y2 - y1) / rows));
 		int left = x1 + (x2 - x1 - columns * tile) / 2, top = y1 + (y2 - y1 - rows * tile) / 2;
 		for(int r = 0;r < rows;++r) {
@@ -53,6 +57,27 @@ public class WorldView {
 				if(footprint[r * columns + c]) screen.fillRect(left + c * tile, top + r * tile, left + (c + 1) * tile, top + (r + 1) * tile, Theme.FOOTPRINT);
 			}
 		}
+	}
+
+	// The Scan's view (2026-10-28): a given area of the loaded world from the top, no shape over it; read again
+	// every two seconds or when the area changes
+	public void drawArea(BaseScreen screen, int x1, int y1, int x2, int y2, int x0, int z0, int spanX, int spanZ) {
+		long now = System.currentTimeMillis();
+		Object key = x0 + "," + z0 + "," + spanX + "," + spanZ;
+		if(colours == null || !key.equals(builtShape) || now - builtAt > refreshMillis) {
+			readArea(x0, z0, spanX, spanZ, x2 - x1, y2 - y1);
+			footprint = new boolean[columns * rows];
+			builtShape = key;
+			builtAt = now;
+		}
+		if(colours != null) paint(screen, x1, y1, x2, y2);
+	}
+
+	private void readArea(int x0, int z0, int spanX, int spanZ, int width, int height) {
+		step = Math.max(1, Math.max((int) Math.ceil(spanX / (double) Math.min(width, maxSide)), (int) Math.ceil(spanZ / (double) Math.min(height, maxSide))));
+		columns = Math.max(1, spanX / step);
+		rows = Math.max(1, spanZ / step);
+		colours = BuildGuide.shapeHandler.topColours(x0, z0, columns, rows, step);
 	}
 
 	// The area: the shape's footprint and a margin of a quarter of its size (8 blocks at least) on each side
@@ -72,15 +97,8 @@ public class WorldView {
 		int margin = Math.max(8, Math.max(maxX - minX, maxZ - minZ) / 4);
 		int x0 = ox + minX - margin, z0 = oz + minZ - margin, spanX = maxX - minX + 1 + 2 * margin, spanZ = maxZ - minZ + 1 + 2 * margin;
 		// Every step-th column, so that the area fits the view at one pixel a square at least and maxSide a side
-		step = Math.max(1, Math.max((int) Math.ceil(spanX / (double) Math.min(width, maxSide)), (int) Math.ceil(spanZ / (double) Math.min(height, maxSide))));
-		columns = Math.max(1, spanX / step);
-		rows = Math.max(1, spanZ / step);
-		int[] full = BuildGuide.shapeHandler.topColours(x0, z0, columns, rows, step);
-		if(full == null) {
-			colours = null;
-			return;
-		}
-		colours = full;
+		readArea(x0, z0, spanX, spanZ, width, height);
+		if(colours == null) return;
 		footprint = new boolean[columns * rows];
 		for(long pos: shape.getExpectedBlocks()) {
 			int c = (ox + LocalPos.unpackX(pos) - x0) / step, r = (oz + LocalPos.unpackZ(pos) - z0) / step;

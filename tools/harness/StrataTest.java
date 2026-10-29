@@ -103,12 +103,12 @@ public class StrataTest {
 		System.out.println("-- the panel rows (LayerControls)");
 		ShapeIsland is = new ShapeIsland(){ @Override public void update(){} }; prop(is, "propertyLayers").value = true; prop(is, "propertySpikes").value = 6;
 		Object lc = field(is, "layerControls");
-		int capacity = (ShapeLayout.accordionHeight(ShapeLayout.minHeight) - (1 + is.getSectionCount()) * 11) / Property.rowHeight;
+		int capacity = brentmaas.buildguide.common.screen.ShapeScreen.inspectorCapacity(ShapeLayout.minHeight, is.getSectionCount());
 		int worstLayers = 0, worstSpikes = 0;
 		for(int count = 2; count <= 5; count++) for(int rest = 1; rest <= count; rest++) for(int edit = 1; edit <= count; edit++){
 			prop(lc, "count").value = count; prop(lc, "rest").value = rest; prop(lc, "edit").value = edit;
 			worstLayers = Math.max(worstLayers, is.countRows(4)); worstSpikes = Math.max(worstSpikes, is.countRows(3)); }
-		check(worstLayers <= capacity && worstLayers == 7 && worstSpikes <= capacity, "Island, every count, rest and edited layer: Layers " + worstLayers + " rows, Spike shape " + worstSpikes + ", capacity " + capacity + " at the minimum height");
+		check(worstLayers <= capacity && worstLayers == 9 && worstSpikes <= capacity, "Island, every count, rest and edited layer: Layers " + worstLayers + " rows, Spike shape " + worstSpikes + ", capacity " + capacity + " at the minimum height");
 		is.setOpenSection(4); prop(lc, "count").value = 5; prop(lc, "rest").value = 3; prop(lc, "edit").value = 2; is.onSelectedInGUI();
 		Property<?>[] thick = (Property<?>[]) field(lc, "thickness");
 		check(nameKey(thick[1]).equals("property.buildguide.layer.blocks"), "layer 2, above the rest: its thickness in blocks");
@@ -119,7 +119,7 @@ public class StrataTest {
 		prop(lc, "count").value = 2; call(lc, "onCountChanged");
 		check(prop(lc, "rest").value.equals(2) && prop(lc, "edit").value.equals(2), "count 2: the rest and the edited layer come down to 2");
 		ShapeTerrain te = new ShapeTerrain(); prop(te, "propertyLayers").value = true; Object tc = field(te, "layerControls");
-		int tcap = (ShapeLayout.accordionHeight(ShapeLayout.minHeight) - (1 + te.getSectionCount()) * 11) / Property.rowHeight, tworst = 0;
+		int tcap = brentmaas.buildguide.common.screen.ShapeScreen.inspectorCapacity(ShapeLayout.minHeight, te.getSectionCount()), tworst = 0;
 		for(int count = 2; count <= 5; count++) for(int rest = 1; rest <= count; rest++) for(int edit = 1; edit <= count; edit++){ prop(tc, "count").value = count; prop(tc, "rest").value = rest; prop(tc, "edit").value = edit; tworst = Math.max(tworst, te.countRows(2)); }
 		check(tworst <= tcap && field(tc, "spikeLayer") == null, "Terrain: Layers " + tworst + " rows (capacity " + tcap + "), no spike layer");
 		te.setOpenSection(2); prop(tc, "count").value = 4; prop(tc, "rest").value = 2; prop(tc, "edit").value = 1; te.onSelectedInGUI(); Property<?>[] tt = (Property<?>[]) field(tc, "thickness");

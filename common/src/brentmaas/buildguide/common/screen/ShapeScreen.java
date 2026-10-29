@@ -196,7 +196,7 @@ public class ShapeScreen extends BaseScreen{
 		switchX = new int[] {-1, -1};
 		int x = wrapper.getWidth() - AbstractWidgetHandler.defaultSize - 4;
 		Shape shape = currentShapeOrNull();
-		if(shape != null && shape.hasLayers() && !worldView) {
+		if(shape != null && shape.hasLayers() && !worldView && !scanView) {
 			x -= 2 * segmentWidth + 4;
 			boolean byLayer = preview.getColourMode() == ColourMode.LAYER;
 			addWidget(BuildGuide.widgetHandler.createButton(x + 2, 3, segmentWidth, 14, new Translatable("screen.buildguide.view.status"), () -> setColour(ColourMode.STATUS)).setStyle(byLayer ? IButton.STYLE_SEGMENT : IButton.STYLE_SEGMENT_ON));
@@ -205,8 +205,8 @@ public class ShapeScreen extends BaseScreen{
 			x -= 4;
 		}
 		x -= 2 * segmentWidth + 4;
-		addWidget(BuildGuide.widgetHandler.createButton(x + 2, 3, segmentWidth, 14, new Translatable("screen.buildguide.view.preview"), () -> setWorldView(false)).setStyle(worldView ? IButton.STYLE_SEGMENT : IButton.STYLE_SEGMENT_ON));
-		addWidget(BuildGuide.widgetHandler.createButton(x + 2 + segmentWidth, 3, segmentWidth, 14, new Translatable("screen.buildguide.view.world"), () -> setWorldView(true)).setStyle(worldView ? IButton.STYLE_SEGMENT_ON : IButton.STYLE_SEGMENT));
+		addWidget(BuildGuide.widgetHandler.createButton(x + 2, 3, segmentWidth, 14, new Translatable("screen.buildguide.view.preview"), () -> setWorldView(false)).setStyle(worldView || scanView ? IButton.STYLE_SEGMENT : IButton.STYLE_SEGMENT_ON));
+		addWidget(BuildGuide.widgetHandler.createButton(x + 2 + segmentWidth, 3, segmentWidth, 14, new Translatable("screen.buildguide.view.world"), () -> setWorldView(true)).setStyle(worldView && !scanView ? IButton.STYLE_SEGMENT_ON : IButton.STYLE_SEGMENT));
 		switchX[0] = x;
 	}
 
@@ -217,6 +217,7 @@ public class ShapeScreen extends BaseScreen{
 
 	private void setWorldView(boolean on) {
 		worldView = on;
+		scanView = false;
 		BuildGuide.screenHandler.showScreen(this);
 	}
 
@@ -254,7 +255,16 @@ public class ShapeScreen extends BaseScreen{
 	private static final int cardsY = top + 16, cardHeight = 28, placeHereY = top + 48, crosshairY = top + 66, rotateY = top + 84, nameLabelY = top + 105, nameY = top + 115, worldY = top + 134, instanceRows = 3;
 	private int savedY = 0, savedRowsEnd = 0;
 	// Scan: the five modes, then the mode's input, the Scan button and the shapes that use the ground
-	private static final int scanRowHeight = 22, scanRowsY = top + 16, scanInputY = top + 138, scanButtonY = top + 166, scanGroundY = top + 186;
+	private static final int scanRowHeight = 20, scanRowsY = top + 16, scanInputY = top + 123, scanButtonY = top + 149, scanGroundY = top + 168;
+	// The scan's uses (the prototype's): relief under a build, farming land on the real ground, terraform, lighting
+	private static final String[] scanUseKeys = {"relief", "farm", "terraform", "light"};
+	private static final int USE_FARM = 1, USE_TERRAFORM = 2, USE_LIGHT = 3;
+	// The scanned area {x0, z0, width, depth} once Scan was pressed, the chosen use, Slime chunk for lighting
+	private static int[] scanArea = null;
+	private static int scanUse = -1;
+	private static boolean slimeChunk = false;
+	private static boolean scanView = false;
+	private final WorldView scanMap = new WorldView();
 	// Validation rows
 	private static final int checkRowsY = top + 42, nearestY = top + 92, checkButtonsY = top + 148;
 
@@ -374,7 +384,7 @@ public class ShapeScreen extends BaseScreen{
 			// stage, so its button is not clickable yet. The shapes that use the real ground work now
 			for(int i = 0;i < scanModeKeys.length;++i) {
 				final int mode = i;
-				addWidget(BuildGuide.widgetHandler.createButton(x, scanRowsY + i * (scanRowHeight + 2), w, scanRowHeight, new Translatable("screen.buildguide.scan." + scanModeKeys[i]), () -> {
+				addWidget(BuildGuide.widgetHandler.createButton(x, scanRowsY + i * (scanRowHeight + 1), w, scanRowHeight, new Translatable("screen.buildguide.scan." + scanModeKeys[i]), () -> {
 					scanMode = mode;
 					BuildGuide.screenHandler.showScreen(this);
 				}).setStyle(i == scanMode ? IButton.STYLE_GHOST_SELECTED : IButton.STYLE_GHOST));
@@ -395,17 +405,23 @@ public class ShapeScreen extends BaseScreen{
 				addWidget(fy);
 				addWidget(fz);
 			}
-			IButton scan = BuildGuide.widgetHandler.createButton(x, scanButtonY, w, 16, new Translatable("screen.buildguide.scan.run"), () -> {}).setStyle(IButton.STYLE_PRIMARY);
-			scan.setActive(false);
-			addWidget(scan);
+			addWidget(BuildGuide.widgetHandler.createButton(x, scanButtonY, w, 16, new Translatable("screen.buildguide.scan.run"), () -> doScan()).setStyle(IButton.STYLE_PRIMARY));
+			// What to use the scan for, once there is one. Farming land and Terraform open their shapes (Farming
+			// land, Terrain), which work on the real ground now; Relief and Lighting are the next stage
 			int uy = scanGroundY + 11;
-			for(String key: scanShapes) {
-				int index = registryIndex(key);
-				if(index < 0) continue;
-				IButton b = BuildGuide.widgetHandler.createButton(x, uy, w, rowHeight - 1, new Translatable(key), () -> pickShape(index)).setStyle(index == current ? IButton.STYLE_GHOST_SELECTED : IButton.STYLE_GHOST);
-				b.setActive(available);
+			for(int i = 0;i < scanUseKeys.length;++i) {
+				final int use = i;
+				IButton b = BuildGuide.widgetHandler.createButton(x, uy, w, rowHeight - 1, new Translatable("screen.buildguide.scan.use." + scanUseKeys[i]), () -> pickUse(use)).setStyle(i == scanUse ? IButton.STYLE_GHOST_SELECTED : IButton.STYLE_GHOST);
+				b.setActive(scanArea != null);
 				addWidget(b);
 				uy += rowHeight;
+			}
+			if(scanUse == USE_LIGHT) {
+				String state = new Translatable(slimeChunk ? "screen.buildguide.config.on" : "screen.buildguide.config.off").toString();
+				addWidget(BuildGuide.widgetHandler.createButton(x, uy, w, rowHeight - 1, new Translatable(new Translatable("screen.buildguide.scan.slime").toString() + "\t" + state), () -> {
+					slimeChunk = !slimeChunk;
+					BuildGuide.screenHandler.showScreen(this);
+				}).setStyle(slimeChunk ? IButton.STYLE_TOGGLE_ON : IButton.STYLE_TOGGLE_OFF));
 			}
 			break;
 		}
@@ -608,12 +624,12 @@ public class ShapeScreen extends BaseScreen{
 		}
 		case SCAN: {
 			for(int i = 0;i < scanModeKeys.length;++i) {
-				int y = scanRowsY + i * (scanRowHeight + 2);
+				int y = scanRowsY + i * (scanRowHeight + 1);
 				drawTextLeft(fit(new Translatable("screen.buildguide.scan." + scanModeKeys[i] + ".hint").toString(), w - 12), x + 6, y + 12, Theme.TEXT_MUTED);
 			}
 			if(scanMode == SCAN_UNDER || scanMode == SCAN_ABOVE) drawTextLeft(new Translatable("screen.buildguide.scan.toy").toString(), x, scanInputY + 1, Theme.TEXT_MUTED);
 			else if(scanMode == SCAN_REGION) drawTextLeft(new Translatable("screen.buildguide.scan.box").toString(), x, scanInputY + 1, Theme.TEXT_MUTED);
-			sectionLabel("screen.buildguide.scan.usenow", scanGroundY + 2);
+			sectionLabel("screen.buildguide.scan.usefor", scanGroundY + 2);
 			break;
 		}
 		case CHECK: {
@@ -679,6 +695,50 @@ public class ShapeScreen extends BaseScreen{
 		nearestAt = 0;
 	}
 
+	// Scan: the area of the chosen mode (96 x 56 blocks around you; Region from the typed corner to you), shown
+	// from the top in the preview's place. Reading the blocks in 3D is the next stage
+	private void doScan() {
+		Origin player = BuildGuide.shapeHandler.getPlayerPosition();
+		int width = 96, depth = 56, x0 = player.x - width / 2, z0 = player.z - depth / 2;
+		if(scanMode == SCAN_REGION) {
+			try {
+				int cx = Integer.parseInt(scanX1.trim()), cz = Integer.parseInt(scanZ1.trim());
+				x0 = Math.min(cx, player.x);
+				z0 = Math.min(cz, player.z);
+				width = Math.abs(cx - player.x) + 1;
+				depth = Math.abs(cz - player.z) + 1;
+			}catch(NumberFormatException e) {
+				// no corner typed: the area around you
+			}
+		}
+		scanArea = new int[] {x0, z0, width, depth};
+		scanView = true;
+		worldView = false;
+		BuildGuide.screenHandler.showScreen(this);
+	}
+
+	// A use of the scan: Farming land and Terraform open their shape, keeping the Scan panel
+	private void pickUse(int use) {
+		scanUse = use;
+		String key = use == USE_FARM ? "shape.buildguide.farmingland" : use == USE_TERRAFORM ? "shape.buildguide.terrain" : null;
+		int index = key == null ? -1 : registryIndex(key);
+		if(index >= 0 && BuildGuide.stateManager.getState().isShapeAvailable() && index != BuildGuide.stateManager.getState().getCurrentShapeIndex()) {
+			BuildGuide.stateManager.getState().getCurrentShape().onDeselectedInGUI();
+			BuildGuide.stateManager.getState().setShape(index);
+		}
+		BuildGuide.screenHandler.showScreen(this);
+	}
+
+	// The scanned area from the top, what was scanned at the top, what the chosen use does at the foot
+	private void renderScanView(int x1, int x2) {
+		int y1 = previewTop + 1, y2 = bands.previewBottom - 1;
+		scanMap.drawArea(this, x1, y1, x2, y2, scanArea[0], scanArea[1], scanArea[2], scanArea[3]);
+		String mode = new Translatable("screen.buildguide.scan." + scanModeKeys[scanMode]).toString();
+		chip(new Translatable("screen.buildguide.scan.title", mode, "" + scanArea[2], "" + scanArea[3]).toString(), x1 + 4, y1 + 4, x2 - x1 - 8);
+		String note = scanUse < 0 ? "screen.buildguide.scan.note.choose" : "screen.buildguide.scan.note." + scanUseKeys[scanUse] + (scanUse == USE_LIGHT && slimeChunk ? ".slime" : "");
+		chip(new Translatable(note).toString(), x1 + 4, y2 - 16, x2 - x1 - 8);
+	}
+
 	// "At the crosshair block": the shape stands on the block the crosshair was on when the screen opened
 	private void setOriginAtCrosshair() {
 		int[] hit = BuildGuide.shapeHandler.crosshairBlock();
@@ -730,6 +790,10 @@ public class ShapeScreen extends BaseScreen{
 		int x1 = px1(), x2 = px2(), y1 = previewAreaTop(), y2 = previewAreaBottom();
 		Shape shape = currentShapeOrNull();
 		if(shape == null) return;
+		if(scanView && scanArea != null) {
+			renderScanView(x1, x2);
+			return;
+		}
 		if(worldView) {
 			renderWorldView(shape, x1, x2);
 			return;
@@ -812,7 +876,7 @@ public class ShapeScreen extends BaseScreen{
 	public static final int legendSwatch = 8, legendTextX = 11;
 
 	private void renderLegend() {
-		if(worldView) return;
+		if(worldView || scanView) return;
 		boolean byLayer = shownModel != null && shownModel.colourMode == ColourMode.LAYER;
 		int entries = byLayer ? shownModel.layers.count() : hasPalette() ? legendKeys.length + 1 : legendKeys.length;
 		int x = px1() + 3, end = px2() - 3, y = bands.legendY;
@@ -862,7 +926,7 @@ public class ShapeScreen extends BaseScreen{
 		buttonPreviewExpand = BuildGuide.widgetHandler.createButton(x2 - expandSize - 2, y, expandSize, expandSize, new Translatable("+"), () -> BuildGuide.screenHandler.showScreen(new PreviewScreen(this)));
 		buttonPreviewExpand.setActive(available);
 		buttonPreviewExpand.setStyle(IButton.STYLE_OUTLINE);
-		if(!worldView) addWidget(buttonPreviewExpand);
+		if(!worldView && !scanView) addWidget(buttonPreviewExpand);
 		// Fill at the status bar's right end
 		fillTitle = SmartFill.title();
 		buttonFill = BuildGuide.widgetHandler.createButton(x2 - fillWidth, bands.previewBottom + 2, fillWidth, controlsHeight, new Translatable(fillTitle), () -> {
@@ -873,7 +937,7 @@ public class ShapeScreen extends BaseScreen{
 		buttonFill.setActive(available);
 		buttonFill.setStyle(IButton.STYLE_PRIMARY);
 		addWidget(buttonFill);
-		if(compact() || worldView) return;
+		if(compact() || worldView || scanView) return;
 		// Row 1: slice axis, slice slider (the colour is the header's Status | Layers). Row 2: Part, Layer
 		int colourSpace = 0;
 		String axisName = axis == PreviewModel.SLICE_OFF ? new Translatable("screen.buildguide.slice.off").toString() : axisNames[axis];
@@ -982,13 +1046,26 @@ public class ShapeScreen extends BaseScreen{
 
 	public static final int tabHeight = 14;
 
+	private static int tabsPerRow(int sections) {
+		return sections <= 3 ? Math.max(1, sections) : (sections + 1) / 2;
+	}
+
 	private static int tabsPerRow(Shape shape) {
-		int n = shape.getSectionCount();
-		return n <= 3 ? Math.max(1, n) : (n + 1) / 2;
+		return tabsPerRow(shape.getSectionCount());
+	}
+
+	private static int tabRows(int sections) {
+		return (sections + tabsPerRow(sections) - 1) / tabsPerRow(sections);
 	}
 
 	private static int tabRows(Shape shape) {
-		return (shape.getSectionCount() + tabsPerRow(shape) - 1) / tabsPerRow(shape);
+		return tabRows(shape.getSectionCount());
+	}
+
+	// The rows the inspector holds under its tabs at a GUI height, for a shape with this many sections (the tests
+	// check every shape's largest section against it)
+	public static int inspectorCapacity(int height, int sections) {
+		return (ShapeLayout.accordionHeight(height) - tabRows(sections) * tabHeight - 4) / Property.rowHeight;
 	}
 
 	// Tab i's box {x1, y1, x2, y2}

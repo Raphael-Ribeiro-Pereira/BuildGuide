@@ -132,7 +132,7 @@ public class IslandSpikesShapeTest {
 		check(panel.getSectionCount() == 6 && panel.getSectionName(shape).getTranslationKey().equals("property.buildguide.section.spikeshape") && panel.getSectionName(shape + 1).getTranslationKey().equals("property.buildguide.section.layers") && panel.getSectionName(random).getTranslationKey().equals("property.buildguide.section.seed"), "sections: Base, Body, Spikes, Spike shape, Layers (4C), Random");
 		check(panel.countRows(shape) == 0, "Count 0: Spike shape has no rows (the accordion's sections are fixed, so the header stays)");
 		setProp(panel, "propertySpikes", 4); check(panel.countRows(shape) == 4, "with spikes: Dripstone, Taper, Edge falloff %, and Break since phase 3 (4 rows; Pieces and Gap only in Segmented)");
-		check(panel.countRows(random) == 7, "Random: 7 rows (Seed not shown, still saved)");
+		check(panel.countRows(random) == 8, "Random: 8 rows with Naturalise all (Seed not shown, still saved)");
 		System.out.println(fails == 0 ? "ALL OK" : fails + " FAILED");
 	}
 }

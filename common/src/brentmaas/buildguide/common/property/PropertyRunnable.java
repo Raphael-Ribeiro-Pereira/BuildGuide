@@ -6,6 +6,7 @@ import brentmaas.buildguide.common.BuildGuide;
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
 import brentmaas.buildguide.common.screen.BaseScreen;
 import brentmaas.buildguide.common.screen.widget.AbstractWidgetHandler;
+import brentmaas.buildguide.common.screen.widget.IButton;
 import brentmaas.buildguide.common.screen.widget.IWidget;
 
 public class PropertyRunnable extends Property<Runnable> {
@@ -24,9 +25,11 @@ public class PropertyRunnable extends Property<Runnable> {
 	}
 	
 	protected void initWidgets(ArrayList<IWidget> widgetList) {
-		widgetList.add(BuildGuide.widgetHandler.createButton(x + xOffset, y, width, rowHeight, name, () -> {
+		IButton button = BuildGuide.widgetHandler.createButton(x + xOffset, y, width, rowHeight - 1, name, () -> {
 			this.value.run();
-		}));
+		});
+		button.setStyle(IButton.STYLE_OUTLINE);
+		widgetList.add(button);
 	}
 	
 	@Override

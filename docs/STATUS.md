@@ -762,9 +762,19 @@ Stage 2c, the rest of the prototype's frame (`ui-full`, 2026-10-28):
   lights the block in the world.
 - Config is a side panel: Show in the world, Generate in background, Remember shapes, Random list colours as on /
   off pills, then All settings.
-Not yet from the prototype: the Layers tab's own editor (layer chips, the block card, thickness and spots bars,
-"Make this the rest", edge blend), the number rows with a bar under them and Randomize, the Spikes tab's
-Points | Filled switch, the scan result view and its uses.
+Stage 2d, the inspector and the Scan as the prototype (`ui-final`, 2026-10-28):
+- Layers tab: chips 1..n with each layer's colour and + (`PropertyLayerChips`), then the chosen layer's block,
+  thickness ("Blocks thick" / "% from bottom"), "Spots %", "Spot size", Make this the rest | Remove a layer,
+  Edge blend, Naturalise layers. Count, rest and the edited layer have no rows any more (saved as before).
+- Naturalise (Raphael's definition): Naturalise layers (thin top, a few blocks under it, blended edges, spots of
+  each lower layer, the blocks kept), and Naturalise all in the Island's Random tab (body, spikes and layers).
+- Every range number in the accent with a bar of where it sits in its range; labels flat; actions outlined;
+  enums of two or three choices as a segmented switch (the prototype's Points | Filled).
+- Scan: Scan shows the chosen area from the top (96 x 56 around you, Region from the typed corner to you);
+  "Use the scan for": Relief, Farming land (opens it), Terraform (opens Terrain), Lighting with Slime chunk;
+  a note at the foot says what each does. Reading the blocks in 3D and Relief / Lighting are the next stage.
+Still different from the prototype: Rotate 90 degrees is shown but does nothing (the generator cannot rotate);
+the Ctrl+Z note is left out (there is no general undo).
 Check in game: World shows the ground and the shape in blue; the tabs switch sections; At the crosshair block
 moves the origin; Nearest to you lights a block; the Config pills switch and stay after reopening.
 

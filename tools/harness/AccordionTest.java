@@ -28,8 +28,8 @@ public class AccordionTest {
 			for(Class<?> c: SHAPES) {
 				Shape s = (Shape) c.getDeclaredConstructor().newInstance();
 				maxPoints(s);
-				int headers = 1 + s.getSectionCount(); // Origin + the shape's sections
-				int capacity = (accordion - headers * HEADER) / Property.rowHeight;
+				// The Oficina's inspector (2026-10-28): tabs instead of headers
+				int capacity = brentmaas.buildguide.common.screen.ShapeScreen.inspectorCapacity(h, s.getSectionCount());
 				StringBuilder line = new StringBuilder(c.getSimpleName() + ": capacity " + capacity + " rows, sections");
 				int worst = ORIGIN_ROWS;
 				for(int i = 0;i < s.getSectionCount();++i) {
@@ -49,7 +49,7 @@ public class AccordionTest {
 				Field f = ShapeIsland.class.getDeclaredField("propertyOutline");
 				f.setAccessible(true);
 				((Property<Object>) f.get(s)).value = o;
-				int capacity = (accordion - (1 + s.getSectionCount()) * HEADER) / Property.rowHeight;
+				int capacity = brentmaas.buildguide.common.screen.ShapeScreen.inspectorCapacity(h, s.getSectionCount());
 				int worst = ORIGIN_ROWS;
 				for(int i = 0;i < s.getSectionCount();++i) worst = Math.max(worst, s.countRows(i));
 				check(worst <= capacity, "height " + h + ", Island " + o + ": capacity " + capacity + " rows, base=" + s.countRows(0) + " body=" + s.countRows(1) + " spikes=" + s.countRows(2) + " spikeshape=" + s.countRows(3) + " random=" + s.countRows(s.getSectionCount() - 1));
@@ -64,11 +64,11 @@ public class AccordionTest {
 				Field f = ShapeIsland.class.getDeclaredField("propertyLayers");
 				f.setAccessible(true);
 				((Property<Object>) f.get(s)).value = on;
-				int capacity = (accordion - (1 + s.getSectionCount()) * HEADER) / Property.rowHeight;
+				int capacity = brentmaas.buildguide.common.screen.ShapeScreen.inspectorCapacity(h, s.getSectionCount());
 				int worst = ORIGIN_ROWS;
 				for(int i = 0;i < s.getSectionCount();++i) worst = Math.max(worst, s.countRows(i));
 				int layers = s.countRows(4);
-				check(s.getSectionCount() == 6 && s.getSectionName(4).getTranslationKey().equals("property.buildguide.section.layers") && layers == (on ? 7 : 1) && worst <= capacity, "height " + h + ", Island with Layers " + (on ? "on" : "off") + ": Layers " + layers + " rows, 6 sections, capacity " + capacity);
+				check(s.getSectionCount() == 6 && s.getSectionName(4).getTranslationKey().equals("property.buildguide.section.layers") && layers == (on ? 9 : 1) && worst <= capacity, "height " + h + ", Island with Layers " + (on ? "on" : "off") + ": Layers " + layers + " rows, 6 sections, capacity " + capacity);
 			}
 		}
 		// Spikes section: 1 row (Count) with no spikes, 6 with some; every section must still fit
@@ -80,11 +80,11 @@ public class AccordionTest {
 				f.setAccessible(true);
 				((Property<Object>) f.get(s)).value = Math.abs(count);
 				if(count < 0) { Field m = ShapeIsland.class.getDeclaredField("propertySpikeMode"); m.setAccessible(true); ((Property<Object>) m.get(s)).value = IslandGeometry.SpikeMode.FILL; }
-				int capacity = (accordion - (1 + s.getSectionCount()) * HEADER) / Property.rowHeight;
+				int capacity = brentmaas.buildguide.common.screen.ShapeScreen.inspectorCapacity(h, s.getSectionCount());
 				int worst = ORIGIN_ROWS;
 				for(int i = 0;i < s.getSectionCount();++i) worst = Math.max(worst, s.countRows(i));
 				int shapeRows = s.countRows(3), randomRows = s.countRows(s.getSectionCount() - 1);
-				check(worst <= capacity && s.countRows(2) == (count == 0 ? 1 : count > 0 ? 6 : 7) && shapeRows == (count == 0 ? 0 : 4) && randomRows == 7, "height " + h + ", Island with " + Math.abs(count) + (count < 0 ? " spikes in Fill" : " spikes") + ": Spikes " + s.countRows(2) + " rows, Spike shape " + shapeRows + ", Random " + randomRows + ", capacity " + capacity);
+				check(worst <= capacity && s.countRows(2) == (count == 0 ? 1 : count > 0 ? 6 : 7) && shapeRows == (count == 0 ? 0 : 4) && randomRows == 8, "height " + h + ", Island with " + Math.abs(count) + (count < 0 ? " spikes in Fill" : " spikes") + ": Spikes " + s.countRows(2) + " rows, Spike shape " + shapeRows + ", Random " + randomRows + ", capacity " + capacity);
 			}
 		}
 		System.out.println(fails == 0 ? "ALL OK" : fails + " FAILED");

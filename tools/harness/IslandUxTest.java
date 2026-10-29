@@ -82,7 +82,7 @@ public class IslandUxTest {
 		ShapeIsland v = new TestIsland(); updates = 0;
 		int[] expectBase = {4, 5, 6, 7}; // Outline, widths, rotation (+ Corner round, + Sides, + Wobble and its size)
 		for(Outline o: Outline.values()){ setProp(v, "propertyOutline", o); check(v.countRows(0) == expectBase[o.ordinal()], o + ": Base shows " + v.countRows(0) + " rows (Body " + v.countRows(1) + ", Random " + v.countRows(v.getSectionCount() - 1) + ")"); }
-		check(v.countRows(v.getSectionCount() - 1) == 7, "Random rows: Base %, Body %, Spikes %, Randomize, Naturalize, Natural spikes, Undo (Seed is saved but not shown since spikes 2: 7 rows fit at 270)");
+		check(v.countRows(v.getSectionCount() - 1) == 8, "Random rows: Base %, Body %, Spikes %, Randomize, Naturalise all, Naturalize, Natural spikes, Undo (Seed is saved but not shown)");
 
 		System.out.println("-- Randomize (seeded)");
 		TestIsland r1 = island(42), r2 = island(42);

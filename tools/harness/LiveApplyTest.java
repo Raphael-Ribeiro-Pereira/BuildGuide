@@ -69,7 +69,7 @@ public class LiveApplyTest {
 		rf.type("42"); run(1800, rf);
 		check(range.value == 7 && presses[0] == 1 && rf.colour == 0xFF0000, "out of range (42 > 10): not applied, field red");
 		rf.type("7"); run(2400, rf);
-		check(presses[0] == 2 && range.value == 7 && rf.colour == 0xFFFFFF, "typing 7 again after a red value: applied (the field turns white again)");
+		check(presses[0] == 2 && range.value == 7 && rf.colour == brentmaas.buildguide.common.screen.Theme.rgb(brentmaas.buildguide.common.screen.Theme.ACCENT), "typing 7 again after a red value: applied (the field turns back to the accent)");
 		rf.type("8"); rf.focusLost();
 		check(range.value == 8 && presses[0] == 3, "focus lost: applied at once (8)");
 		rf.type("9"); rf.enter(); run(4000, rf);

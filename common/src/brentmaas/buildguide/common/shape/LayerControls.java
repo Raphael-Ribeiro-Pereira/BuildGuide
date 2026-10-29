@@ -7,22 +7,28 @@ import brentmaas.buildguide.common.property.Property;
 import brentmaas.buildguide.common.property.PropertyBlockId;
 import brentmaas.buildguide.common.property.PropertyBoolean;
 import brentmaas.buildguide.common.property.PropertyCompactRangeInt;
+import brentmaas.buildguide.common.property.PropertyLayerChips;
 import brentmaas.buildguide.common.property.PropertyRangeInt;
 import brentmaas.buildguide.common.property.PropertyRowLabel;
+import brentmaas.buildguide.common.property.PropertyRunnable;
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
 import brentmaas.buildguide.common.screen.BaseScreen;
 
 /**
- * The layer rows (2026-10-27) the Island and the Terrain share, in their Layers section (7 rows at most, what
- * the accordion fits at the minimum height):
+ * The layer rows the Island and the Terrain share, in their Layers tab, as the Oficina prototype has them
+ * (2026-10-28; 9 rows, what the tabs leave at the minimum height):
  *
  *   Layers [x]
- *   Layers, rest    [count] [rest]
- *   Mix             - blocks +
- *   Layer [colour]  - n +            (which layer the next three rows edit; not saved)
+ *   [1] [2] [3] [4] [+]              (the layers in use, the chosen one lit; + adds one; not saved)
  *   Block n         [id] Hand
- *   Blocks / % ...  - thickness +    ("Fills the rest" for the rest layer)
- *   Patches %, size [patches] [size]
+ *   Blocks thick / % from ...  - n + ("Fills the rest" for the rest layer)
+ *   Spots %         [patches]
+ *   Spot size       [size]
+ *   [Make this the rest] [Remove a layer]
+ *   Edge blend      - blocks +
+ *   [Naturalise layers]
+ *
+ * The count and the rest are saved values without rows of their own: the chips, + and the two buttons set them.
  *
  * plus, for the Island, "Spike layer" in its Spike shape section. The Layers box and blocks 1 to 4 are the
  * shape's own (saved where they always were); the rest is saved after the shape's last value, in the order of
@@ -40,6 +46,11 @@ final class LayerControls {
 	private final PropertyRowLabel countLabel = new PropertyRowLabel(new Translatable("property.buildguide.layercount"));
 	private final PropertyRowLabel restLabel = new PropertyRowLabel(new Translatable("property.buildguide.layer.rest"));
 	private final PropertyRowLabel patchesLabel = new PropertyRowLabel(new Translatable("property.buildguide.patches"));
+	private final PropertyRowLabel sizeLabel = new PropertyRowLabel(new Translatable("property.buildguide.patchsize"));
+	private final PropertyLayerChips chips = new PropertyLayerChips(() -> countValue(), () -> edited(), layer -> pickLayer(layer), () -> addLayer());
+	private final PropertyRunnable makeRest = new PropertyRunnable(() -> makeRest(), new Translatable("property.buildguide.layer.makerest"), 0, Property.rowWidth / 2 - 1);
+	private final PropertyRunnable removeLayer = new PropertyRunnable(() -> removeLayer(), new Translatable("property.buildguide.layer.remove"), Property.rowWidth / 2 + 1, Property.rowWidth / 2 - 1);
+	private final PropertyRunnable naturalise = new PropertyRunnable(() -> naturalise(new java.util.Random()), new Translatable("property.buildguide.layer.naturalise"));
 
 	/**
 	 * @param blocks1to4 the shape's blocks of layers 1 to 4 (block 5 is made here)
@@ -93,8 +104,13 @@ final class LayerControls {
 		shape.addGuiOnly(countLabel);
 		shape.addGuiOnly(restLabel);
 		shape.addGuiOnly(patchesLabel);
+		shape.addGuiOnly(sizeLabel);
 		shape.addGuiOnly(edit);
-		shape.assignSection(section, enabled, countLabel, count, rest, mix, edit, restLabel, patchesLabel);
+		shape.addGuiOnly(chips);
+		shape.addGuiOnly(makeRest);
+		shape.addGuiOnly(removeLayer);
+		shape.addGuiOnly(naturalise);
+		shape.assignSection(section, enabled, countLabel, count, rest, mix, edit, chips, restLabel, patchesLabel, sizeLabel, makeRest, removeLayer, naturalise);
 		shape.assignSection(section, blocks);
 		shape.assignSection(section, thickness);
 		shape.assignSection(section, patches);
@@ -116,13 +132,10 @@ final class LayerControls {
 		else shape.hideRow(enabled);
 		boolean on = enabled.value && shape.isShown(countLabel);
 		int e = edited();
-		if(on) {
-			row = shape.placeRow(row, countLabel, count, rest);
-			row = shape.placeRow(row, mix);
-			row = shape.placeRow(row, edit);
-		}else {
-			shape.hideRow(countLabel, count, rest, mix, edit);
-		}
+		// The count, the rest and the edited layer are set by the chips and the buttons
+		shape.hideRow(countLabel, count, rest, edit);
+		if(on) row = shape.placeRow(row, chips);
+		else shape.hideRow(chips);
 		for(int i = 0;i < ShapeLayers.COUNT;++i) {
 			if(on && i == e - 1) row = shape.placeRow(row, blocks[i]);
 			else shape.hideRow(blocks[i]);
@@ -138,8 +151,15 @@ final class LayerControls {
 		}
 		if(on && restEdited) row = shape.placeRow(row, restLabel);
 		else shape.hideRow(restLabel);
-		if(on) row = shape.placeRow(row, patchesLabel, patches[e - 1], size[e - 1]);
-		else shape.hideRow(patchesLabel);
+		if(on) {
+			row = shape.placeRow(row, patchesLabel, patches[e - 1]);
+			row = shape.placeRow(row, sizeLabel, size[e - 1]);
+			row = shape.placeRow(row, makeRest, removeLayer);
+			row = shape.placeRow(row, mix);
+			row = shape.placeRow(row, naturalise);
+		}else {
+			shape.hideRow(patchesLabel, sizeLabel, makeRest, removeLayer, mix, naturalise);
+		}
 		for(int i = 0;i < ShapeLayers.COUNT;++i) {
 			if(!on || i != e - 1) shape.hideRow(patches[i], size[i]);
 		}
@@ -174,6 +194,51 @@ final class LayerControls {
 	private void onRestChanged() {
 		if(rest.value > countValue()) rest.setValue(countValue());
 		shape.onSelectedInGUI(); // the thickness row's unit
+		shape.update();
+	}
+
+	// A chip: that layer is the one the rows below edit
+	private void pickLayer(int layer) {
+		edit.setValue(layer);
+		onEditChanged();
+	}
+
+	// + : one more layer (at the bottom), chosen at once
+	private void addLayer() {
+		if(countValue() >= ShapeLayers.COUNT) return;
+		count.setValue(countValue() + 1);
+		edit.setValue(countValue());
+		onCountChanged();
+	}
+
+	// Remove a layer: the last one goes (its values stay saved for when it comes back)
+	private void removeLayer() {
+		if(countValue() <= ShapeLayers.minCount) return;
+		count.setValue(countValue() - 1);
+		onCountChanged();
+	}
+
+	// The chosen layer becomes the one that fills what the others leave
+	private void makeRest() {
+		rest.setValue(edited());
+		onRestChanged();
+	}
+
+	/**
+	 * Naturalise (Raphael's definition, 2026-10-28): the chosen blocks laid out the way chunk generation does it,
+	 * with controlled randomness, so the layers look like part of the world. A thin top, a few blocks under it,
+	 * the edges blended, and spots of each lower layer reaching into the one above; the blocks stay as chosen.
+	 */
+	void naturalise(java.util.Random random) {
+		int c = countValue(), r = Math.min(c, rest.value);
+		mix.setValue(1 + random.nextInt(3));
+		for(int i = 0;i < c;++i) {
+			int maxSpots = Math.min(20, ShapeLayers.maxPatches) / ShapeLayers.patchStep;
+			patches[i].setValue(i == 0 ? 0 : ShapeLayers.patchStep * random.nextInt(maxSpots + 1));
+			size[i].setValue(Math.max(ShapeLayers.minSize, Math.min(ShapeLayers.maxSize, 2 + random.nextInt(4))));
+			if(axis == ShapeLayers.Axis.DEPTH && i < r - 1) thickness[i].setValue(i == 0 ? 1 : 2 + random.nextInt(3));
+		}
+		shape.onSelectedInGUI();
 		shape.update();
 	}
 

@@ -28,7 +28,7 @@ public class PaletteGuiTest {
 		ShapeIsland s = new ShapeIsland(); Field lf = ShapeIsland.class.getDeclaredField("propertyLayers"); lf.setAccessible(true);
 		check(s.countRows(4) == 1, "Layers off: only the box (1 row)");
 		((Property<Object>) lf.get(s)).value = true;
-		check(s.countRows(4) == 7, "Layers on (2026-10-27): the box, count and rest, mix, the edited layer, its block, thickness, patches (7 rows; 7 fit at 270)");
+		check(s.countRows(4) == 9, "Layers on (2026-10-28, the Oficina's layer editor): the box, the chips, block, thickness, spots, spot size, rest / remove, edge blend, naturalise (9 rows)");
 		check(PropertyCompactRangeInt.columnX(2) + PropertyCompactRangeInt.columnWidth == Property.rowWidth && PropertyCompactRangeInt.buttonWidth * 2 + PropertyCompactRangeInt.textFieldWidth == PropertyCompactRangeInt.columnWidth, "compact columns (- 10, field 26, + 10): the second and third end exactly at the row's 184 px");
 		for(String k: new String[]{"layercount", "patches"}){ String t = lang(json, "property.buildguide." + k); check(w(t) <= PropertyCompactRangeInt.columnX(1) - 4, "\"" + t + "\": " + w(t) + " px before its first column (x " + PropertyCompactRangeInt.columnX(1) + ")"); }
 		check(w(lang(json, "property.buildguide.editlayer")) <= 50 - 4, "\"" + lang(json, "property.buildguide.editlayer") + "\" before the layer's colour (x 50)");

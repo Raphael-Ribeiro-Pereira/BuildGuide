@@ -101,8 +101,8 @@ public class TerrainLayersTest {
 		ShapeIsland is = new ShapeIsland(); String isave = is.toPersistence(); ShapeIsland is2 = new ShapeIsland(); is2.restorePersistence(isave);
 		check(is.properties.size() == 64 && !is2.error && is2.toPersistence().equals(isave), "an Island loads as before (64 values)");
 		for(int h: new int[]{brentmaas.buildguide.common.screen.ShapeLayout.minHeight, 360}){ ShapeTerrain lay = new ShapeTerrain(); prop(lay, "propertyLayers").value = true; int worst = 0; for(int sec = 0; sec < lay.getSectionCount(); sec++) worst = Math.max(worst, lay.countRows(sec));
-			int capacity = (brentmaas.buildguide.common.screen.ShapeLayout.accordionHeight(h) - (1 + lay.getSectionCount()) * 11) / Property.rowHeight;
-			check(lay.countRows(2) == 7 && worst <= capacity, "height " + h + ", Layers on: the Layers section has the Island's 7 rows (box, count and rest, mix, layer, block, thickness, patches), largest section " + worst + ", capacity " + capacity); }
+			int capacity = brentmaas.buildguide.common.screen.ShapeScreen.inspectorCapacity(h, lay.getSectionCount());
+			check(lay.countRows(2) == 9 && worst <= capacity, "height " + h + ", Layers on: the Layers tab has the Island's 9 rows (box, chips, block, thickness, spots, spot size, rest / remove, edge blend, naturalise), largest section " + worst + ", capacity " + capacity); }
 
 		System.out.println("-- the preview");
 		PreviewModel m = PreviewModel.of(t.getExpectedBlocks(), t.getGeneration(), t.getLayers()).withView(PreviewFilter.ALL, PreviewModel.SLICE_OFF, 0, ColourMode.LAYER);

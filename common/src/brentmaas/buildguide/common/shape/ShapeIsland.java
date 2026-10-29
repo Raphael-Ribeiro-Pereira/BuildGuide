@@ -71,6 +71,8 @@ public class ShapeIsland extends Shape {
 	private PropertyRangeInt propertyBodyPercent = new PropertyRangeInt(15, new Translatable("property.buildguide.bodypercent"), null, 0, 100, percentStep);
 	private PropertyRunnable propertyNaturalize = new PropertyRunnable(() -> naturalize(), new Translatable("property.buildguide.naturalize"));
 	private PropertyRunnable propertyUndo = new PropertyRunnable(() -> undo(), new Translatable("property.buildguide.undo"));
+	// Naturalise everything at once (2026-10-28): the body, the spikes and, with Layers on, the layers. Panel only
+	private PropertyRunnable propertyNaturaliseAll = new PropertyRunnable(() -> naturaliseAll(), new Translatable("property.buildguide.naturaliseall"));
 	// Spikes (block B), after the 19 above: cones under the body. Count 0 = none (the body exactly as without)
 	private PropertyRangeInt propertySpikes = new PropertyRangeInt(0, new Translatable("property.buildguide.spikes"), () -> onSpikesChanged(), 0, IslandGeometry.maxSpikes);
 	private PropertyEnum<SpikeMode> propertySpikeMode = new PropertyEnum<SpikeMode>(SpikeMode.RANDOM, new Translatable("property.buildguide.spikemode"), () -> onSpikesChanged(), spikeModeNames);
@@ -124,7 +126,7 @@ public class ShapeIsland extends Shape {
 	// Panel order per section (persistence order is the `properties` list)
 	private Property<?>[] baseRows = {propertyOutline, propertyWidthX, propertyWidthZ, propertySides, propertyRoundness, propertyRotation, propertyEdgeAmplitude, propertyEdgeScale};
 	private Control[] baseControls = {null, Control.WIDTH_X, Control.WIDTH_Z, Control.SIDES, Control.CORNER_ROUND, Control.ROTATION, Control.WOBBLE, Control.WOBBLE_SIZE};
-	private Property<?>[] otherRows = {propertyWall, propertyDepth, propertyProfile, propertySharpness, propertyRoughness, propertyBasePercent, propertyBodyPercent, propertySpikesPercent, propertyRandomize, propertyNaturalize, propertyNaturalizeSpikes, propertyUndo, propertySeed};
+	private Property<?>[] otherRows = {propertyWall, propertyDepth, propertyProfile, propertySharpness, propertyRoughness, propertyBasePercent, propertyBodyPercent, propertySpikesPercent, propertyRandomize, propertyNaturaliseAll, propertyNaturalize, propertyNaturalizeSpikes, propertyUndo, propertySeed};
 	// Spike shape section: shown only with spikes
 	private Property<?>[] spikeShapeRows = {propertyDripstone, propertyTaper, propertyFalloff, propertyBreak, propertyPieces, propertyGap};
 	// Spikes section: Count alone while it is 0, then the five others
@@ -201,7 +203,8 @@ public class ShapeIsland extends Shape {
 		assignSection(sectionSpikes, spikeRows);
 		assignSection(sectionSpikeShape, spikeShapeRows);
 		layerControls.assign(sectionLayers, sectionSpikeShape);
-		assignSection(sectionRandom, propertyBasePercent, propertyBodyPercent, propertySpikesPercent, propertyRandomize, propertyNaturalize, propertyNaturalizeSpikes, propertyUndo, propertySeed);
+		addGuiOnly(propertyNaturaliseAll);
+		assignSection(sectionRandom, propertyBasePercent, propertyBodyPercent, propertySpikesPercent, propertyRandomize, propertyNaturaliseAll, propertyNaturalize, propertyNaturalizeSpikes, propertyUndo, propertySeed);
 		// Random has 8 rows with Seed; at the minimum GUI height (270) the sections leave room for 7 (six of
 		// them since Layers, with 11-px headers), so the Seed row is not shown (still saved, still in presets,
 		// still drawn by Randomize and New seed)
@@ -405,6 +408,15 @@ public class ShapeIsland extends Shape {
 		IslandControls.Values before = values();
 		IslandControls.Values next = IslandControls.naturalizeSpikes(before);
 		undoValues = before;
+		apply(next);
+	}
+
+	// Body and spikes in one step (Undo goes back over both), then the layers
+	void naturaliseAll() {
+		IslandControls.Values before = values();
+		IslandControls.Values next = IslandControls.naturalizeSpikes(IslandControls.naturalize(before, random));
+		undoValues = before;
+		if(propertyLayers.value) layerControls.naturalise(random);
 		apply(next);
 	}
 

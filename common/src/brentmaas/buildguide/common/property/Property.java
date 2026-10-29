@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
 import brentmaas.buildguide.common.screen.BaseScreen;
 import brentmaas.buildguide.common.screen.ShapeScreen;
+import brentmaas.buildguide.common.screen.Theme;
 import brentmaas.buildguide.common.screen.widget.IWidget;
 
 public abstract class Property<T> {
@@ -82,11 +83,12 @@ public abstract class Property<T> {
 		drawString(screen, name.toString(), x + labelX, y + 5, 0xFFFFFF);
 	}
 	
+	// Flat text in the Oficina's colours (2026-10-28): labels soft white, values in the accent
 	public void drawString(BaseScreen screen, String text, int x, int y, int colour) {
-		if(visible) screen.drawShadowLeft(text, x, y, 0xFFFFFF);
+		if(visible) screen.drawTextLeft(text, x, y, Theme.TEXT_SOFT);
 	}
 	
 	public void drawStringCentred(BaseScreen screen, String text, int x, int y, int colour) {
-		if(visible) screen.drawShadowCentred(text, x, y, 0xFFFFFF);
+		if(visible) screen.drawTextCentred(text, x, y, Theme.ACCENT);
 	}
 }

@@ -137,7 +137,7 @@ public class TerrainTest {
 		for(int h: new int[]{ShapeLayout.minHeight, 360}){
 			int acc = ShapeLayout.accordionHeight(h); int worst = 0;
 			for(Outline o: Outline.values()){ ShapeTerrain s = new ShapeTerrain(); prop(s, "propertyOutline").value = o; for(int sec = 0; sec < s.getSectionCount(); sec++) worst = Math.max(worst, s.countRows(sec)); }
-			int capacity = (acc - (1 + new ShapeTerrain().getSectionCount()) * 11) / Property.rowHeight;
+			int capacity = brentmaas.buildguide.common.screen.ShapeScreen.inspectorCapacity(h, new ShapeTerrain().getSectionCount());
 			check(worst <= capacity, "height " + h + ": sections Base, Relief, Layers, Random; the largest open section (every Outline) " + worst + " rows, capacity " + capacity + "; Seed is a visible row");
 		}
 		ShapeTerrain sec = new ShapeTerrain();

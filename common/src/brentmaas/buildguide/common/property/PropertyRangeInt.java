@@ -4,6 +4,8 @@ import java.util.ArrayList;
 
 import brentmaas.buildguide.common.BuildGuide;
 import brentmaas.buildguide.common.screen.AbstractScreenHandler.Translatable;
+import brentmaas.buildguide.common.screen.BaseScreen;
+import brentmaas.buildguide.common.screen.Theme;
 import brentmaas.buildguide.common.screen.widget.AbstractWidgetHandler;
 import brentmaas.buildguide.common.screen.widget.IButton;
 import brentmaas.buildguide.common.screen.widget.IWidget;
@@ -37,7 +39,7 @@ public class PropertyRangeInt extends PropertyInt {
 		widgetList.add(buttonDecrease);
 		valueTextField = BuildGuide.widgetHandler.createTextField(x + fieldX, y, fieldWidth, rowHeight, "");
 		valueTextField.setTextValue("" + value);
-		valueTextField.setTextColour(0xFFFFFF);
+		valueTextField.setTextColour(Theme.rgb(Theme.ACCENT));
 		widgetList.add(valueTextField);
 		// Enter in the field applies the value (no Set button since GUI redesign E4)
 		valueTextField.setOnEnter(() -> {
@@ -68,9 +70,20 @@ public class PropertyRangeInt extends PropertyInt {
 	// Sync text field and button states with the value
 	private void refresh() {
 		valueTextField.setTextValue("" + value);
-		valueTextField.setTextColour(0xFFFFFF);
+		valueTextField.setTextColour(Theme.rgb(Theme.ACCENT));
 		buttonDecrease.setActive(value > minValue);
 		buttonIncrease.setActive(value < maxValue);
+	}
+	
+	// Where the value sits in its range, as a thin accent bar along the field's foot
+	@Override
+	public void render(BaseScreen screen) {
+		super.render(screen);
+		if(!visible || maxValue <= minValue) return;
+		int left = x + fieldX + 2, width = fieldWidth - 4;
+		int filled = (int) Math.round(width * (value - minValue) / (double) (maxValue - minValue));
+		screen.fillRect(left, y + rowHeight - 3, left + width, y + rowHeight - 2, Theme.CONTROL);
+		if(filled > 0) screen.fillRect(left, y + rowHeight - 3, left + filled, y + rowHeight - 2, Theme.ACCENT_DIM);
 	}
 	
 	@Override
