@@ -49,6 +49,7 @@ public class ShapeScreen extends BaseScreen{
 	public static int propertiesX = basePropertiesX;
 	// Side panels; NONE = closed
 	public static final int NONE = -1, SHAPES = 0, PLACEMENT = 1, SCAN = 2, CHECK = 3, CONFIG = 4;
+	public static boolean scanEnabled = false;
 	private static final String[] railKeys = {"screen.buildguide.rail.shapes", "screen.buildguide.rail.placement", "screen.buildguide.rail.scan", "screen.buildguide.rail.check", "screen.buildguide.rail.config"};
 	public static final String[] panelTitleKeys = {"screen.buildguide.panel.title.shapes", "screen.buildguide.panel.title.placement", "screen.buildguide.panel.title.scan", "screen.buildguide.panel.title.check", "screen.buildguide.panel.title.config"};
 	private static final int railButtonHeight = 24, railGap = 4;
@@ -406,7 +407,13 @@ public class ShapeScreen extends BaseScreen{
 				addWidget(fy);
 				addWidget(fz);
 			}
-			addWidget(BuildGuide.widgetHandler.createButton(x, scanButtonY, w, 16, new Translatable("screen.buildguide.scan.run"), () -> doScan()).setStyle(IButton.STYLE_PRIMARY));
+			// Scan is off until it is fixed (2026-10-28: it broke the world preview and stayed on screen, cut)
+			IButton scan = BuildGuide.widgetHandler.createButton(x, scanButtonY, w, 16, new Translatable("screen.buildguide.scan.run"), () -> {
+				if(scanEnabled) doScan();
+			});
+			scan.setStyle(IButton.STYLE_PRIMARY);
+			scan.setActive(scanEnabled);
+			addWidget(scan);
 			// What to use the scan for, once there is one. Farming land and Terraform open their shapes (Farming
 			// land, Terrain), which work on the real ground now; Relief and Lighting are the next stage
 			int uy = scanGroundY + 11;
