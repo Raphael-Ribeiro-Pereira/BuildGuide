@@ -376,3 +376,22 @@ Raphael's order. Each step gets its own investigation and approval, and nothing 
   - The tokens (colours, spacing) in one class in `common`, so 1.21.11 and 26.3 look the same.
   - A smoother font (a TTF font provider in the resource pack) is a possible second step, after the widgets.
   - This comes before the other stage 2 items, since every later screen is built on it.
+
+### Decisions of 2026-10-28 (after the `ui-pages` test)
+
+- **Goal: the left column exactly as the prototype.** Done in stage 2b (`ui-proto`): a rail without boxes (the
+  open section lit), one scrolled column of shapes in groups with a search field, the Placement cards, the Scan
+  mode cards and the Validation summary. Still missing from the prototype: "At the crosshair block", "Rotate
+  90 degrees", the "Nearest to you" list in Validation, the saved projects as cards with Open, the BG mark at the
+  top of the rail, the Preview / See in the world toggle in the header.
+- **Terrain and Farming land leave the shape list:** they work on the real ground, so they belong to the Scan.
+  Until the Scan exists its panel offers them ("On the real ground, now").
+- **Projects is renamed Placement** (rail "Place").
+- **Language:** both English and Portuguese (`pt_br.json`), English first. A missing Portuguese key falls back to
+  English, so `pt_br.json` grows with each stage.
+- **Naturalise (Raphael's definition):** the chosen blocks are laid out the way chunk generation does it, with
+  controlled randomness, so the result looks like part of the world. One Naturalise button in every part of the
+  process (layers, spikes, body, ...) and one general button for the whole shape. To design: which noise and
+  which controls (a seed, a strength), and how each part maps it.
+- **Check -> Errors and blocks and Exclusions are not intuitive:** redesign both from the user's task (find what
+  is wrong and go fix it; leave something out of the check), not from the old layout.

@@ -27,6 +27,11 @@ public interface IScreenWrapper {
 	public void addSelectorList(ISelectorList selectorList);
 	
 	public void drawShadow(String text, int x, int y, int colour);
+
+	// Text without the Minecraft drop shadow (the flat look); default: with it
+	public default void drawText(String text, int x, int y, int colour) {
+		drawShadow(text, x, y, colour);
+	}
 	
 	// Filled rectangle from (x1, y1) inclusive to (x2, y2) exclusive, ARGB colour
 	public void fillRect(int x1, int y1, int x2, int y2, int colour);

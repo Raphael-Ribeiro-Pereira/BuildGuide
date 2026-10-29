@@ -43,7 +43,7 @@ public class FlatCheckbox extends AbstractButton {
 			for(int i = 0;i < 4;++i) graphics.fill(x + 4 + i, y + 8 + i, x + 6 + i, y + 10 + i, tick);
 			for(int i = 0;i < 6;++i) graphics.fill(x + 7 + i, y + 10 - i, x + 9 + i, y + 12 - i, tick);
 		}
-		if(!getMessage().getString().isEmpty()) graphics.text(Minecraft.getInstance().font, getMessage(), x + boxSize + 4, y + (boxSize - 8) / 2, active ? Theme.TEXT : Theme.TEXT_FAINT);
+		if(!getMessage().getString().isEmpty()) graphics.text(Minecraft.getInstance().font, getMessage(), x + boxSize + 4, y + (boxSize - 7) / 2, active ? Theme.TEXT : Theme.TEXT_FAINT, false);
 	}
 	
 	@Override

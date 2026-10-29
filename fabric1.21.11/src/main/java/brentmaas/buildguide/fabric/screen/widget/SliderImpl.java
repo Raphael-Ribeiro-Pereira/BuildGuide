@@ -43,7 +43,8 @@ public class SliderImpl extends AbstractSliderButton implements ISlider {
 		int handleX = getX() + (int) (value * (getWidth() - 4));
 		if(handleX > getX() + 1) graphics.fill(getX() + 1, getY() + 1, handleX, getY() + getHeight() - 1, active ? Theme.SELECTED : Theme.CONTROL_DISABLED);
 		graphics.fill(handleX, getY() + 1, handleX + 4, getY() + getHeight() - 1, active ? (hovered ? Theme.ACCENT : Theme.ACCENT_DIM) : Theme.BORDER);
-		graphics.drawCenteredString(Minecraft.getInstance().font, getMessage(), getX() + getWidth() / 2, getY() + (getHeight() - 8) / 2, active ? Theme.TEXT : Theme.TEXT_FAINT);
+		String label = FlatStyle.fit(Minecraft.getInstance().font, getMessage().getString(), getWidth() - 6);
+		graphics.drawString(Minecraft.getInstance().font, label, getX() + (getWidth() - Minecraft.getInstance().font.width(label) + 1) / 2, getY() + (getHeight() - 7) / 2, active ? Theme.TEXT : Theme.TEXT_FAINT, false);
 	}
 	
 	protected void applyValue() {

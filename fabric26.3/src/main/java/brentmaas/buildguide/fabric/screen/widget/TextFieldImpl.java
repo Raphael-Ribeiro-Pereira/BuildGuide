@@ -27,6 +27,7 @@ public class TextFieldImpl extends EditBox implements ITextField {
 		super(Minecraft.getInstance().font, x + padX, y + (height - 8) / 2, width - 2 * padX, height - 2 * ((height - 8) / 2), Component.literal(value));
 		padY = (height - 8) / 2;
 		setBordered(false);
+		setTextShadow(false);
 		setResponder(text -> {
 			if(!settingByCode) debounce.onUserEdit(text);
 		});
@@ -69,6 +70,11 @@ public class TextFieldImpl extends EditBox implements ITextField {
 		int border = isFocused() ? Theme.ACCENT_DIM : isMouseOver(mouseX, mouseY) ? Theme.BORDER_HOVER : Theme.BORDER;
 		FlatStyle.box(graphics, getX() - padX, getY() - padY, getWidth() + 2 * padX, getHeight() + 2 * padY, Theme.FIELD, border);
 		super.extractWidgetRenderState(graphics, mouseX, mouseY, partialTicks);
+	}
+
+	@Override
+	public void setHint(String hint) {
+		setHint(Component.literal(hint).withColor(Theme.TEXT_FAINT & 0xFFFFFF));
 	}
 
 	public String getTextValue() {

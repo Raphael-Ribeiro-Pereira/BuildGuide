@@ -21,6 +21,11 @@ public class Theme {
 	public static final int TEXT_SOFT = 0xFFC9CED6;
 	public static final int TEXT_MUTED = 0xFF9AA1AD;
 	public static final int TEXT_FAINT = 0xFF6F7784;
+	public static final int SELECTED_HOVER = 0xFF2A3442;
+	public static final int ACCENT_HOVER = 0xFFB3DCFF;
+	public static final int ON_ACCENT = 0xFF0C0D10;
+	public static final int WARN = 0xFFFF8C1A;
+	public static final int ERROR = 0xFFFF5A5A;
 	
 	// RGB only, for the draw calls that take a colour without alpha
 	public static int rgb(int argb) {

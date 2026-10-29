@@ -11,10 +11,10 @@ import brentmaas.buildguide.common.shape.ShapeRegistry;
 import brentmaas.buildguide.common.shape.ShapeSet.Origin;
 
 public class ShapelistScreen extends BaseScreen {
-	// A page of the Oficina's projects section (its page bar)
+	// A page of the Oficina's placement section (its page bar)
 	@Override
 	protected int section() {
-		return ShapeScreen.PROJECTS;
+		return ShapeScreen.PLACEMENT;
 	}
 
 	private Translatable titleNewShape = new Translatable("screen.buildguide.newshape");

@@ -14,4 +14,7 @@ public interface ITextField extends IWidget {
 	// The field's value was applied by another way than its own Enter (a point row committing its three
 	// fields at once): live apply (FieldDebounce) must not apply this text again. Default no-op
 	public default void markApplied() {}
+
+	// Grey text shown while the field is empty ("Search shape...")
+	public default void setHint(String hint) {}
 }

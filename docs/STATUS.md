@@ -734,6 +734,17 @@ the header text, the bottom progress bar, the Fill and Preview panels, Visualisa
 Check in game: from Check open Visualization, switch to Exclusions with its tab, "< Workshop" comes back with
 Check open; the same from Projects (Shape list, Presets) and Config; the lists scroll and select.
 
+Stage 2b, the left column as the prototype (`ui-proto`, 2026-10-28): button styles of the prototype
+(`IButton.setStyle`: ghost rows, rail, soft, primary, outline), rounded boxes, text without the Minecraft shadow.
+The rail has no boxes and lights the open section. Shapes: a search field, then one scrolled column in groups
+(Solids, Flat, Lines and curves, Nature, Builds) with a slim scrollbar; Terrain and Farming land moved to the Scan
+panel. Placement (was Projects): X / Y / Z cards with - and +, At my position, the name, up to four instances of
+this world and All instances, Save this project and Open a saved one. Scan: the five mode cards (next stage) and
+the ground shapes. Validation: the percentage, a bar, Built / Missing / Wrong layer / Errors, Validate now while
+not validated, Errors and blocks and Exclusions. Portuguese texts in `pt_br.json`.
+Check in game: the wheel scrolls the shape list, the search filters it, picking a shape closes it; the origin
+cards change the origin; the instance rows switch instance; the Scan panel picks Terrain and Farming land.
+
 ## 2. Final jars
 
 Build output: `fabric1.21.11/build/libs/BuildGuide-Fabric-0.4.8.jar` (mod version is still 0.4.8).

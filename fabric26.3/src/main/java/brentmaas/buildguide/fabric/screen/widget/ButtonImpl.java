@@ -20,16 +20,22 @@ public class ButtonImpl extends Button.Plain implements IButton {
 		setMessage(Component.translatable(title.getTranslationKey(), title.getValues()));
 	}
 	
+	private int style = IButton.STYLE_PLAIN;
+	
+	@Override
+	public IButton setStyle(int style) {
+		this.style = style;
+		return this;
+	}
+	
 	public ButtonImpl(int x, int y, int width, int height, Translatable text, IButton.IPressable onPress) {
 		super(x, y, width, height, Component.translatable(text.getTranslationKey(), text.getValues()), button -> onPress.onPress(), DEFAULT_NARRATION);
 	}
 	
-	// Flat look (Theme) instead of the stone sprite; the label as vanilla draws it
+	// Flat look (Theme, the prototype's styles) instead of the stone sprite; the label without a shadow
 	@Override
 	protected void extractContents(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTicks) {
-		boolean hovered = active && isHoveredOrFocused();
-		FlatStyle.box(graphics, getX(), getY(), getWidth(), getHeight(), FlatStyle.buttonFill(active, hovered), FlatStyle.buttonBorder(active, hovered));
-		extractDefaultLabel(graphics.textRendererForWidget(this, GuiGraphicsExtractor.HoveredTextEffects.NONE));
+		FlatStyle.button(graphics, style, getX(), getY(), getWidth(), getHeight(), getMessage().getString(), active, active && isHoveredOrFocused());
 	}
 	
 	public void setYPosition(int y) {

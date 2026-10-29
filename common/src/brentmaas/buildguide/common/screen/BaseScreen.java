@@ -40,7 +40,7 @@ public abstract class BaseScreen {
 	// the right. Sections are the Oficina's rail: Projects, Check and Config have pages; overlays have none
 	public static final int pageBarTop = 20, pageBarHeight = 20, backWidth = 72, pageTabWidth = 96;
 	public static final int SECTION_CONFIG = 4;
-	private static final String[] sectionKeys = {"screen.buildguide.rail.shapes", "screen.buildguide.rail.projects", "screen.buildguide.rail.scan", "screen.buildguide.rail.check", "screen.buildguide.rail.config"};
+	private static final String[] sectionKeys = {"screen.buildguide.panel.title.shapes", "screen.buildguide.panel.title.placement", "screen.buildguide.panel.title.scan", "screen.buildguide.panel.title.check", "screen.buildguide.configuration"};
 	private int currentPageTab = -1;
 	
 	public void init() {
@@ -137,7 +137,7 @@ public abstract class BaseScreen {
 		return true;
 	}
 
-	// The Oficina section this screen belongs to (ShapeScreen.PROJECTS, CHECK or SECTION_CONFIG); NONE for the
+	// The Oficina section this screen belongs to (ShapeScreen.PLACEMENT, CHECK or SECTION_CONFIG); NONE for the
 	// overlays (fill, preview, presets, dropdowns), whose back button acts as Escape
 	protected int section() {
 		return ShapeScreen.NONE;
@@ -148,7 +148,7 @@ public abstract class BaseScreen {
 		String[] keys;
 		Runnable[] actions;
 		switch(section()) {
-		case ShapeScreen.PROJECTS:
+		case ShapeScreen.PLACEMENT:
 			keys = new String[] {"screen.buildguide.shapelist", "screen.buildguide.page.presets"};
 			actions = new Runnable[] {() -> openPage(ActiveScreen.Shapelist), () -> BuildGuide.screenHandler.showScreen(new PresetScreen(this))};
 			break;
@@ -189,7 +189,7 @@ public abstract class BaseScreen {
 	private void backToOficina() {
 		int s = section();
 		if(s == ShapeScreen.NONE && onEscape()) return;
-		BuildGuide.stateManager.getState().sidePanel = s == ShapeScreen.PROJECTS || s == ShapeScreen.CHECK ? s : ShapeScreen.NONE;
+		BuildGuide.stateManager.getState().sidePanel = s == ShapeScreen.PLACEMENT || s == ShapeScreen.CHECK ? s : ShapeScreen.NONE;
 		openPage(ActiveScreen.Shape);
 	}
 
@@ -282,6 +282,26 @@ public abstract class BaseScreen {
 	
 	public void fillRect(int x1, int y1, int x2, int y2, int colour) {
 		if(wrapper != null) wrapper.fillRect(x1, y1, x2, y2, colour);
+	}
+
+	// The prototype's rounded boxes: a fill with its four corner pixels left out
+	public void fillRound(int x1, int y1, int x2, int y2, int colour) {
+		fillRect(x1 + 1, y1, x2 - 1, y2, colour);
+		fillRect(x1, y1 + 1, x1 + 1, y2 - 1, colour);
+		fillRect(x2 - 1, y1 + 1, x2, y2 - 1, colour);
+	}
+
+	// Flat text (no drop shadow); colours are ARGB
+	public void drawTextLeft(String text, int x, int y, int colour) {
+		if(wrapper != null) wrapper.drawText(text, x, y, colour);
+	}
+
+	public void drawTextRight(String text, int x, int y, int colour) {
+		if(wrapper != null) wrapper.drawText(text, x - wrapper.getTextWidth(text), y, colour);
+	}
+
+	public void drawTextCentred(String text, int x, int y, int colour) {
+		if(wrapper != null) wrapper.drawText(text, x - wrapper.getTextWidth(text) / 2, y, colour);
 	}
 	
 	protected void addProperty(Property<?> p) {
